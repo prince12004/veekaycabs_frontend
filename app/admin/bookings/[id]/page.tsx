@@ -1,39 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { bookingsApi } from "@/lib/api";
 import {
   ArrowLeft, Phone, FileText, Car, User, Calendar, IndianRupee,
-  Video, Upload, CheckCircle, XCircle, AlertTriangle, Clock,
-  MapPin, MessageSquare, RefreshCw, Camera, ChevronDown, ChevronUp,
-  Printer, Shield, Fuel, Gauge, Send, X as XIcon, FileCheck,
+  Video, Upload, CheckCircle, XCircle, Clock,
+  MessageSquare, RefreshCw, Camera, ChevronDown, ChevronUp,
+  Printer, Shield, Fuel, Gauge, Send, X as XIcon, FileCheck, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const BOOKING_DETAIL = {
-  id: "DL_MarutiSuzukiBaleno__1506",
-  customer: { name: "Vivek kumar", mobile: "9507246588", email: "vivek@email.com", kyc: "verified" },
-  car: { name: "Maruti Suzuki Baleno", regNo: "DL7CX6144", type: "Hatchback", fuel: "Petrol", seats: 5, image: "" },
-  city: "Delhi",
-  start: "2026-06-15T12:00",
-  end: "2026-06-16T12:00",
-  bookingType: "Online",
-  addedBy: "Akki",
-  payment: { total: 8208, received: 8208, mode: "Online", status: "Success" },
-  securityDeposit: 10000,
-  homeDelivery: 0,
-  remark: "Customer requested early morning pickup",
-  status: "confirmed",
-  carReceived: false,
-  carReturned: false,
-  carConditionPickup: { fuel: "Full", odometer: "48200", challan: false, damage: "", extras: "" },
-  carConditionReturn: { fuel: "", odometer: "", challan: false, damage: "", extras: "" },
-  pickupVideos: [] as string[],
-  returnVideos: [] as string[],
-  refundStatus: null as string | null,
-};
 
 const CAR_DOCUMENTS = [
   { key: "rc", label: "RC (Registration Certificate)", available: true },
@@ -42,27 +20,152 @@ const CAR_DOCUMENTS = [
   { key: "fitness", label: "Fitness Certificate", available: false },
 ] as const;
 
-const TIMELINE = [
-  { time: "15 Jun 2026, 09:00", event: "Booking Created", by: "Online", color: "#10B981" },
-  { time: "15 Jun 2026, 09:01", event: "Payment Received", by: "Razorpay", color: "#10B981" },
-  { time: "15 Jun 2026, 11:30", event: "Car Dispatched for Pickup", by: "Akki", color: "#3B82F6" },
-  { time: "15 Jun 2026, 12:05", event: "Car Handed Over to Customer", by: "Pending", color: "#F59E0B" },
-];
+const fmtDT = (d: string) =>
+  new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+
+const fmtMode = (m: string) =>
+  m === "online" ? "Online" : m === "offline_cash" ? "Offline Cash" : m === "offline_qr" ? "UPI/QR" : m;
 
 export default function BookingDetailPage() {
   const params = useParams();
-  const [booking, setBooking] = useState(BOOKING_DETAIL);
+  const id = String(params.id);
+
+  // All hooks must be declared before any early returns
+  const [rawBooking, setRawBooking] = useState<Record<string, any> | null>(null);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "vehicle" | "documents" | "payment" | "timeline">("overview");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [carReceived, setCarReceived] = useState(false);
+  const [carReturned, setCarReturned] = useState(false);
   const [pickupVideos, setPickupVideos] = useState<File[]>([]);
   const [returnVideos, setReturnVideos] = useState<File[]>([]);
   const [pickupVideosSaved, setPickupVideosSaved] = useState(false);
   const [returnVideosSaved, setReturnVideosSaved] = useState(false);
   const [showPickupChecklist, setShowPickupChecklist] = useState(false);
   const [showReturnChecklist, setShowReturnChecklist] = useState(false);
-  const [pickupCondition, setPickupCondition] = useState({ fuel: "Full", odometer: "48200", challan: false, damage: "", extras: "", tyres: "Good", ac: true, documents: true });
+  const [pickupCondition, setPickupCondition] = useState({ fuel: "", odometer: "", challan: false, damage: "", extras: "", tyres: "Good", ac: true, documents: true });
   const [returnCondition, setReturnCondition] = useState({ fuel: "", odometer: "", challan: false, damage: "", extras: "", tyres: "", ac: true, documents: true });
   const [refundInitiated, setRefundInitiated] = useState(false);
   const [sentDocs, setSentDocs] = useState<string[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", amountPaid: "", paymentMode: "online", notes: "" });
+  const [editLoading, setEditLoading] = useState(false);
+
+  useEffect(() => {
+    bookingsApi.getById(id)
+      .then(({ data }) => {
+        const b = data.data;
+        setRawBooking(b);
+        setCarReceived(b?.odometerStart != null);
+        setCarReturned(b?.odometerEnd != null);
+        if (b?.odometerStart) setPickupCondition(p => ({ ...p, odometer: String(b.odometerStart) }));
+      })
+      .catch(() => setRawBooking(null))
+      .finally(() => setLoadingPage(false));
+  }, [id]);
+
+  const handleStatusChange = async (status: string) => {
+    if (!rawBooking) return;
+    setUpdatingStatus(true);
+    try {
+      const { data } = await bookingsApi.updateStatus(rawBooking._id, { status });
+      setRawBooking(data.data);
+      toast.success(`Status updated to ${status}`);
+    } catch {
+      toast.error("Failed to update status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const openEditModal = () => {
+    if (!rawBooking) return;
+    const toLocal = (iso: string) => {
+      const d = new Date(iso);
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 16);
+    };
+    setEditForm({
+      startTime:   toLocal(rawBooking.startTime),
+      endTime:     toLocal(rawBooking.endTime),
+      totalAmount: String(rawBooking.totalAmount || ""),
+      amountPaid:  String(rawBooking.amountPaid  || ""),
+      paymentMode: rawBooking.paymentMode || "online",
+      notes:       rawBooking.challanDetails || "",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!rawBooking) return;
+    setEditLoading(true);
+    try {
+      const { data } = await bookingsApi.update(rawBooking._id, {
+        startTime:   editForm.startTime  ? new Date(editForm.startTime).toISOString()  : undefined,
+        endTime:     editForm.endTime    ? new Date(editForm.endTime).toISOString()    : undefined,
+        totalAmount: editForm.totalAmount ? Number(editForm.totalAmount) : undefined,
+        amountPaid:  editForm.amountPaid  ? Number(editForm.amountPaid)  : undefined,
+        paymentMode: editForm.paymentMode,
+        notes:       editForm.notes,
+      });
+      setRawBooking(data.data);
+      setShowEditModal(false);
+      toast.success("Booking updated successfully");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to update booking");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  if (loadingPage) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] gap-3 text-[#9090A8]">
+        <Loader2 size={24} className="animate-spin" /> Loading booking...
+      </div>
+    );
+  }
+
+  if (!rawBooking) {
+    return (
+      <div className="p-8 text-center text-[#9090A8]">
+        <p className="font-bold text-lg">Booking not found</p>
+        <Link href="/admin/bookings" className="text-[#E8540A] text-sm font-semibold mt-2 inline-block">← Back to Bookings</Link>
+      </div>
+    );
+  }
+
+  // Map API fields to display (after hooks, after early returns)
+  const booking = {
+    id: rawBooking.bookingId || rawBooking._id,
+    customer: {
+      name: rawBooking.userId?.name || "—",
+      mobile: rawBooking.userId?.mobile || "—",
+      email: rawBooking.userId?.email || "—",
+      kyc: rawBooking.userId?.kycStatus || "pending",
+    },
+    car: {
+      name: rawBooking.carId?.name || "—",
+      regNo: rawBooking.carId?.registrationNo || "—",
+      type: rawBooking.carId?.type || "—",
+      fuel: rawBooking.carId?.fuel || "—",
+    },
+    city: rawBooking.cityId?.name || rawBooking.pickupLocation || "—",
+    start: rawBooking.startTime,
+    end: rawBooking.endTime,
+    bookingType: rawBooking.isOffline ? "Offline" : "Online",
+    addedBy: rawBooking.isOffline ? "Offline Entry" : "Customer",
+    payment: {
+      total: rawBooking.totalAmount || 0,
+      received: rawBooking.amountPaid || 0,
+      mode: fmtMode(rawBooking.paymentMode || "online"),
+      status: rawBooking.razorpayPaymentId ? "Success" : rawBooking.amountPaid > 0 ? "Partial" : "Pending",
+    },
+    securityDeposit: rawBooking.securityDeposit || 0,
+    homeDelivery: rawBooking.doorstepCharge || 0,
+    remark: rawBooking.challanDetails || "",
+    status: rawBooking.status,
+  };
 
   const sendDocument = (key: string, label: string) => {
     setSentDocs((d) => (d.includes(key) ? d : [...d, key]));
@@ -102,6 +205,7 @@ export default function BookingDetailPage() {
   ] as const;
 
   return (
+    <>
     <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -122,7 +226,10 @@ export default function BookingDetailPage() {
           <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm">
             <Printer size={14} /> Print
           </button>
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 transition-colors">
+          <button
+            onClick={openEditModal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors"
+          >
             <FileText size={14} /> Edit Booking
           </button>
         </div>
@@ -144,9 +251,18 @@ export default function BookingDetailPage() {
             <p className="text-white/70 text-xs">Duration</p>
             <p className="font-bold">{nights} day{nights !== 1 ? "s" : ""}</p>
           </div>
-          <div className="bg-white/15 rounded-xl px-4 py-2">
-            <p className="text-white/70 text-xs">Status</p>
-            <p className="font-bold capitalize">{booking.status}</p>
+          <div className="bg-white/15 rounded-xl px-3 py-2">
+            <p className="text-white/70 text-xs mb-1">Status</p>
+            <select
+              value={booking.status}
+              onChange={e => handleStatusChange(e.target.value)}
+              disabled={updatingStatus}
+              className="bg-white/20 text-white font-bold text-sm rounded-lg px-2 py-0.5 border border-white/30 outline-none cursor-pointer capitalize disabled:opacity-60"
+            >
+              {["pending","confirmed","active","completed","cancelled"].map(s => (
+                <option key={s} value={s} className="text-[#0F0F1A] bg-white capitalize">{s}</option>
+              ))}
+            </select>
           </div>
           <div className="bg-white/15 rounded-xl px-4 py-2">
             <p className="text-white/70 text-xs">Type</p>
@@ -227,8 +343,8 @@ export default function BookingDetailPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={cn("text-xs font-bold px-3 py-1 rounded-full", booking.carReceived ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEF3C7] text-[#92400E]")}>
-                  {booking.carReceived ? "Completed" : "Pending"}
+                <span className={cn("text-xs font-bold px-3 py-1 rounded-full", carReceived ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEF3C7] text-[#92400E]")}>
+                  {carReceived ? "Completed" : "Pending"}
                 </span>
                 {showPickupChecklist ? <ChevronUp size={18} className="text-[#9090A8]" /> : <ChevronDown size={18} className="text-[#9090A8]" />}
               </div>
@@ -323,7 +439,7 @@ export default function BookingDetailPage() {
                     </button>
                   )}
                 </div>
-                <button onClick={() => setBooking(b => ({ ...b, carReceived: true }))}
+                <button onClick={() => { setCarReceived(true); toast.success("Car marked as handed over"); }}
                   className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm">
                   <CheckCircle size={16} /> Mark Car Handed Over
                 </button>
@@ -345,8 +461,8 @@ export default function BookingDetailPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={cn("text-xs font-bold px-3 py-1 rounded-full", booking.carReturned ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#F1F2F7] text-[#9090A8]")}>
-                  {booking.carReturned ? "Completed" : "Not Returned Yet"}
+                <span className={cn("text-xs font-bold px-3 py-1 rounded-full", carReturned ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#F1F2F7] text-[#9090A8]")}>
+                  {carReturned ? "Completed" : "Not Returned Yet"}
                 </span>
                 {showReturnChecklist ? <ChevronUp size={18} className="text-[#9090A8]" /> : <ChevronDown size={18} className="text-[#9090A8]" />}
               </div>
@@ -423,11 +539,11 @@ export default function BookingDetailPage() {
                   )}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => setBooking(b => ({ ...b, carReturned: true }))}
+                  <button onClick={() => { setCarReturned(true); toast.success("Car marked as returned"); }}
                     className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm">
                     <CheckCircle size={16} /> Mark Car Returned
                   </button>
-                  {booking.carReturned && !refundInitiated && (
+                  {carReturned && !refundInitiated && (
                     <button onClick={() => setRefundInitiated(true)}
                       className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#EDE9FE] text-[#7C3AED] font-bold text-sm hover:bg-[#7C3AED] hover:text-white transition-colors">
                       <RefreshCw size={16} /> Initiate Deposit Refund
@@ -562,20 +678,27 @@ export default function BookingDetailPage() {
           <div className="relative pl-6">
             <div className="absolute left-2 top-0 bottom-0 w-px bg-[#E4E5EF]" />
             <div className="space-y-6">
-              {TIMELINE.map((item, i) => (
+              {[
+                { time: rawBooking.createdAt, event: "Booking Created", by: booking.bookingType, color: "#10B981" },
+                ...(rawBooking.amountPaid > 0 ? [{ time: rawBooking.updatedAt, event: `Payment Received — Rs. ${rawBooking.amountPaid?.toLocaleString("en-IN")}`, by: fmtMode(rawBooking.paymentMode), color: "#10B981" }] : []),
+                ...(rawBooking.status === "confirmed" ? [{ time: rawBooking.updatedAt, event: "Booking Confirmed", by: "Admin", color: "#3B82F6" }] : []),
+                ...(rawBooking.status === "active" ? [{ time: rawBooking.updatedAt, event: "Car Handed Over — Trip Active", by: "Admin", color: "#F59E0B" }] : []),
+                ...(rawBooking.status === "completed" ? [{ time: rawBooking.updatedAt, event: "Trip Completed — Car Returned", by: "Admin", color: "#9090A8" }] : []),
+                ...(rawBooking.status === "cancelled" ? [{ time: rawBooking.cancelledAt || rawBooking.updatedAt, event: "Booking Cancelled", by: "System", color: "#EF4444" }] : []),
+              ].map((item, i) => (
                 <div key={i} className="relative flex gap-4">
                   <div className="absolute -left-4 w-3 h-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: item.color }} />
                   <div>
                     <p className="font-semibold text-sm text-[#0F0F1A]">{item.event}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Clock size={11} className="text-[#9090A8]" />
-                      <p className="text-xs text-[#9090A8]">{item.time}</p>
+                      <p className="text-xs text-[#9090A8]">{fmtDT(item.time)}</p>
                       <span className="text-xs text-[#4A4A6A] font-medium">by {item.by}</span>
                     </div>
                   </div>
                 </div>
               ))}
-              {!booking.carReceived && (
+              {!carReceived && (
                 <div className="relative flex gap-4">
                   <div className="absolute -left-4 w-3 h-3 rounded-full border-2 border-[#E4E5EF] bg-white" />
                   <div>
@@ -589,5 +712,110 @@ export default function BookingDetailPage() {
         </div>
       )}
     </div>
+
+      {/* ── Edit Booking Modal ── */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl my-4">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Edit Booking</h3>
+                <p className="text-[#9090A8] text-xs mt-0.5">#{rawBooking?.bookingId || rawBooking?._id?.slice(-8)}</p>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="text-[#9090A8] hover:text-[#0F0F1A] transition-colors">
+                <XIcon size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Pickup Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.startTime}
+                    onChange={e => setEditForm(f => ({ ...f, startTime: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Return Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.endTime}
+                    onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Total Amount (Rs.)</label>
+                  <input
+                    type="number"
+                    value={editForm.totalAmount}
+                    onChange={e => setEditForm(f => ({ ...f, totalAmount: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Amount Paid (Rs.)</label>
+                  <input
+                    type="number"
+                    value={editForm.amountPaid}
+                    onChange={e => setEditForm(f => ({ ...f, amountPaid: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Mode</label>
+                <select
+                  value={editForm.paymentMode}
+                  onChange={e => setEditForm(f => ({ ...f, paymentMode: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none bg-white"
+                >
+                  <option value="online">Online / Razorpay</option>
+                  <option value="offline_cash">Cash</option>
+                  <option value="offline_qr">UPI / QR</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Remarks / Notes</label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                  rows={3}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
+                  placeholder="Internal notes or challan details..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={editLoading}
+                className="flex-1 py-2.5 rounded-xl btn-gradient text-white font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {editLoading && <Loader2 size={14} className="animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

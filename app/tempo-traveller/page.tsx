@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { MapPin, Search, Users, Star, ArrowRight, Phone, ChevronDown, ChevronUp, ArrowLeftRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, Phone, ChevronDown, ChevronUp, ArrowLeftRight } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import DateTimePicker, { DateTimePickerHandle } from "@/components/ui/DateTimePicker";
 import { LocationAutocomplete } from "@/components/ui/LocationAutocomplete";
 import { addHoursToSlot, getEarliestPickup } from "@/lib/utils";
-import api from "@/lib/api";
 
 interface Tempo {
   _id: string;
@@ -95,16 +94,13 @@ const STATS = [
 ];
 
 export default function TempoTravellerPage() {
+  const router = useRouter();
   const [tripType, setTripType] = useState<"round_trip" | "local">("round_trip");
   const [pickupLocation, setPickupLocation] = useState("");
   const [dropLocation, setDropLocation] = useState("");
   const [startDT, setStartDT] = useState("");
   const [endDT, setEndDT] = useState("");
   const [searchError, setSearchError] = useState("");
-
-  const [tempos, setTempos] = useState<Tempo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
 
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [galleryIdx, setGalleryIdx] = useState(0);
@@ -143,32 +139,18 @@ export default function TempoTravellerPage() {
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     if (!startDT) { setSearchError("Please select pickup date & time"); return; }
     if (tripType === "round_trip" && !endDT) { setSearchError("Please select return date & time"); return; }
     setSearchError("");
-    setLoading(true);
-    setSearched(true);
-    try {
-      const { data } = await api.get("/api/tempo/available");
-      setTempos(data.data || []);
-    } catch {
-      setTempos([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const buildBookUrl = (tempo: Tempo) => {
-    const days = calcDays();
     const params = new URLSearchParams({
       city: pickupLocation || "Delhi",
       tripType,
       start: startDT,
       end: endDT,
-      days: String(days),
+      days: String(calcDays()),
     });
-    return `/tempo-traveller/${tempo.slug}?${params}`;
+    router.push(`/tempo-traveller/listing?${params}`);
   };
 
   return (
@@ -287,89 +269,6 @@ export default function TempoTravellerPage() {
           </div>
         </div>
       </section>
-
-      {/* ── RESULTS ── */}
-      {searched && (
-        <section className="py-12 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {loading ? (
-              <div className="flex flex-col items-center py-20">
-                <div className="w-12 h-12 border-4 border-[#E8540A] border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-gray-500 text-sm">Finding available tempos...</p>
-              </div>
-            ) : tempos.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-6xl mb-4">🚐</div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">No tempos available</h3>
-                <p className="text-gray-500 mb-6">Contact us directly for bookings</p>
-                <a href="tel:+919999926867" className="inline-flex items-center gap-2 px-6 py-3 bg-[#E8540A] text-white rounded-full font-semibold text-sm">
-                  <Phone size={16} /> Call Now
-                </a>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-black text-gray-900">
-                    {tempos.length} Tempo{tempos.length > 1 ? "s" : ""} Available
-                  </h2>
-                  <p className="text-gray-500 text-sm">{calcDays()} day{calcDays() > 1 ? "s" : ""} · {tripType === "round_trip" ? "Round Trip" : "Local"}</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {tempos.map(tempo => (
-                    <div key={tempo._id} className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-                      <div className="relative h-48 bg-gray-100 overflow-hidden">
-                        {tempo.images?.[0] ? (
-                          <img src={tempo.images[0]} alt={tempo.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-6xl opacity-20">🚐</div>
-                        )}
-                        {tempo.showOnTop && (
-                          <div className="absolute top-3 left-3 bg-[#E8540A] text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                            <Star size={11} fill="white" /> Featured
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-5">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-bold text-gray-900 text-lg group-hover:text-[#E8540A] transition-colors">{tempo.name}</h3>
-                            <div className="flex items-center gap-3 text-gray-400 text-xs mt-0.5">
-                              <span className="flex items-center gap-1"><Users size={11} />{tempo.seats} Seats</span>
-                              <span>{tempo.fuel}</span>
-                              <span className="flex items-center gap-1"><MapPin size={11} />{tempo.location}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 mb-4">
-                          {[
-                            { label: "Base", value: `₹${tempo.basePrice.toLocaleString("en-IN")}` },
-                            { label: "Per Day", value: `₹${tempo.pricePerDay.toLocaleString("en-IN")}` },
-                            { label: "Per KM", value: `₹${tempo.pricePerKm}` },
-                          ].map(({ label, value }) => (
-                            <div key={label} className="bg-orange-50 rounded-xl p-2.5 text-center">
-                              <div className="text-[#E8540A] font-bold text-sm">{value}</div>
-                              <p className="text-gray-400 text-[10px] mt-0.5">{label}</p>
-                            </div>
-                          ))}
-                        </div>
-                        {tempo.shortDescription && (
-                          <p className="text-gray-500 text-xs leading-relaxed mb-4 line-clamp-2">{tempo.shortDescription}</p>
-                        )}
-                        <Link
-                          href={buildBookUrl(tempo)}
-                          className="w-full py-3 bg-[#E8540A] text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm hover:bg-[#d4470a] transition-colors"
-                        >
-                          Book Now <ArrowRight size={15} />
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </section>
-      )}
 
       {/* ── WHY BOOK ── */}
       <section className="py-16 bg-white">

@@ -3,31 +3,70 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MapPin, Loader2 } from "lucide-react";
 
-interface Suggestion {
-  label: string;
-  value: string;
+// ── Load Google Maps script once globally ────────────────────────────────────
+let scriptLoaded = false;
+let scriptLoading = false;
+const callbacks: (() => void)[] = [];
+
+function loadGoogleMaps(): Promise<void> {
+  return new Promise((resolve) => {
+    if (scriptLoaded) { resolve(); return; }
+    callbacks.push(resolve);
+    if (scriptLoading) return;
+    scriptLoading = true;
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "";
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=en`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      scriptLoaded = true;
+      callbacks.forEach((cb) => cb());
+      callbacks.length = 0;
+    };
+    document.head.appendChild(script);
+  });
 }
 
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number) {
+// ── Debounce helper ──────────────────────────────────────────────────────────
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number) {
   let t: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
-async function fetchNominatim(query: string): Promise<Suggestion[]> {
+// ── Google Places fetch ──────────────────────────────────────────────────────
+interface Suggestion {
+  label: string;    // full description
+  value: string;    // short display name
+  placeId: string;
+}
+
+async function fetchPlaces(query: string): Promise<Suggestion[]> {
   if (!query || query.length < 2) return [];
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=in&format=json&limit=6&addressdetails=1`;
-    const res = await fetch(url, { headers: { "Accept-Language": "en-IN,en" } });
-    const data: any[] = await res.json();
-    return data.map((item) => {
-      const parts = item.display_name.split(",").map((s: string) => s.trim());
-      const label = parts.slice(0, 3).join(", ");
-      const value = parts.slice(0, 2).join(", ");
-      return { label, value };
-    });
-  } catch {
-    return [];
-  }
+  await loadGoogleMaps();
+  return new Promise((resolve) => {
+    const svc = new google.maps.places.AutocompleteService();
+    svc.getPlacePredictions(
+      {
+        input: query,
+        componentRestrictions: { country: "in" },
+        types: ["geocode", "establishment"],
+      },
+      (predictions, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+          resolve([]);
+          return;
+        }
+        resolve(
+          predictions.map((p) => ({
+            label: p.description,
+            value: p.structured_formatting.main_text,
+            placeId: p.place_id,
+          }))
+        );
+      }
+    );
+  });
 }
 
 // ── Shared dropdown logic ────────────────────────────────────────────────────
@@ -40,11 +79,11 @@ function useLocationDropdown(onChange: (v: string) => void) {
     debounce(async (q: string) => {
       if (!q || q.length < 2) { setSuggestions([]); setOpen(false); return; }
       setLoading(true);
-      const results = await fetchNominatim(q);
+      const results = await fetchPlaces(q);
       setSuggestions(results);
       setOpen(results.length > 0);
       setLoading(false);
-    }, 350),
+    }, 300),
     []
   );
 
@@ -57,7 +96,7 @@ function useLocationDropdown(onChange: (v: string) => void) {
   return { suggestions, loading, open, search, select, setOpen };
 }
 
-// ── With icon wrapper — used in search card ──────────────────────────────────
+// ── LocationAutocomplete — with icon wrapper (used in tempo search card) ─────
 interface LocationAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
@@ -78,7 +117,7 @@ export function LocationAutocomplete({
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [setOpen]);
 
   return (
     <div ref={wrapperRef} className={`relative ${className ?? ""}`}>
@@ -103,7 +142,7 @@ export function LocationAutocomplete({
         <ul className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
           {suggestions.map((s, i) => (
             <li
-              key={i}
+              key={s.placeId || i}
               onMouseDown={() => select(s)}
               className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-orange-50 cursor-pointer text-sm transition-colors border-b border-gray-50 last:border-0"
             >
@@ -114,8 +153,9 @@ export function LocationAutocomplete({
               </div>
             </li>
           ))}
-          <li className="px-4 py-1.5 text-[10px] text-gray-300 bg-gray-50">
-            Powered by OpenStreetMap
+          <li className="px-4 py-1.5 flex items-center justify-end gap-1 bg-gray-50">
+            <span className="text-[10px] text-gray-300">Powered by</span>
+            <img src="https://www.gstatic.com/images/branding/googlelogo/1x/googlelogo_color_68x28dp.png" alt="Google" className="h-3 opacity-40" />
           </li>
         </ul>
       )}
@@ -123,7 +163,7 @@ export function LocationAutocomplete({
   );
 }
 
-// ── Plain input variant — used in booking forms ──────────────────────────────
+// ── LocationInput — plain variant (used in booking forms) ────────────────────
 interface LocationInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -141,7 +181,7 @@ export function LocationInput({ value, onChange, placeholder, className }: Locat
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [setOpen]);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -163,19 +203,20 @@ export function LocationInput({ value, onChange, placeholder, className }: Locat
         <ul className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-[#E4E5EF] rounded-xl shadow-xl overflow-hidden">
           {suggestions.map((s, i) => (
             <li
-              key={i}
+              key={s.placeId || i}
               onMouseDown={() => select(s)}
-              className="flex items-start gap-2.5 px-3 py-2 hover:bg-[#F5F3FF] cursor-pointer text-sm transition-colors border-b border-gray-50 last:border-0"
+              className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-[#FFF3ED] cursor-pointer text-sm transition-colors border-b border-gray-50 last:border-0"
             >
-              <MapPin size={12} className="text-[#7C3AED] shrink-0 mt-0.5" />
+              <MapPin size={12} className="text-[#E8540A] shrink-0 mt-0.5" />
               <div>
                 <p className="text-gray-800 font-medium text-xs leading-tight">{s.value}</p>
                 <p className="text-gray-400 text-[10px] mt-0.5 leading-tight">{s.label}</p>
               </div>
             </li>
           ))}
-          <li className="px-3 py-1 text-[10px] text-gray-300 bg-gray-50">
-            Powered by OpenStreetMap
+          <li className="px-3 py-1 flex items-center justify-end gap-1 bg-gray-50">
+            <span className="text-[10px] text-gray-300">Powered by</span>
+            <img src="https://www.gstatic.com/images/branding/googlelogo/1x/googlelogo_color_68x28dp.png" alt="Google" className="h-3 opacity-40" />
           </li>
         </ul>
       )}

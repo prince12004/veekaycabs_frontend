@@ -26,9 +26,33 @@ import {
   isSlotBefore,
 } from "@/lib/utils";
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
-import { CARS as CARS_DATA } from "@/lib/cars-data";
+import { CARS as LOCAL_CARS } from "@/lib/cars-data";
+import { carsAPI } from "@/lib/api";
 
-const CARS = CARS_DATA;
+// Map API car → local display format so CarGridCard component needs no changes
+const mapApiCar = (c: any) => {
+  const localMatch = LOCAL_CARS.find(l => l.name.toLowerCase() === c.name.toLowerCase());
+  return {
+    id: localMatch?.id || c.slug || c._id,
+    _id: c._id,
+    slug: c.slug,
+    name: c.name,
+    type: c.type,
+    year: c.modelYear || localMatch?.year || 2023,
+    fuel: c.fuel,
+    transmission: c.transmission,
+    seats: c.seats,
+    pricePerHr: c.regularPrice,
+    kmIncluded: parseInt(c.kmPackage) || 250,
+    securityDeposit: c.securityDeposit || 10000,
+    rating: localMatch?.rating || 4.8,
+    reviews: localMatch?.reviews || 0,
+    badge: c.type,
+    badgeColor: c.type === "SUV" || c.type === "MUV" ? "#E8540A" : c.type === "Luxury" ? "#6366F1" : "#10B981",
+    gradient: "from-[#1C1C2E] to-[#242438]",
+    image: c.images?.[0] || localMatch?.image || "",
+  };
+};
 
 const SEGMENTS = ["All", "SUV", "Hatchback", "Sedan", "MUV", "Luxury"];
 const FUELS = ["Petrol", "Diesel", "CNG", "Electric"];
@@ -65,7 +89,7 @@ function CarGridCard({
   hours,
   bookUrl,
 }: {
-  car: (typeof CARS)[0];
+  car: ReturnType<typeof mapApiCar>;
   highlighted?: boolean;
   cardRef?: (el: HTMLDivElement | null) => void;
   hours: number;
@@ -204,19 +228,32 @@ function CarListingInner() {
   const [transmission, setTransmission] = useState<string[]>([]);
   const [seats, setSeats] = useState("Any");
   const [sort, setSort] = useState("Recommended");
-  const [loading] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [apiCars, setApiCars] = useState<ReturnType<typeof mapApiCar>[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (highlightCar && cardRefs.current[highlightCar]) {
-      cardRefs.current[highlightCar]?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      cardRefs.current[highlightCar]?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [highlightCar]);
+
+  // Fetch real cars from API
+  useEffect(() => {
+    const start = pickupDT || getEarliestPickup();
+    const end   = dropDT   || addHoursToSlot(start, MIN_BOOKING_HOURS);
+    setLoading(true);
+    carsAPI.getAvailable({
+      city,
+      startTime: new Date(start.replace(" ", "T")).toISOString(),
+      endTime:   new Date(end.replace(" ", "T")).toISOString(),
+    }).then(({ data }) => {
+      setApiCars((data.data || []).map(mapApiCar));
+    }).catch(() => setApiCars([]))
+    .finally(() => setLoading(false));
+  }, [city, pickupDT, dropDT]);
 
   const toggleArr = (
     arr: string[],
@@ -268,16 +305,17 @@ function CarListingInner() {
 
   const bookingHours = pickupDT && dropDT ? getSlotHours(pickupDT, dropDT) : MIN_BOOKING_HOURS;
 
-  const buildCarUrl = (carId: string) => {
+  const buildCarUrl = (car: ReturnType<typeof mapApiCar>) => {
     const params = new URLSearchParams({
       city,
-      start: pickupDT || getEarliestPickup(),
-      end: dropDT || addHoursToSlot(pickupDT || getEarliestPickup(), MIN_BOOKING_HOURS),
+      start:  pickupDT || getEarliestPickup(),
+      end:    dropDT   || addHoursToSlot(pickupDT || getEarliestPickup(), MIN_BOOKING_HOURS),
+      carId:  car._id,
     });
-    return `/${carId}?${params.toString()}`;
+    return `/${car.id}?${params.toString()}`;
   };
 
-  const filtered = CARS.filter((c) => {
+  const filtered = apiCars.filter((c) => {
     if (segment !== "All" && c.type !== segment) return false;
     if (fuel.length && !fuel.includes(c.fuel)) return false;
     if (transmission.length && !transmission.includes(c.transmission))
@@ -617,14 +655,12 @@ function CarListingInner() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filtered.map((car) => (
                   <CarGridCard
-                    key={car.id}
+                    key={car._id}
                     car={car}
-                    highlighted={car.id === highlightCar}
-                    cardRef={(el) => {
-                      cardRefs.current[car.id] = el;
-                    }}
+                    highlighted={car._id === highlightCar}
+                    cardRef={(el) => { cardRefs.current[car._id] = el; }}
                     hours={bookingHours}
-                    bookUrl={buildCarUrl(car.id)}
+                    bookUrl={buildCarUrl(car)}
                   />
                 ))}
               </div>

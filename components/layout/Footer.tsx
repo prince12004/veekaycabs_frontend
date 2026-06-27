@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   Phone,
   Mail,
@@ -35,14 +36,16 @@ export default function Footer() {
           {/* Brand Column */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#E8540A] to-[#FF6B35] flex items-center justify-center shadow-lg shadow-orange-500/20">
-                <span className="text-white font-black text-xl font-syne">
-                  VK
-                </span>
-              </div>
-              <span className="text-white font-bold text-2xl font-syne">
-                Veekay Cabs
-              </span>
+              <Link href="/" className="flex items-center group">
+            <Image
+              src="/logowhite.png"
+              alt="Veekay Cabs"
+              width={160}
+              height={29}
+              className="h-9 w-auto object-contain group-hover:opacity-90 transition-opacity"
+              priority
+            />
+          </Link>
             </div>
             <p className="text-white/50 text-sm leading-relaxed mb-6">
               Delhi NCR&apos;s premier self-drive car rental platform. Drive

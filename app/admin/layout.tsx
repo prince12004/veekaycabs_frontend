@@ -56,6 +56,10 @@ const navGroups = [
     label: "Content",
     items: [
       { href: "/admin/blogs", label: "Blogs", icon: BookOpen, badge: null },
+      { href: "/admin/slider", label: "Slider / Banners", icon: Globe, badge: null },
+      { href: "/admin/offers", label: "Offers & Banners", icon: Tag, badge: null },
+      { href: "/admin/testimonials", label: "Testimonials", icon: MessageSquare, badge: null },
+      { href: "/admin/policy-pages", label: "Policy Pages", icon: Info, badge: null },
       { href: "/admin/coupons", label: "Coupons", icon: Tag, badge: null },
       { href: "/admin/cities", label: "Manage Cities", icon: MapPin, badge: null },
       { href: "/admin/contact-requests", label: "Contact Requests", icon: MessageSquare, badge: "3" },

@@ -1,19 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Upload, AlertTriangle, CheckCircle, Wrench } from "lucide-react";
-
-const CAR_DATA: Record<string, {
-  name: string; registrationNo: string; modelYear: string; type: string; fuel: string; transmission: string;
-  seats: string; regularPrice: string; weekendPrice: string; securityDeposit: string; kmPackage: string;
-  city: string; gpsDeviceId: string; insuranceExpiry: string; pucExpiry: string; fitnessExpiry: string;
-  roadTaxExpiry: string; rcExpiry: string; status: boolean; extraKmCharge: string; homeDelivery: boolean; homeDeliveryCharge: string;
-  nextServiceDue: string; serviceIntervalKm: string;
-}> = {
-  "1": { name: "Hyundai Creta", registrationNo: "DL01AB1234", modelYear: "2023", type: "SUV", fuel: "Petrol", transmission: "Automatic", seats: "5", regularPrice: "149", weekendPrice: "179", securityDeposit: "10000", kmPackage: "250", city: "Delhi", gpsDeviceId: "GPS-0021", insuranceExpiry: "2026-06-25", pucExpiry: "2026-08-10", fitnessExpiry: "2027-01-05", roadTaxExpiry: "2027-06-30", rcExpiry: "2038-04-15", status: true, extraKmCharge: "15", homeDelivery: true, homeDeliveryCharge: "500", nextServiceDue: "2026-07-01", serviceIntervalKm: "5000" },
-};
+import { ArrowLeft, Save, Upload, AlertTriangle, CheckCircle, Wrench, Loader2 } from "lucide-react";
+import { adminCarsApi } from "@/lib/api";
+import toast from "react-hot-toast";
 
 const inputCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
 const selectCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
@@ -30,18 +22,16 @@ function FieldGroup({ label, required, children }: { label: string; required?: b
 }
 
 function ExpiryField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const today = new Date().toISOString().split("T")[0];
-  const diff = value ? Math.ceil((new Date(value).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
-  const isExpired = diff !== null && diff < 0;
+  const diff = value ? Math.ceil((new Date(value).getTime() - Date.now()) / 86400000) : null;
+  const isExpired  = diff !== null && diff < 0;
   const isCritical = diff !== null && diff >= 0 && diff <= 10;
-  const isWarning = diff !== null && diff > 10 && diff <= 30;
-
+  const isWarning  = diff !== null && diff > 10 && diff <= 30;
   return (
     <div>
-      <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">{label} <span className="text-[#EF4444]">*</span></label>
-      <input type="date" value={value} onChange={e => onChange(e.target.value)} className={inputCls} required />
+      <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">{label}</label>
+      <input type="date" value={value} onChange={e => onChange(e.target.value)} className={inputCls} />
       {diff !== null && (
-        <p className={`text-xs mt-1 font-semibold flex items-center gap-1 ${isExpired ? "text-[#EF4444]" : isCritical ? "text-[#EF4444]" : isWarning ? "text-[#F59E0B]" : "text-[#10B981]"}`}>
+        <p className={`text-xs mt-1 font-semibold flex items-center gap-1 ${isExpired || isCritical ? "text-[#EF4444]" : isWarning ? "text-[#F59E0B]" : "text-[#10B981]"}`}>
           {(isExpired || isCritical) && <AlertTriangle size={11} />}
           {isExpired ? `EXPIRED ${Math.abs(diff)} days ago` : `${diff} days remaining`}
         </p>
@@ -50,45 +40,128 @@ function ExpiryField({ label, value, onChange }: { label: string; value: string;
   );
 }
 
+const toDateInput = (d: string | Date | null | undefined) => {
+  if (!d) return "";
+  return new Date(d).toISOString().split("T")[0];
+};
+
 export default function EditCarPage() {
-  const params = useParams();
-  const id = String(params.id ?? "1");
-  const defaultData = CAR_DATA[id] ?? CAR_DATA["1"];
-  const [form, setForm] = useState(defaultData);
-  const [saved, setSaved] = useState(false);
-  const [images, setImages] = useState<File[]>([]);
+  const { id } = useParams();
+  const router = useRouter();
+  const carId = String(id);
 
-  const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [car, setCar] = useState<any>(null);
+  const [cities, setCities] = useState<{ _id: string; name: string }[]>([]);
+  const [newImages, setNewImages] = useState<File[]>([]);
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  const docFields: { field: keyof typeof form; label: string }[] = [
-    { field: "insuranceExpiry", label: "Insurance Expiry" },
-    { field: "pucExpiry", label: "PUC Expiry" },
-    { field: "fitnessExpiry", label: "Fitness Certificate Expiry" },
-    { field: "roadTaxExpiry", label: "Road Tax Expiry" },
-    { field: "rcExpiry", label: "RC Expiry" },
-  ];
-
-  const expiringSoon = docFields.filter(({ field }) => {
-    const v = form[field] as string;
-    if (!v) return false;
-    const diff = Math.ceil((new Date(v).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return diff <= 10;
+  const [form, setForm] = useState({
+    name: "", registrationNo: "", modelYear: "", type: "SUV",
+    fuel: "Petrol", transmission: "Automatic", seats: "5",
+    cityId: "", gpsDeviceId: "",
+    regularPrice: "", weekendPrice: "", securityDeposit: "", kmPackage: "",
+    insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "",
+    isActive: true,
   });
 
-  const serviceDueSoon = (() => {
-    if (!form.nextServiceDue) return null;
-    const diff = Math.ceil((new Date(form.nextServiceDue).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    if (diff < 0) return `Overdue: service/alignment was due ${Math.abs(diff)} day(s) ago.`;
-    if (diff <= 7) return `Service/alignment due in ${diff} day(s) — schedule soon.`;
-    return null;
-  })();
+  useEffect(() => {
+    Promise.all([
+      adminCarsApi.getAll(),
+      fetch("http://localhost:5000/api/cities").then(r => r.json()),
+    ]).then(([carsRes, citiesRes]) => {
+      const allCars: any[] = carsRes.data.data || [];
+      const found = allCars.find((c: any) => c._id === carId);
+      if (found) {
+        setCar(found);
+        setForm({
+          name: found.name || "",
+          registrationNo: found.registrationNo || "",
+          modelYear: String(found.modelYear || ""),
+          type: found.type || "SUV",
+          fuel: found.fuel || "Petrol",
+          transmission: found.transmission || "Automatic",
+          seats: String(found.seats || "5"),
+          cityId: found.cityId?._id || found.cityId || "",
+          gpsDeviceId: found.gpsDeviceId || "",
+          regularPrice: String(found.regularPrice || ""),
+          weekendPrice: String(found.weekendPrice || ""),
+          securityDeposit: String(found.securityDeposit || ""),
+          kmPackage: found.kmPackage || "",
+          insuranceExpiry: toDateInput(found.documents?.insurance?.expiry),
+          pucExpiry:       toDateInput(found.documents?.puc?.expiry),
+          fitnessExpiry:   toDateInput(found.documents?.fitness?.expiry),
+          roadTaxExpiry:   toDateInput(found.documents?.roadTax?.expiry),
+          rcExpiry:        toDateInput(found.documents?.rc?.expiry),
+          isActive: found.isActive ?? true,
+        });
+      }
+      setCities(citiesRes.data || []);
+    }).catch(() => toast.error("Failed to load car data"))
+    .finally(() => setLoading(false));
+  }, [carId]);
+
+  const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(prev => ({ ...prev, [field]: field === "isActive" ? (e.target as HTMLInputElement).checked : e.target.value }));
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("name", form.name);
+      fd.append("registrationNo", form.registrationNo);
+      fd.append("modelYear", form.modelYear);
+      fd.append("type", form.type);
+      fd.append("fuel", form.fuel);
+      fd.append("transmission", form.transmission);
+      fd.append("seats", form.seats);
+      fd.append("cityId", form.cityId);
+      fd.append("gpsDeviceId", form.gpsDeviceId);
+      fd.append("regularPrice", form.regularPrice);
+      fd.append("weekendPrice", form.weekendPrice);
+      fd.append("securityDeposit", form.securityDeposit);
+      fd.append("kmPackage", form.kmPackage);
+      fd.append("isActive", String(form.isActive));
+      fd.append("documents", JSON.stringify({
+        insurance: { expiry: form.insuranceExpiry || null },
+        puc:       { expiry: form.pucExpiry       || null },
+        fitness:   { expiry: form.fitnessExpiry   || null },
+        roadTax:   { expiry: form.roadTaxExpiry   || null },
+        rc:        { expiry: form.rcExpiry        || null },
+      }));
+      newImages.forEach(img => fd.append("images", img));
+
+      await adminCarsApi.update(carId, fd);
+      toast.success("Car updated successfully!");
+      router.push("/admin/cars");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const docFields = [
+    { key: "insuranceExpiry" as const, label: "Insurance Expiry" },
+    { key: "pucExpiry"       as const, label: "PUC Expiry" },
+    { key: "fitnessExpiry"   as const, label: "Fitness Certificate Expiry" },
+    { key: "roadTaxExpiry"   as const, label: "Road Tax Expiry" },
+    { key: "rcExpiry"        as const, label: "RC Expiry" },
+  ];
+
+  const expiringSoon = docFields.filter(({ key }) => {
+    const v = form[key]; if (!v) return false;
+    return Math.ceil((new Date(v).getTime() - Date.now()) / 86400000) <= 10;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 size={36} className="animate-spin text-[#E8540A]" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -124,7 +197,7 @@ export default function EditCarPage() {
               <input type="text" value={form.registrationNo} onChange={update("registrationNo")} className={inputCls} required />
             </FieldGroup>
             <FieldGroup label="Model Year" required>
-              <input type="number" value={form.modelYear} onChange={update("modelYear")} min="2010" max="2026" className={inputCls} required />
+              <input type="number" value={form.modelYear} onChange={update("modelYear")} min="2010" max="2030" className={inputCls} required />
             </FieldGroup>
             <FieldGroup label="Car Type" required>
               <select value={form.type} onChange={update("type")} className={selectCls}>
@@ -147,111 +220,77 @@ export default function EditCarPage() {
               </select>
             </FieldGroup>
             <FieldGroup label="City" required>
-              <select value={form.city} onChange={update("city")} className={selectCls}>
-                {["Delhi", "Noida", "Gurgaon", "Ghaziabad", "Greater Noida"].map(c => <option key={c}>{c}</option>)}
+              <select value={form.cityId} onChange={update("cityId")} className={selectCls}>
+                <option value="">Select city</option>
+                {cities.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </FieldGroup>
             <FieldGroup label="GPS Device ID">
               <input type="text" value={form.gpsDeviceId} onChange={update("gpsDeviceId")} placeholder="GPS-001234" className={inputCls} />
             </FieldGroup>
           </div>
+          <div className="mt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.isActive} onChange={e => setForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 accent-[#E8540A]" />
+              <span className="text-sm text-[#4A4A6A] font-semibold">Car is Active (visible on website)</span>
+            </label>
+          </div>
         </div>
 
         {/* Pricing */}
         <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
           <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Pricing</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
-            {[
-              { field: "regularPrice" as const, label: "Regular Price/hr" },
-              { field: "weekendPrice" as const, label: "Weekend Price/hr" },
-              { field: "securityDeposit" as const, label: "Security Deposit" },
-              { field: "kmPackage" as const, label: "KM Package/day" },
-              { field: "extraKmCharge" as const, label: "Extra KM Charge" },
-            ].map(({ field, label }) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+            {([
+              ["regularPrice",   "Regular Price/hr"],
+              ["weekendPrice",   "Weekend Price/hr"],
+              ["securityDeposit","Security Deposit"],
+              ["kmPackage",      "KM Package"],
+            ] as [keyof typeof form, string][]).map(([field, label]) => (
               <FieldGroup key={field} label={label} required>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8] text-xs font-medium">Rs.</span>
-                  <input type="number" value={form[field] as string} onChange={update(field)} className={`${inputCls} pl-9`} required />
-                </div>
+                <input type={field === "kmPackage" ? "text" : "number"} value={form[field] as string} onChange={update(field)} className={inputCls} placeholder={field === "kmPackage" ? "250 km/day" : undefined} required />
               </FieldGroup>
             ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.homeDelivery} onChange={e => setForm(p => ({ ...p, homeDelivery: e.target.checked }))} className="w-4 h-4 accent-[#E8540A]" />
-              <span className="text-sm text-[#4A4A6A] font-semibold">Home Delivery Available</span>
-            </label>
-            {form.homeDelivery && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-[#4A4A6A]">Charge:</span>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9090A8] text-xs">Rs.</span>
-                  <input type="number" value={form.homeDeliveryCharge} onChange={update("homeDeliveryCharge")} className="border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-8 pr-3 py-2 text-sm outline-none w-28" />
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Car Images */}
         <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
           <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Car Images</h3>
-          <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-[#E4E5EF] rounded-2xl cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
-            <input type="file" multiple accept="image/*" className="sr-only" onChange={e => setImages(e.target.files ? Array.from(e.target.files) : [])} />
+          {car?.images?.length > 0 && (
+            <div className="flex gap-3 mb-4">
+              {car.images.map((img: string, i: number) => (
+                <img key={i} src={img} alt="" className="w-24 h-16 rounded-xl object-cover border border-[#E4E5EF]" />
+              ))}
+            </div>
+          )}
+          <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#E4E5EF] rounded-2xl cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
+            <input type="file" multiple accept="image/*" className="sr-only" onChange={e => setNewImages(e.target.files ? Array.from(e.target.files) : [])} />
             <Upload size={22} className="text-[#9090A8] mb-1.5" />
-            <p className="text-sm font-semibold text-[#4A4A6A]">{images.length > 0 ? `${images.length} new image(s) selected` : "Upload new car images"}</p>
-            <p className="text-xs text-[#9090A8]">Replaces existing images</p>
+            <p className="text-sm font-semibold text-[#4A4A6A]">{newImages.length > 0 ? `${newImages.length} new image(s) selected` : "Upload new car images"}</p>
+            <p className="text-xs text-[#9090A8]">Adds to existing images</p>
           </label>
         </div>
 
-        {/* Documents & Expiry */}
+        {/* Documents */}
         <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
           <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Vehicle Documents & Expiry</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {docFields.map(({ field, label }) => (
-              <ExpiryField key={field} label={label} value={form[field] as string} onChange={v => setForm(p => ({ ...p, [field]: v }))} />
+            {docFields.map(({ key, label }) => (
+              <ExpiryField key={key} label={label} value={form[key]} onChange={v => setForm(p => ({ ...p, [key]: v }))} />
             ))}
           </div>
-          {expiringSoon.length > 0 && (
-            <div className="mt-4 p-3 bg-[#FEE2E2] rounded-xl">
-              <p className="text-xs font-bold text-[#991B1B] flex items-center gap-1.5"><AlertTriangle size={13} /> Critical: {expiringSoon.map(f => f.label).join(", ")} expire within 10 days!</p>
-            </div>
-          )}
         </div>
 
-        {/* Service & Maintenance Alert */}
-        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
-          <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF] flex items-center gap-2">
-            <Wrench size={16} className="text-[#E8540A]" />
-            Service & Maintenance Alert
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            <FieldGroup label="Next Service / Alignment Due">
-              <input type="date" value={form.nextServiceDue} onChange={update("nextServiceDue")} className={inputCls} />
-            </FieldGroup>
-            <FieldGroup label="Service Interval (km)">
-              <div className="relative">
-                <input type="number" value={form.serviceIntervalKm} onChange={update("serviceIntervalKm")} placeholder="5000" className={`${inputCls} pr-10`} />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9090A8] text-xs font-medium">km</span>
-              </div>
-            </FieldGroup>
-          </div>
-          {serviceDueSoon && (
-            <div className="mt-4 p-3 bg-[#FEF3C7] rounded-xl">
-              <p className="text-xs font-bold text-[#92400E] flex items-center gap-1.5"><AlertTriangle size={13} /> {serviceDueSoon}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
+        {/* Save Actions */}
         <div className="flex items-center gap-4">
-          <button type="submit" className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm shadow-[0_8px_24px_rgba(232,84,10,0.35)]">
-            <Save size={16} /> Save Changes
+          <button type="submit" disabled={saving} className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm shadow-[0_8px_24px_rgba(232,84,10,0.35)] disabled:opacity-60">
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {saving ? "Saving..." : "Save Changes"}
           </button>
-          <Link href="/admin/cars" className="px-6 py-3.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 transition-colors">Cancel</Link>
-          {saved && (
-            <span className="text-[#10B981] text-sm font-semibold flex items-center gap-1.5"><CheckCircle size={15} /> Changes saved!</span>
-          )}
+          <Link href="/admin/cars" className="px-6 py-3.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 transition-colors">
+            Cancel
+          </Link>
         </div>
       </form>
     </div>

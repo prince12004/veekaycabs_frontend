@@ -73,6 +73,20 @@ export const adminAuthAPI = {
     adminApi.post("/api/auth/admin-login", { email, password }),
 };
 
+export const bookingsApi = {
+  getAll: (params?: Record<string, string | number>) =>
+    adminApi.get("/api/admin/bookings", { params }),
+  getById: (id: string) => adminApi.get(`/api/admin/bookings/${id}`),
+  updateStatus: (id: string, data: { status?: string; amountPaid?: number; notes?: string }) =>
+    adminApi.patch(`/api/admin/bookings/${id}/status`, data),
+  update: (id: string, data: Record<string, unknown>) =>
+    adminApi.put(`/api/admin/bookings/${id}`, data),
+  exportCsv: (params?: Record<string, string>) =>
+    adminApi.get("/api/admin/bookings/export", { params, responseType: "blob" }),
+  createOffline: (data: Record<string, unknown>) =>
+    adminApi.post("/api/admin/bookings/offline", data),
+};
+
 export const adminAdminsAPI = {
   getAll: () => adminApi.get("/api/admin/admins"),
   create: (data: { name: string; email: string; password: string }) =>
@@ -88,6 +102,18 @@ export const carsAPI = {
   getPopular: (city: string, limit = 8) =>
     api.get("/api/cars/popular", { params: { city, limit } }),
   getById: (id: string) => api.get(`/api/cars/${id}`),
+};
+
+export const adminCarsApi = {
+  getAll: (params?: Record<string, string | number>) =>
+    adminApi.get("/api/admin/cars", { params }),
+  create: (data: FormData) =>
+    adminApi.post("/api/admin/cars", data),
+  update: (id: string, data: FormData | Record<string, unknown>) =>
+    adminApi.put(`/api/admin/cars/${id}`, data),
+  remove: (id: string) => adminApi.delete(`/api/admin/cars/${id}`),
+  toggleStatus: (id: string) => adminApi.patch(`/api/admin/cars/${id}/toggle`),
+  getExpiryAlerts: () => adminApi.get("/api/admin/cars/expiry-alerts"),
 };
 
 export const bookingsAPI = {
@@ -189,4 +215,61 @@ export const adminTempoSeoAPI = {
   update: (id: string, data: Record<string, unknown>) =>
     adminApi.put(`/api/admin/tempo-seo/${id}`, data),
   remove: (id: string) => adminApi.delete(`/api/admin/tempo-seo/${id}`),
+};
+
+export const settingsApi = {
+  get: () => adminApi.get("/api/admin/settings"),
+  update: (data: Record<string, unknown>) =>
+    adminApi.put("/api/admin/settings", data),
+};
+
+export const sliderApi = {
+  getAll: () => adminApi.get("/api/admin/slider"),
+  create: (formData: FormData) =>
+    adminApi.post("/api/admin/slider", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  update: (id: string, formData: FormData) =>
+    adminApi.put(`/api/admin/slider/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  remove: (id: string) => adminApi.delete(`/api/admin/slider/${id}`),
+};
+
+export const testimonialsApi = {
+  getAll: () => adminApi.get("/api/admin/testimonials"),
+  create: (formData: FormData) =>
+    adminApi.post("/api/admin/testimonials", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  update: (id: string, formData: FormData) =>
+    adminApi.put(`/api/admin/testimonials/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  remove: (id: string) => adminApi.delete(`/api/admin/testimonials/${id}`),
+};
+
+export const offersApi = {
+  getAll: () => adminApi.get("/api/admin/offers"),
+  create: (formData: FormData) =>
+    adminApi.post("/api/admin/offers", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  update: (id: string, formData: FormData) =>
+    adminApi.put(`/api/admin/offers/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  remove: (id: string) => adminApi.delete(`/api/admin/offers/${id}`),
+};
+
+export const policyApi = {
+  getAll: () => adminApi.get("/api/admin/policy"),
+  getPage: (key: string) => adminApi.get(`/api/admin/policy/${key}`),
+  upsert: (key: string, data: Record<string, unknown>) =>
+    adminApi.put(`/api/admin/policy/${key}`, data),
+};
+
+export const favoritesApi = {
+  getMyFavorites: () => api.get("/api/favorites/my"),
+  toggle: (carId: string) => api.post("/api/favorites/toggle", { carId }),
 };

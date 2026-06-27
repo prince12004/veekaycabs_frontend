@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useInView } from "framer-motion";
@@ -15,7 +15,6 @@ import {
   Fuel,
   Users,
   Settings,
-  CheckCircle,
   Phone,
   ArrowRight,
   Zap,
@@ -29,6 +28,7 @@ import Footer from "@/components/layout/Footer";
 import DateTimePicker, { DateTimePickerHandle } from "@/components/ui/DateTimePicker";
 import { cn, addHoursToSlot, getEarliestPickup, getDefaultBookingWindow, isSlotBefore } from "@/lib/utils";
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
+import { carsAPI } from "@/lib/api";
 
 // ─── Car Images (Unsplash) ────────────────────────────────────────────────────
 
@@ -50,144 +50,6 @@ const CAR_IMAGES: Record<string, string> = {
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
 
-const SAMPLE_CARS = [
-  {
-    id: "hyundai-i20",
-    name: "Hyundai i20",
-    type: "Hatchback",
-    fuel: "Petrol",
-    transmission: "Manual",
-    seats: 5,
-    pricePerHr: 89,
-    pricePerDay: 1599,
-    rating: 4.8,
-    reviews: 142,
-    badge: "Most Popular",
-    badgeColor: "#E8540A",
-    gradient: "from-[#1C1C2E] to-[#242438]",
-    image: CAR_IMAGES.hatchback1,
-    kmPackage: "200 km/day",
-  },
-  {
-    id: "maruti-swift",
-    name: "Maruti Swift",
-    type: "Hatchback",
-    fuel: "Petrol",
-    transmission: "Manual",
-    seats: 5,
-    pricePerHr: 89,
-    pricePerDay: 1499,
-    rating: 4.7,
-    reviews: 198,
-    badge: "Best Value",
-    badgeColor: "#10B981",
-    gradient: "from-[#1C1C2E] to-[#1A2E1A]",
-    image: CAR_IMAGES.hatchback2,
-    kmPackage: "200 km/day",
-  },
-  {
-    id: "hyundai-creta",
-    name: "Hyundai Creta",
-    type: "SUV",
-    fuel: "Petrol",
-    transmission: "Automatic",
-    seats: 5,
-    pricePerHr: 139,
-    pricePerDay: 2499,
-    rating: 4.9,
-    reviews: 231,
-    badge: "Premium",
-    badgeColor: "#E8540A",
-    gradient: "from-[#1C1C2E] to-[#2E1C0F]",
-    image: CAR_IMAGES.suv1,
-    kmPackage: "250 km/day",
-  },
-  {
-    id: "kia-seltos",
-    name: "Kia Seltos",
-    type: "SUV",
-    fuel: "Diesel",
-    transmission: "Manual",
-    seats: 5,
-    pricePerHr: 129,
-    pricePerDay: 2299,
-    rating: 4.8,
-    reviews: 167,
-    badge: "Top Rated",
-    badgeColor: "#F59E0B",
-    gradient: "from-[#1C1C2E] to-[#2E2A1C]",
-    image: CAR_IMAGES.suv2,
-    kmPackage: "250 km/day",
-  },
-  {
-    id: "maruti-ertiga",
-    name: "Maruti Ertiga",
-    type: "MUV",
-    fuel: "CNG",
-    transmission: "Manual",
-    seats: 7,
-    pricePerHr: 109,
-    pricePerDay: 1899,
-    rating: 4.6,
-    reviews: 88,
-    badge: "Family Pick",
-    badgeColor: "#6366F1",
-    gradient: "from-[#1C1C2E] to-[#1C1A2E]",
-    image: CAR_IMAGES.mpv,
-    kmPackage: "200 km/day",
-  },
-  {
-    id: "honda-city",
-    name: "Honda City",
-    type: "Sedan",
-    fuel: "Petrol",
-    transmission: "Automatic",
-    seats: 5,
-    pricePerHr: 119,
-    pricePerDay: 2099,
-    rating: 4.8,
-    reviews: 134,
-    badge: "Executive",
-    badgeColor: "#0EA5E9",
-    gradient: "from-[#1C1C2E] to-[#0F1A2E]",
-    image: CAR_IMAGES.sedan,
-    kmPackage: "200 km/day",
-  },
-  {
-    id: "hyundai-venue",
-    name: "Hyundai Venue",
-    type: "SUV",
-    fuel: "Petrol",
-    transmission: "Automatic",
-    seats: 5,
-    pricePerHr: 119,
-    pricePerDay: 2099,
-    rating: 4.7,
-    reviews: 112,
-    badge: "Compact SUV",
-    badgeColor: "#EC4899",
-    gradient: "from-[#1C1C2E] to-[#2E1C26]",
-    image: CAR_IMAGES.suv3,
-    kmPackage: "200 km/day",
-  },
-  {
-    id: "maruti-baleno",
-    name: "Maruti Baleno",
-    type: "Hatchback",
-    fuel: "Petrol",
-    transmission: "Manual",
-    seats: 5,
-    pricePerHr: 94,
-    pricePerDay: 1649,
-    rating: 4.7,
-    reviews: 156,
-    badge: "Smart Choice",
-    badgeColor: "#10B981",
-    gradient: "from-[#1C1C2E] to-[#152E1C]",
-    image: CAR_IMAGES.hatchback3,
-    kmPackage: "200 km/day",
-  },
-];
 
 const SAMPLE_BLOGS = [
   {
@@ -401,7 +263,26 @@ function SectionInView({
 
 // ─── Car Card ─────────────────────────────────────────────────────────────────
 
-function CarCard({ car, bookUrl }: { car: (typeof SAMPLE_CARS)[0]; bookUrl: string }) {
+interface HomeCar {
+  id: string;
+  _id: string;
+  name: string;
+  type: string;
+  fuel: string;
+  transmission: string;
+  seats: number;
+  pricePerHr: number;
+  pricePerDay: number;
+  rating: number;
+  reviews: number;
+  badge: string;
+  badgeColor: string;
+  gradient: string;
+  image: string;
+  kmPackage: string;
+}
+
+function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
   return (
     <motion.div
       variants={scaleIn}
@@ -455,7 +336,7 @@ function CarCard({ car, bookUrl }: { car: (typeof SAMPLE_CARS)[0]; bookUrl: stri
               {car.name}
             </h3>
             <span className="text-[#9090A8] text-xs">
-              {car.type} · {car.kmPackage} included
+              {car.type}
             </span>
           </div>
           <div className="text-right shrink-0">
@@ -482,12 +363,6 @@ function CarCard({ car, bookUrl }: { car: (typeof SAMPLE_CARS)[0]; bookUrl: stri
             <Settings size={13} className="text-[#9090A8]" />
             <span>{car.transmission}</span>
           </div>
-        </div>
-
-        {/* KM package */}
-        <div className="flex items-center gap-1.5 mb-4">
-          <CheckCircle size={13} className="text-[#10B981]" />
-          <span className="text-[#4A4A6A] text-xs">{car.kmPackage} included</span>
         </div>
 
         {/* CTA */}
@@ -549,14 +424,39 @@ export default function HomePage() {
   const [dropDateTime, setDropDateTime] = useState("");
   const [searchError, setSearchError] = useState("");
   const [reviewPage, setReviewPage] = useState(0);
+  const [popularCars, setPopularCars] = useState<HomeCar[]>([]);
 
   const statsRef = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: "-100px" });
 
+  useEffect(() => {
+    carsAPI.getPopular(selectedCity, 8).then(({ data }) => {
+      const cars: HomeCar[] = (data.data || []).map((c: any) => ({
+        id: c.slug || c._id,
+        _id: c._id,
+        name: c.name,
+        type: c.type,
+        fuel: c.fuel,
+        transmission: c.transmission,
+        seats: c.seats,
+        pricePerHr: c.regularPrice,
+        pricePerDay: (c.regularPrice || 0) * 24,
+        rating: 4.8,
+        reviews: 0,
+        badge: c.type,
+        badgeColor: c.type === "SUV" || c.type === "MUV" ? "#E8540A" : c.type === "Luxury" ? "#6366F1" : "#10B981",
+        gradient: "from-[#1C1C2E] to-[#242438]",
+        image: c.images?.[0] || "",
+        kmPackage: c.kmPackage || "250 km/day",
+      }));
+      setPopularCars(cars);
+    }).catch(() => setPopularCars([]));
+  }, [selectedCity]);
+
   const filteredCars =
     activeCarFilter === "All"
-      ? SAMPLE_CARS
-      : SAMPLE_CARS.filter((c) => c.type === activeCarFilter);
+      ? popularCars
+      : popularCars.filter((c) => c.type === activeCarFilter);
 
   const reviewsPerPage = 3;
   const totalReviewPages = Math.ceil(REVIEWS.length / reviewsPerPage);
@@ -593,10 +493,10 @@ export default function HomePage() {
     router.push(`/book?${params.toString()}`);
   };
 
-  const buildCarBookUrl = (carId: string) => {
+  const buildCarBookUrl = (car: HomeCar) => {
     const { start, end } = getDefaultBookingWindow();
-    const params = new URLSearchParams({ city: selectedCity, car: carId, start, end });
-    return `/book?${params.toString()}`;
+    const params = new URLSearchParams({ city: selectedCity, start, end, carId: car._id });
+    return `/${car.id}?${params.toString()}`;
   };
 
   const buildDefaultBookUrl = () => {
@@ -940,7 +840,7 @@ export default function HomePage() {
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
             >
               {filteredCars.map((car) => (
-                <CarCard key={car.id} car={car} bookUrl={buildCarBookUrl(car.id)} />
+                <CarCard key={car.id} car={car} bookUrl={buildCarBookUrl(car)} />
               ))}
             </motion.div>
 

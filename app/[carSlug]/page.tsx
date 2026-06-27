@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams, notFound } from "next/navigation";
+import { useParams, useSearchParams, useRouter, notFound } from "next/navigation";
 import {
   ChevronRight,
   MapPin,
@@ -16,11 +16,16 @@ import {
   Tag,
   Lock,
   Truck,
+  X,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { cn, getDefaultBookingWindow, getSlotHours, getDurationLabel } from "@/lib/utils";
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
 import { getCarById } from "@/lib/cars-data";
+import api, { bookingsAPI, paymentsAPI, carsAPI } from "@/lib/api";
+import toast from "react-hot-toast";
 
 const PICKUP_LOCATIONS = [
   { id: "delhi", label: "Delhi Office", address: "A 13, 1st Floor, Ganesh Nagar, New Delhi" },
@@ -47,12 +52,12 @@ const TERMS = [
 export default function CarSlugPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const carSlug = String(params.carSlug);
-  const CAR = getCarById(carSlug);
+  const localCar = getCarById(carSlug);
 
-  if (!CAR) notFound();
-
-  const city = searchParams.get("city") || "Delhi";
+  const city   = searchParams.get("city")  || "Delhi";
+  const carId  = searchParams.get("carId") || "";   // real MongoDB _id passed from book page
   const fallback = getDefaultBookingWindow();
   const startSlot = searchParams.get("start") || fallback.start;
   const endSlot = searchParams.get("end") || fallback.end;
@@ -74,17 +79,187 @@ export default function CarSlugPage() {
   const [coupon, setCoupon] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [paymentMode, setPaymentMode] = useState<"token" | "full">("token");
+  const [showKmModal, setShowKmModal] = useState(false);
+  const [kmPolicy, setKmPolicy] = useState({ includedKmPerDay: 250, extraKmRate: 12 });
+  const [payLoading, setPayLoading] = useState(false);
+  const [apiCar, setApiCar] = useState<any>(null);
+  const [carFetchDone, setCarFetchDone] = useState(!!localCar);
+
+  // Fetch from API when car is not in local static data (e.g., new cars added via admin)
+  useEffect(() => {
+    if (!localCar && carId) {
+      carsAPI.getById(carId)
+        .then(({ data }) => setApiCar(data.data))
+        .catch(() => {})
+        .finally(() => setCarFetchDone(true));
+    } else if (!localCar && !carId) {
+      setCarFetchDone(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    api.get("/api/public/settings").then(({ data }) => {
+      if (data?.data) {
+        setKmPolicy({
+          includedKmPerDay: data.data.includedKmPerDay || 250,
+          extraKmRate: data.data.extraKmRate || 12,
+        });
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Show spinner while fetching non-local car from API
+  if (!localCar && !carFetchDone) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]">
+        <Loader2 size={40} className="animate-spin text-[#E8540A]" />
+      </div>
+    );
+  }
+
+  // Merge local static data with API data (API car wins for new admin-added cars)
+  const CAR = localCar ?? (apiCar ? {
+    name: apiCar.name,
+    type: apiCar.type,
+    fuel: apiCar.fuel,
+    transmission: apiCar.transmission,
+    seats: apiCar.seats,
+    pricePerHr: apiCar.regularPrice,
+    securityDeposit: apiCar.securityDeposit || 10000,
+    year: apiCar.modelYear || 2023,
+    image: apiCar.images?.[0] || "",
+    gradient: "from-[#1C1C2E] to-[#242438]",
+    badge: apiCar.type,
+    badgeColor: "#E8540A",
+    rating: 4.8,
+    reviews: 0,
+    kmPackage: apiCar.kmPackage || "250 km/day",
+  } : null);
+
+  if (!CAR) notFound();
+
+  const isOneDayBooking = hours >= 24 && hours < 48;
+
+  const loadRazorpay = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) { resolve(true); return; }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const proceedToPayment = async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("vk_token") : null;
+    if (!token) {
+      toast.error("Please login to continue booking");
+      router.push(`/login?redirect=/${carSlug}?city=${city}&start=${startSlot}&end=${endSlot}`);
+      return;
+    }
+
+    setPayLoading(true);
+    try {
+      const startISO = new Date(startSlot.replace(" ", "T")).toISOString();
+      const endISO   = new Date(endSlot.replace(" ", "T")).toISOString();
+
+      // Resolve real MongoDB car _id
+      let realCarId = carId; // passed from book page via URL param
+      if (!realCarId) {
+        // Fallback: search by name
+        const { data: carsData } = await carsAPI.getAvailable({ city, startTime: startISO, endTime: endISO });
+        const realCar = (carsData.data || []).find(
+          (c: any) => c.name.toLowerCase() === CAR!.name.toLowerCase()
+        );
+        if (!realCar) { toast.error("Car not available. Please go back and search again."); return; }
+        realCarId = realCar._id;
+      }
+
+      // Create booking on backend
+      const { data: bookingData } = await bookingsAPI.create({
+        carId: realCarId,
+        startTime: startISO,
+        endTime: endISO,
+        pickupLocation: doorstep ? "Doorstep Delivery" : (PICKUP_LOCATIONS.find(l => l.id === pickupLocation)?.address || pickupLocation),
+        doorstepDelivery: doorstep,
+        couponCode: couponApplied ? coupon : undefined,
+      });
+
+      const { razorpayOrderId, razorpayKeyId, fareBreakdown, booking } = bookingData.data;
+      const payAmount = paymentMode === "full" ? fareBreakdown.totalAmount : fareBreakdown.tokenAmount;
+
+      if (!razorpayOrderId) {
+        toast.error("Payment gateway error. Please try again.");
+        return;
+      }
+
+      const loaded = await loadRazorpay();
+      if (!loaded) { toast.error("Failed to load payment gateway. Check your internet connection."); return; }
+
+      const user = JSON.parse(localStorage.getItem("vk_user") || "{}");
+
+      const rzp = new (window as any).Razorpay({
+        key: razorpayKeyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY,
+        amount: payAmount * 100,
+        currency: "INR",
+        name: "Veekay Cabs",
+        description: `Booking ${booking.bookingId} — ${CAR.name}`,
+        order_id: razorpayOrderId,
+        prefill: {
+          name:    user?.name  || "",
+          contact: user?.mobile || "",
+          email:   user?.email  || "",
+        },
+        theme: { color: "#E8540A" },
+        handler: async (response: any) => {
+          try {
+            await paymentsAPI.verify({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              bookingId: booking.bookingId,
+            });
+            toast.success("Booking confirmed! Check your SMS for details.");
+            router.push("/account/history");
+          } catch {
+            toast.error("Payment received but verification failed. Please contact support with your payment ID: " + response.razorpay_payment_id);
+          }
+        },
+        modal: {
+          ondismiss: () => { toast("Payment cancelled. Your booking is on hold.", { icon: "ℹ️" }); },
+        },
+      });
+      rzp.open();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || "Something went wrong. Please try again.";
+      toast.error(msg);
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  const handlePayClick = () => {
+    if (isOneDayBooking) { setShowKmModal(true); return; }
+    proceedToPayment();
+  };
 
   const baseFare = CAR.pricePerHr * hours;
-  const gst = Math.round(baseFare * 0.05);
   const doorstepFee = doorstep ? 500 : 0;
   const discount = couponApplied ? 200 : 0;
-  const total = baseFare + CAR.securityDeposit + gst + doorstepFee - discount;
+  const total = baseFare + CAR.securityDeposit + doorstepFee - discount;
   const tokenAmount = Math.min(1000, Math.round(total * 0.2));
   const balanceDue = total - tokenAmount;
 
-  const applyCoupon = () => {
-    if (coupon.toUpperCase() === "VKFIRST") setCouponApplied(true);
+  const applyCoupon = async () => {
+    if (!coupon) return;
+    try {
+      await api.post("/api/coupons/validate", { code: coupon.toUpperCase() });
+      setCouponApplied(true);
+      toast.success("Coupon applied!");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Invalid coupon code");
+    }
   };
 
   return (
@@ -125,9 +300,6 @@ export default function CarSlugPage() {
                         <span className="bg-[#FFF3ED] text-[#E8540A] text-xs font-bold px-3 py-1 rounded-full">
                           Rs. {CAR.pricePerHr}/hr
                         </span>
-                        <span className="bg-[#D1FAE5] text-[#065F46] text-xs font-bold px-3 py-1 rounded-full">
-                          {CAR.kmIncluded} km included
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -143,7 +315,7 @@ export default function CarSlugPage() {
                       <div className="flex-1 h-0.5 bg-gradient-to-r from-[#10B981] to-[#E8540A] relative">
                         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex items-center">
                           <span className="bg-[#FFF3ED] text-[#E8540A] text-xs font-bold px-3 py-1 rounded-full border border-[#E8540A]/30 whitespace-nowrap">
-                            {getDurationLabel(hours)} • {CAR.kmIncluded} km
+                            {getDurationLabel(hours)}
                           </span>
                         </div>
                       </div>
@@ -168,7 +340,6 @@ export default function CarSlugPage() {
                     { icon: Fuel, label: CAR.fuel },
                     { icon: Settings, label: CAR.transmission },
                     { icon: Users, label: `${CAR.seats} Seats` },
-                    { icon: MapPin, label: `${CAR.kmIncluded} km included` },
                     { icon: Clock, label: `Min ${MIN_BOOKING_HOURS} hrs` },
                     { icon: Shield, label: "Fully Insured" },
                   ].map(({ icon: Icon, label }) => (
@@ -301,7 +472,6 @@ export default function CarSlugPage() {
                     {[
                       { label: `Base fare (Rs. ${CAR.pricePerHr} × ${hours} hrs)`, value: baseFare },
                       { label: "Security deposit (refundable)", value: CAR.securityDeposit },
-                      { label: "GST (5%)", value: gst },
                       ...(doorstep ? [{ label: "Doorstep delivery", value: doorstepFee }] : []),
                     ].map(({ label, value }) => (
                       <div key={label} className="flex items-center justify-between text-sm">
@@ -390,9 +560,15 @@ export default function CarSlugPage() {
                     ))}
                   </div>
 
-                  <button className="w-full btn-gradient py-4 rounded-xl text-white font-bold text-base flex items-center justify-center gap-2 shadow-[0_12px_32px_rgba(232,84,10,0.4)]">
-                    <Lock size={16} />
-                    Pay Now Rs. {paymentMode === "token" ? tokenAmount.toLocaleString("en-IN") : total.toLocaleString("en-IN")}
+                  <button
+                    onClick={handlePayClick}
+                    disabled={payLoading}
+                    className="w-full btn-gradient py-4 rounded-xl text-white font-bold text-base flex items-center justify-center gap-2 shadow-[0_12px_32px_rgba(232,84,10,0.4)] disabled:opacity-70"
+                  >
+                    {payLoading
+                      ? <><Loader2 size={16} className="animate-spin" /> Processing...</>
+                      : <><Lock size={16} /> Pay Now Rs. {paymentMode === "token" ? tokenAmount.toLocaleString("en-IN") : total.toLocaleString("en-IN")}</>
+                    }
                   </button>
 
                   <p className="text-center text-xs text-[#9090A8] mt-3">
@@ -404,6 +580,91 @@ export default function CarSlugPage() {
           </div>
         </div>
       </div>
+
+      {/* KM Policy Modal — shown for 1-day bookings */}
+      {showKmModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#E8540A] to-[#FF6B35] px-6 py-5 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <AlertCircle size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-lg font-syne leading-tight">KM Policy — 1 Day Booking</h3>
+                  <p className="text-white/80 text-xs mt-0.5">Please read before proceeding</p>
+                </div>
+              </div>
+              <button onClick={() => setShowKmModal(false)} className="text-white/60 hover:text-white transition-colors mt-0.5">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Included km */}
+              <div className="bg-[#FFF3ED] border border-[#E8540A]/20 rounded-xl p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[#E8540A]/10 flex items-center justify-center shrink-0">
+                  <span className="text-2xl">🛣️</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#9090A8] uppercase tracking-wider">Included in 1 Day</p>
+                  <p className="text-2xl font-black text-[#E8540A] font-syne leading-none mt-0.5">
+                    {kmPolicy.includedKmPerDay} KM
+                  </p>
+                  <p className="text-xs text-[#4A4A6A] mt-0.5">Free kilometres for your trip</p>
+                </div>
+              </div>
+
+              {/* Extra km charge */}
+              <div className="bg-[#F8F9FC] border border-[#E4E5EF] rounded-xl p-4 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[#0F0F1A]/5 flex items-center justify-center shrink-0">
+                  <span className="text-2xl">⚡</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-[#9090A8] uppercase tracking-wider">Extra KM Charge</p>
+                  <p className="text-2xl font-black text-[#0F0F1A] font-syne leading-none mt-0.5">
+                    ₹{kmPolicy.extraKmRate}<span className="text-base font-semibold text-[#4A4A6A]">/km</span>
+                  </p>
+                  <p className="text-xs text-[#4A4A6A] mt-0.5">Charged after {kmPolicy.includedKmPerDay} km limit</p>
+                </div>
+              </div>
+
+              {/* Info points */}
+              <div className="space-y-2">
+                {[
+                  `First ${kmPolicy.includedKmPerDay} km are completely free`,
+                  `Extra km billed at ₹${kmPolicy.extraKmRate}/km at return`,
+                  "Odometer reading verified at pickup & drop",
+                  "Extra km charges settled in cash or UPI at return",
+                ].map((point) => (
+                  <div key={point} className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-[#10B981] mt-0.5 shrink-0" />
+                    <p className="text-[#4A4A6A] text-sm">{point}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setShowKmModal(false)}
+                className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A] hover:bg-[#F8F9FC] transition-colors"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={() => { setShowKmModal(false); proceedToPayment(); }}
+                className="flex-1 py-3 rounded-xl btn-gradient text-white font-bold text-sm shadow-[0_4px_16px_rgba(232,84,10,0.3)]"
+              >
+                Understood, Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 }
