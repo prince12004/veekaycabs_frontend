@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Phone, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { authAPI } from "@/lib/api";
+import toast from "react-hot-toast";
 
 const GOOGLE_SVG = (
   <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -17,6 +19,9 @@ const GOOGLE_SVG = (
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/account";
+
   const [tab, setTab] = useState<"otp" | "google">("otp");
   const [step, setStep] = useState<1 | 2>(1);
   const [mobile, setMobile] = useState("");
@@ -37,19 +42,40 @@ export default function LoginPage() {
   const sendOtp = async () => {
     if (mobile.length < 10) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    setStep(2);
-    setTimer(45);
-    setCanResend(false);
+    try {
+      await authAPI.sendOtp(mobile);
+      toast.success("OTP sent to +91 " + mobile);
+      setStep(2);
+      setTimer(45);
+      setCanResend(false);
+      setOtp(["", "", "", "", "", ""]);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to send OTP. Try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const verifyOtp = async () => {
-    if (otp.join("").length < 6) return;
+    const otpStr = otp.join("");
+    if (otpStr.length < 6) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    router.push("/account");
+    try {
+      const { data } = await authAPI.verifyOtp(mobile, otpStr);
+      // Save auth token + user info
+      localStorage.setItem("vk_token", data.token);
+      if (data.refreshToken) localStorage.setItem("vk_refresh_token", data.refreshToken);
+      localStorage.setItem("vk_user", JSON.stringify(data.user));
+      toast.success("Login successful!");
+      router.push(redirect);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Invalid OTP. Try again.");
+      setOtp(["", "", "", "", "", ""]);
+      otpRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOtpChange = (idx: number, val: string) => {
@@ -59,23 +85,39 @@ export default function LoginPage() {
     setOtp(next);
     if (val && idx < 5) otpRefs.current[idx + 1]?.focus();
     if (!val && idx > 0) otpRefs.current[idx - 1]?.focus();
+    // Auto-submit when last digit entered
+    if (val && idx === 5) {
+      const full = [...next].join("");
+      if (full.length === 6) setTimeout(() => verifyOtp(), 100);
+    }
   };
 
   const handleOtpKeyDown = (idx: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !otp[idx] && idx > 0) {
       otpRefs.current[idx - 1]?.focus();
     }
+    if (e.key === "Enter") verifyOtp();
   };
 
-  const resendOtp = () => {
+  const handleMobileKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && mobile.length === 10) sendOtp();
+  };
+
+  const resendOtp = async () => {
     setTimer(45);
     setCanResend(false);
     setOtp(["", "", "", "", "", ""]);
+    try {
+      await authAPI.sendOtp(mobile);
+      toast.success("OTP resent!");
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } catch {
+      toast.error("Failed to resend OTP");
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] flex items-center justify-center px-4 py-16">
-      {/* Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-[#0F0F1A]/5 to-[#E8540A]/5 pointer-events-none" />
 
       <div className="relative w-full max-w-md">
@@ -131,8 +173,10 @@ export default function LoginPage() {
                         maxLength={10}
                         value={mobile}
                         onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+                        onKeyDown={handleMobileKeyDown}
                         placeholder="Enter 10-digit number"
-                        className="flex-1 border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-3 text-sm text-[#0F0F1A] placeholder:text-[#9090A8]"
+                        autoFocus
+                        className="flex-1 border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-3 text-sm text-[#0F0F1A] placeholder:text-[#9090A8] outline-none"
                       />
                     </div>
                   </div>
@@ -142,7 +186,7 @@ export default function LoginPage() {
                     disabled={mobile.length < 10 || loading}
                     className={cn(
                       "w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all",
-                      mobile.length >= 10
+                      mobile.length >= 10 && !loading
                         ? "btn-gradient"
                         : "bg-[#E4E5EF] cursor-not-allowed text-[#9090A8]"
                     )}
@@ -182,7 +226,7 @@ export default function LoginPage() {
                         value={digit}
                         onChange={(e) => handleOtpChange(idx, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        className="w-12 h-12 text-center border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl text-lg font-bold text-[#0F0F1A] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-12 h-12 text-center border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl text-lg font-bold text-[#0F0F1A] outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     ))}
                   </div>
@@ -207,7 +251,7 @@ export default function LoginPage() {
                     disabled={otp.join("").length < 6 || loading}
                     className={cn(
                       "w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 transition-all",
-                      otp.join("").length === 6
+                      otp.join("").length === 6 && !loading
                         ? "btn-gradient"
                         : "bg-[#E4E5EF] cursor-not-allowed text-[#9090A8]"
                     )}

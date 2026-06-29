@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -10,47 +10,98 @@ import {
   Video, Upload, CheckCircle, XCircle, Clock,
   MessageSquare, RefreshCw, Camera, ChevronDown, ChevronUp,
   Printer, Shield, Fuel, Gauge, Send, X as XIcon, FileCheck, Loader2,
+  MapPin, Truck, AlertTriangle, Eye, Image as ImageIcon, Zap,
+  ScanSearch, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const CAR_DOCUMENTS = [
-  { key: "rc", label: "RC (Registration Certificate)", available: true },
-  { key: "insurance", label: "Insurance", available: true },
-  { key: "puc", label: "PUC Certificate", available: true },
-  { key: "fitness", label: "Fitness Certificate", available: false },
-] as const;
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface MediaRecord { _id: string; type: string; urls: string[]; notes: string; uploadedAt: string; }
+interface UserDoc { aadhaar?: any; pan?: any; dl?: any; }
+interface Prediction { x: number; y: number; width: number; height: number; confidence: number; class: string; }
+interface DamageAnalysisSet {
+  thumbnails: string[];
+  predictions: Prediction[];
+  damageLabels: string[];
+  score: number;
+  damage: boolean;
+  imageWidth: number;
+  imageHeight: number;
+}
+interface DamageReport {
+  pickup: DamageAnalysisSet;
+  return: DamageAnalysisSet;
+  newDamageDetected: boolean;
+  verdict: string;
+  analyzedAt: string;
+  apiUsed: string;
+}
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDT = (d: string) =>
   new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 const fmtMode = (m: string) =>
   m === "online" ? "Online" : m === "offline_cash" ? "Offline Cash" : m === "offline_qr" ? "UPI/QR" : m;
 
+const DOC_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  not_uploaded: { label: "Not Uploaded", color: "text-[#9090A8]" },
+  pending:      { label: "Pending Review", color: "text-[#F59E0B]" },
+  verified:     { label: "Verified", color: "text-[#10B981]" },
+  rejected:     { label: "Rejected", color: "text-[#EF4444]" },
+  mismatch:     { label: "Mismatch", color: "text-[#EF4444]" },
+  expired:      { label: "Expired", color: "text-[#EF4444]" },
+};
+
 export default function BookingDetailPage() {
   const params = useParams();
   const id = String(params.id);
 
-  // All hooks must be declared before any early returns
   const [rawBooking, setRawBooking] = useState<Record<string, any> | null>(null);
   const [loadingPage, setLoadingPage] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "vehicle" | "documents" | "payment" | "timeline">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "vehicle" | "userdocs" | "cardocs" | "payment" | "timeline">("overview");
+
+  // Vehicle verification
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [carReceived, setCarReceived] = useState(false);
   const [carReturned, setCarReturned] = useState(false);
-  const [pickupVideos, setPickupVideos] = useState<File[]>([]);
-  const [returnVideos, setReturnVideos] = useState<File[]>([]);
-  const [pickupVideosSaved, setPickupVideosSaved] = useState(false);
-  const [returnVideosSaved, setReturnVideosSaved] = useState(false);
-  const [showPickupChecklist, setShowPickupChecklist] = useState(false);
-  const [showReturnChecklist, setShowReturnChecklist] = useState(false);
   const [pickupCondition, setPickupCondition] = useState({ fuel: "", odometer: "", challan: false, damage: "", extras: "", tyres: "Good", ac: true, documents: true });
   const [returnCondition, setReturnCondition] = useState({ fuel: "", odometer: "", challan: false, damage: "", extras: "", tyres: "", ac: true, documents: true });
+  const [showPickupChecklist, setShowPickupChecklist] = useState(false);
+  const [showReturnChecklist, setShowReturnChecklist] = useState(false);
   const [refundInitiated, setRefundInitiated] = useState(false);
+
+  // Media upload
+  const pickupInputRef = useRef<HTMLInputElement>(null);
+  const returnInputRef = useRef<HTMLInputElement>(null);
+  const [pickupFiles, setPickupFiles] = useState<File[]>([]);
+  const [returnFiles, setReturnFiles] = useState<File[]>([]);
+  const [pickupUploading, setPickupUploading] = useState(false);
+  const [returnUploading, setReturnUploading] = useState(false);
+  const [savedMedia, setSavedMedia] = useState<MediaRecord[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+
+  // Dent analysis + comparison modal
+  const [damageReport, setDamageReport] = useState<DamageReport | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+
+  // User KYC docs
+  const [userDocs, setUserDocs] = useState<UserDoc | null>(null);
+  const [userDocsLoading, setUserDocsLoading] = useState(false);
+  const [userDocsUser, setUserDocsUser] = useState<any>(null);
+
+  // Car documents / WhatsApp
   const [sentDocs, setSentDocs] = useState<string[]>([]);
+  const [sendingAllDocs, setSendingAllDocs] = useState(false);
+  const [sendingDocKey, setSendingDocKey] = useState<string | null>(null);
+
+  // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", amountPaid: "", paymentMode: "online", notes: "" });
   const [editLoading, setEditLoading] = useState(false);
 
+  // ── Load booking ────────────────────────────────────────────────────────────
   useEffect(() => {
     bookingsApi.getById(id)
       .then(({ data }) => {
@@ -64,6 +115,30 @@ export default function BookingDetailPage() {
       .finally(() => setLoadingPage(false));
   }, [id]);
 
+  // ── Load saved media ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!id) return;
+    setMediaLoading(true);
+    bookingsApi.getMedia(id)
+      .then(({ data }) => setSavedMedia(data.data || []))
+      .catch(() => {})
+      .finally(() => setMediaLoading(false));
+  }, [id]);
+
+  // ── Load user docs when tab active ─────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== "userdocs" || userDocs !== null) return;
+    setUserDocsLoading(true);
+    bookingsApi.getUserDocs(id)
+      .then(({ data }) => {
+        setUserDocs(data.data?.documents || null);
+        setUserDocsUser(data.data?.user || null);
+      })
+      .catch(() => {})
+      .finally(() => setUserDocsLoading(false));
+  }, [activeTab, id]);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleStatusChange = async (status: string) => {
     if (!rawBooking) return;
     setUpdatingStatus(true);
@@ -75,6 +150,87 @@ export default function BookingDetailPage() {
       toast.error("Failed to update status");
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const deleteMedia = async (mediaId: string, url: string) => {
+    if (!confirm("Delete this file?")) return;
+    try {
+      await bookingsApi.deleteMedia(id, mediaId, url);
+      setSavedMedia(prev => prev.map(m =>
+        m._id === mediaId ? { ...m, urls: m.urls.filter((u: string) => u !== url) } : m
+      ).filter(m => m.urls.length > 0));
+      toast.success("File deleted");
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
+
+  const uploadMedia = async (type: "pickup" | "return") => {
+    const files = type === "pickup" ? pickupFiles : returnFiles;
+    if (!files.length) return;
+    const setter = type === "pickup" ? setPickupUploading : setReturnUploading;
+    setter(true);
+    try {
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      fd.append("type", type);
+      const { data } = await bookingsApi.uploadMedia(id, fd);
+      setSavedMedia((prev) => [...prev, data.data]);
+      if (type === "pickup") { setPickupFiles([]); setCarReceived(true); }
+      else { setReturnFiles([]); setCarReturned(true); }
+      toast.success(`${files.length} ${type} file(s) uploaded to cloud`);
+    } catch {
+      toast.error("Upload failed. Check Cloudinary config.");
+    } finally {
+      setter(false);
+    }
+  };
+
+  const runDamageAnalysis = async () => {
+    setAnalyzing(true);
+    try {
+      const { data } = await bookingsApi.analyzeDamage(id);
+      setDamageReport(data.data);
+      toast.success("Analysis complete");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const sendAllCarDocs = async () => {
+    setSendingAllDocs(true);
+    try {
+      const { data } = await bookingsApi.sendCarDocs(id);
+      if (data.failedDocs?.length > 0 && data.failedDocs.length === (data.totalDocs ?? data.failedDocs.length)) {
+        toast.error("WhatsApp notification failed. Check NeoDove API.");
+      } else {
+        setSentDocs(["rc", "insurance", "puc", "fitness"]);
+        toast.success("WhatsApp notification sent to customer!");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to send documents");
+    } finally {
+      setSendingAllDocs(false);
+    }
+  };
+
+  const sendSingleDoc = async (key: string, label: string) => {
+    setSendingDocKey(key);
+    try {
+      const { data } = await bookingsApi.sendCarDocs(id);
+      if (data.success !== false) {
+        setSentDocs((d) => (d.includes(key) ? d : [...d, key]));
+        toast.success(`Notification sent for ${label}`);
+      } else {
+        toast.error("Failed to send");
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to send");
+    } finally {
+      setSendingDocKey(null);
     }
   };
 
@@ -110,7 +266,7 @@ export default function BookingDetailPage() {
       });
       setRawBooking(data.data);
       setShowEditModal(false);
-      toast.success("Booking updated successfully");
+      toast.success("Booking updated");
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Failed to update booking");
     } finally {
@@ -118,6 +274,7 @@ export default function BookingDetailPage() {
     }
   };
 
+  // ── Loading / not-found ─────────────────────────────────────────────────────
   if (loadingPage) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] gap-3 text-[#9090A8]">
@@ -125,7 +282,6 @@ export default function BookingDetailPage() {
       </div>
     );
   }
-
   if (!rawBooking) {
     return (
       <div className="p-8 text-center text-[#9090A8]">
@@ -135,79 +291,75 @@ export default function BookingDetailPage() {
     );
   }
 
-  // Map API fields to display (after hooks, after early returns)
+  // ── Derived booking object ──────────────────────────────────────────────────
   const booking = {
-    id: rawBooking.bookingId || rawBooking._id,
+    id:   rawBooking.bookingId || rawBooking._id,
+    _id:  rawBooking._id,
     customer: {
-      name: rawBooking.userId?.name || "—",
-      mobile: rawBooking.userId?.mobile || "—",
-      email: rawBooking.userId?.email || "—",
-      kyc: rawBooking.userId?.kycStatus || "pending",
+      name:   rawBooking.userId?.name || "—",
+      mobile: (rawBooking.userId?.mobile && !rawBooking.userId.mobile.startsWith("google_")) ? rawBooking.userId.mobile : "Google user",
+      email:  rawBooking.userId?.email || "—",
+      kyc:    rawBooking.userId?.kycStatus || "pending",
     },
     car: {
-      name: rawBooking.carId?.name || "—",
-      regNo: rawBooking.carId?.registrationNo || "—",
-      type: rawBooking.carId?.type || "—",
-      fuel: rawBooking.carId?.fuel || "—",
+      name:       rawBooking.carId?.name || "—",
+      regNo:      rawBooking.carId?.registrationNo || "—",
+      type:       rawBooking.carId?.type || "—",
+      fuel:       rawBooking.carId?.fuel || "—",
+      documents:  rawBooking.carId?.documents || {},
+      images:     rawBooking.carId?.images || [],
     },
-    city: rawBooking.cityId?.name || rawBooking.pickupLocation || "—",
-    start: rawBooking.startTime,
-    end: rawBooking.endTime,
-    bookingType: rawBooking.isOffline ? "Offline" : "Online",
-    addedBy: rawBooking.isOffline ? "Offline Entry" : "Customer",
+    city:            rawBooking.cityId?.name || rawBooking.pickupLocation || "—",
+    start:           rawBooking.startTime,
+    end:             rawBooking.endTime,
+    pickupLocation:  rawBooking.pickupLocation || "—",
+    deliveryAddress: rawBooking.deliveryAddress || null,
+    doorstep:        rawBooking.doorstepDelivery || false,
+    bookingType:     rawBooking.isOffline ? "Offline" : "Online",
     payment: {
-      total: rawBooking.totalAmount || 0,
-      received: rawBooking.amountPaid || 0,
-      mode: fmtMode(rawBooking.paymentMode || "online"),
-      status: rawBooking.razorpayPaymentId ? "Success" : rawBooking.amountPaid > 0 ? "Partial" : "Pending",
+      total:    rawBooking.totalAmount   || 0,
+      received: rawBooking.amountPaid    || 0,
+      mode:     fmtMode(rawBooking.paymentMode || "online"),
+      status:   rawBooking.razorpayPaymentId ? "Success" : rawBooking.amountPaid > 0 ? "Partial" : "Pending",
     },
     securityDeposit: rawBooking.securityDeposit || 0,
-    homeDelivery: rawBooking.doorstepCharge || 0,
-    remark: rawBooking.challanDetails || "",
-    status: rawBooking.status,
+    homeDelivery:    rawBooking.doorstepCharge || 0,
+    remark:          rawBooking.challanDetails || "",
+    status:          rawBooking.status,
   };
 
-  const sendDocument = (key: string, label: string) => {
-    setSentDocs((d) => (d.includes(key) ? d : [...d, key]));
-    toast.success(`${label} sent to ${booking.customer.name} via WhatsApp`);
-  };
-
-  const sendAllDocuments = () => {
-    const available = CAR_DOCUMENTS.filter((d) => d.available);
-    setSentDocs(available.map((d) => d.key));
-    toast.success(`${available.length} document(s) sent to ${booking.customer.name} via WhatsApp`);
-  };
-
-  const removePickupVideo = (idx: number) => setPickupVideos((v) => v.filter((_, i) => i !== idx));
-  const removeReturnVideo = (idx: number) => setReturnVideos((v) => v.filter((_, i) => i !== idx));
-
-  const savePickupVideos = () => {
-    setPickupVideosSaved(true);
-    toast.success(`${pickupVideos.length} pickup video(s) saved`);
-  };
-
-  const saveReturnVideos = () => {
-    setReturnVideosSaved(true);
-    toast.success(`${returnVideos.length} return video(s) saved`);
-  };
-
-  const nights = Math.round((new Date(booking.end).getTime() - new Date(booking.start).getTime()) / (1000 * 60 * 60 * 24));
+  const nights  = Math.round((new Date(booking.end).getTime() - new Date(booking.start).getTime()) / (1000 * 60 * 60 * 24));
   const balance = booking.payment.total - booking.payment.received;
 
-  const whatsappMsg = encodeURIComponent(`*Veekay Cabs — Booking Confirmation* ✅\n\nBooking ID: ${booking.id}\nCar: ${booking.car.name} (${booking.car.regNo})\nCustomer: ${booking.customer.name}\n\n*Booking Period:*\nFrom: ${new Date(booking.start).toLocaleString("en-IN")}\nTo: ${new Date(booking.end).toLocaleString("en-IN")}\n\n*Payment Summary:*\nTotal Amount: Rs. ${booking.payment.total.toLocaleString("en-IN")}\nAmount Paid: Rs. ${booking.payment.received.toLocaleString("en-IN")}\nBalance Due: Rs. ${balance.toLocaleString("en-IN")}\n\nSecurity Deposit: Rs. ${booking.securityDeposit.toLocaleString("en-IN")}\n\nThank you for choosing Veekay Cabs! 🚗\n📞 +91 99999 26867`);
+  // WhatsApp bill text (fallback session message link)
+  const waText = encodeURIComponent(
+    `*Veekay Cabs — Booking Confirmation* ✅\n\nBooking ID: ${booking.id}\nCar: ${booking.car.name} (${booking.car.regNo})\nCustomer: ${booking.customer.name}\n\nPickup: ${new Date(booking.start).toLocaleString("en-IN")}\nReturn: ${new Date(booking.end).toLocaleString("en-IN")}\nLocation: ${booking.doorstep ? booking.deliveryAddress || "Doorstep" : booking.pickupLocation}\n\nTotal: Rs. ${booking.payment.total.toLocaleString("en-IN")}\nPaid: Rs. ${booking.payment.received.toLocaleString("en-IN")}\nBalance: Rs. ${balance.toLocaleString("en-IN")}\n\nVeekay Cabs | +91 99999 26867`
+  );
+
+  // Car documents list (dynamic from car data)
+  const carDocsList = [
+    { key: "rc",        label: "RC (Registration Certificate)", url: booking.car.documents?.rc?.url,        expiry: booking.car.documents?.rc?.expiry },
+    { key: "insurance", label: "Insurance",                      url: booking.car.documents?.insurance?.url, expiry: booking.car.documents?.insurance?.expiry },
+    { key: "puc",       label: "PUC Certificate",                url: booking.car.documents?.puc?.url,       expiry: booking.car.documents?.puc?.expiry },
+    { key: "fitness",   label: "Fitness Certificate",            url: booking.car.documents?.fitness?.url,   expiry: booking.car.documents?.fitness?.expiry },
+  ];
+
+  const pickupSaved = savedMedia.filter((m) => m.type === "pickup_photos");
+  const returnSaved = savedMedia.filter((m) => m.type === "return_photos");
 
   const tabs = [
-    { key: "overview", label: "Overview" },
-    { key: "vehicle", label: "Vehicle Verification" },
-    { key: "documents", label: "Car Documents" },
-    { key: "payment", label: "Payment" },
-    { key: "timeline", label: "Timeline" },
+    { key: "overview",  label: "Overview" },
+    { key: "vehicle",   label: "Vehicle Verification" },
+    { key: "userdocs",  label: "User KYC Docs" },
+    { key: "cardocs",   label: "Car Documents" },
+    { key: "payment",   label: "Payment" },
+    { key: "timeline",  label: "Timeline" },
   ] as const;
 
   return (
     <>
-    <div className="p-6 space-y-5">
-      {/* Header */}
+    <div className="p-6 space-y-5 min-h-full">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">
           <Link href="/admin/bookings" className="text-[#9090A8] hover:text-[#E8540A] transition-colors">
@@ -219,46 +371,42 @@ export default function BookingDetailPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <a href={`https://wa.me/${booking.customer.mobile}?text=${whatsappMsg}`} target="_blank" rel="noreferrer"
+          <a href={`https://wa.me/${booking.customer.mobile}?text=${waText}`} target="_blank" rel="noreferrer"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] text-white font-semibold text-sm">
             <Phone size={14} /> WhatsApp Bill
           </a>
           <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm">
             <Printer size={14} /> Print
           </button>
-          <button
-            onClick={openEditModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors"
-          >
-            <FileText size={14} /> Edit Booking
+          <button onClick={openEditModal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors">
+            <FileText size={14} /> Edit
           </button>
         </div>
       </div>
 
-      {/* Status Banner */}
+      {/* ── Status Banner ───────────────────────────────────────────────────── */}
       <div className="bg-gradient-to-r from-[#E8540A] to-[#FF6B35] rounded-2xl p-5 text-white flex flex-wrap items-center gap-4 justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-            <Car size={24} />
-          </div>
+          {booking.car.images[0] ? (
+            <img src={booking.car.images[0]} alt={booking.car.name} className="w-14 h-14 rounded-xl object-cover bg-white/20" />
+          ) : (
+            <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center"><Car size={24} /></div>
+          )}
           <div>
             <p className="font-black text-lg">{booking.car.name}</p>
             <p className="text-white/80 text-sm">{booking.car.regNo} · {booking.car.type}</p>
           </div>
         </div>
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-3 flex-wrap text-sm">
           <div className="bg-white/15 rounded-xl px-4 py-2">
             <p className="text-white/70 text-xs">Duration</p>
             <p className="font-bold">{nights} day{nights !== 1 ? "s" : ""}</p>
           </div>
           <div className="bg-white/15 rounded-xl px-3 py-2">
             <p className="text-white/70 text-xs mb-1">Status</p>
-            <select
-              value={booking.status}
-              onChange={e => handleStatusChange(e.target.value)}
-              disabled={updatingStatus}
-              className="bg-white/20 text-white font-bold text-sm rounded-lg px-2 py-0.5 border border-white/30 outline-none cursor-pointer capitalize disabled:opacity-60"
-            >
+            <select value={booking.status} onChange={e => handleStatusChange(e.target.value)} disabled={updatingStatus}
+              className="bg-white/20 text-white font-bold text-sm rounded-lg px-2 py-0.5 border border-white/30 outline-none cursor-pointer capitalize disabled:opacity-60">
               {["pending","confirmed","active","completed","cancelled"].map(s => (
                 <option key={s} value={s} className="text-[#0F0F1A] bg-white capitalize">{s}</option>
               ))}
@@ -266,13 +414,13 @@ export default function BookingDetailPage() {
           </div>
           <div className="bg-white/15 rounded-xl px-4 py-2">
             <p className="text-white/70 text-xs">Type</p>
-            <p className="font-bold">{booking.bookingType}</p>
+            <p className="font-bold">{booking.doorstep ? "Doorstep" : "Office Pickup"}</p>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-white border border-[#E4E5EF] p-1.5 rounded-2xl w-fit">
+      {/* ── Tabs ───────────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 bg-white border border-[#E4E5EF] p-1.5 rounded-2xl flex-wrap">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
             className={cn("px-4 py-2 rounded-xl text-sm font-semibold transition-all", activeTab === t.key ? "bg-[#E8540A] text-white" : "text-[#4A4A6A] hover:bg-[#F8F9FC]")}>
@@ -281,34 +429,42 @@ export default function BookingDetailPage() {
         ))}
       </div>
 
-      {/* Overview Tab */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Overview Tab                                                          */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === "overview" && (
         <div className="grid lg:grid-cols-2 gap-5">
+          {/* Customer Info */}
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-4">
             <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2"><User size={16} className="text-[#E8540A]" /> Customer Info</h3>
             <div className="space-y-3">
               {[
-                { label: "Name", value: booking.customer.name },
+                { label: "Name",   value: booking.customer.name },
                 { label: "Mobile", value: booking.customer.mobile },
-                { label: "Email", value: booking.customer.email },
-                { label: "KYC", value: booking.customer.kyc },
+                { label: "Email",  value: booking.customer.email },
+                { label: "KYC",    value: booking.customer.kyc },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between items-center py-2 border-b border-[#F1F2F7]">
                   <span className="text-[#9090A8] text-sm">{label}</span>
-                  <span className={cn("font-semibold text-sm", label === "KYC" ? value === "verified" ? "text-[#10B981]" : "text-[#F59E0B]" : "text-[#0F0F1A]")}>{value}</span>
+                  <span className={cn("font-semibold text-sm", label === "KYC"
+                    ? value === "verified" ? "text-[#10B981]" : "text-[#F59E0B]"
+                    : "text-[#0F0F1A]"
+                  )}>{value}</span>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Booking Period + Delivery */}
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-4">
             <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2"><Calendar size={16} className="text-[#E8540A]" /> Booking Period</h3>
             <div className="space-y-3">
               {[
-                { label: "Start", value: new Date(booking.start).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) },
-                { label: "End", value: new Date(booking.end).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) },
+                { label: "Start",    value: new Date(booking.start).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) },
+                { label: "End",      value: new Date(booking.end).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) },
                 { label: "Duration", value: `${nights} day${nights !== 1 ? "s" : ""}` },
-                { label: "City", value: booking.city },
-                { label: "Added By", value: booking.addedBy },
+                { label: "City",     value: booking.city },
+                { label: "Type",     value: booking.bookingType },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between items-center py-2 border-b border-[#F1F2F7]">
                   <span className="text-[#9090A8] text-sm">{label}</span>
@@ -317,8 +473,35 @@ export default function BookingDetailPage() {
               ))}
             </div>
           </div>
+
+          {/* Pickup / Delivery Info */}
+          <div className={cn("bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-3", booking.doorstep ? "border-[#E8540A]/30 bg-[#FFF3ED]/30" : "")}>
+            <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2">
+              {booking.doorstep ? <Truck size={16} className="text-[#E8540A]" /> : <MapPin size={16} className="text-[#E8540A]" />}
+              {booking.doorstep ? "Doorstep Delivery" : "Pickup Location"}
+            </h3>
+            {booking.doorstep ? (
+              <div className="space-y-2">
+                <div className="flex justify-between py-2 border-b border-[#F1F2F7]">
+                  <span className="text-[#9090A8] text-sm">Office Address</span>
+                  <span className="font-semibold text-sm text-[#0F0F1A] text-right max-w-[55%]">{booking.pickupLocation}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-[#F1F2F7]">
+                  <span className="text-[#9090A8] text-sm">Delivery Address</span>
+                  <span className="font-semibold text-sm text-[#E8540A] text-right max-w-[55%]">{booking.deliveryAddress || "—"}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-[#9090A8] text-sm">Delivery Charge</span>
+                  <span className="font-semibold text-sm text-[#0F0F1A]">Rs. {booking.homeDelivery.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[#4A4A6A] text-sm font-medium">{booking.pickupLocation}</p>
+            )}
+          </div>
+
           {booking.remark && (
-            <div className="lg:col-span-2 bg-[#FFF3ED] border border-[#E8540A]/20 rounded-2xl p-4">
+            <div className="bg-[#FFF3ED] border border-[#E8540A]/20 rounded-2xl p-4">
               <p className="text-xs font-bold text-[#E8540A] mb-1 flex items-center gap-1.5"><MessageSquare size={13} /> Remark</p>
               <p className="text-[#4A4A6A] text-sm">{booking.remark}</p>
             </div>
@@ -326,10 +509,12 @@ export default function BookingDetailPage() {
         </div>
       )}
 
-      {/* Vehicle Verification Tab */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Vehicle Verification Tab                                              */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === "vehicle" && (
         <div className="space-y-5">
-          {/* Pickup Section */}
+          {/* ── Pickup Section ─────────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
             <button onClick={() => setShowPickupChecklist(!showPickupChecklist)}
               className="w-full flex items-center justify-between px-6 py-4 hover:bg-[#F8F9FC] transition-colors">
@@ -339,7 +524,7 @@ export default function BookingDetailPage() {
                 </div>
                 <div className="text-left">
                   <p className="font-bold text-[#0F0F1A]">Car Pickup Verification</p>
-                  <p className="text-[#9090A8] text-xs">Condition check when car is handed over to customer</p>
+                  <p className="text-[#9090A8] text-xs">Condition check when car is handed to customer</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -353,15 +538,15 @@ export default function BookingDetailPage() {
               <div className="border-t border-[#E4E5EF] p-6 space-y-5">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {[
-                    { label: "Fuel Level", icon: Fuel, field: "fuel" as const, placeholder: "Full / 3/4 / Half" },
-                    { label: "Odometer (km)", icon: Gauge, field: "odometer" as const, placeholder: "e.g. 48200" },
-                  ].map(({ label, icon: Icon, field, placeholder }) => (
+                    { label: "Fuel Level", field: "fuel" as const, placeholder: "Full / 3/4 / Half", icon: Fuel },
+                    { label: "Odometer (km)", field: "odometer" as const, placeholder: "e.g. 48200", icon: Gauge },
+                  ].map(({ label, field, icon: Icon, placeholder }) => (
                     <div key={field} className="col-span-2 sm:col-span-1">
                       <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">{label}</label>
                       <div className="relative">
                         <Icon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
-                        <input value={pickupCondition[field]} onChange={e => setPickupCondition(p => ({ ...p, [field]: e.target.value }))} placeholder={placeholder}
-                          className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none" />
+                        <input value={pickupCondition[field]} onChange={e => setPickupCondition(p => ({ ...p, [field]: e.target.value }))}
+                          placeholder={placeholder} className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none" />
                       </div>
                     </div>
                   ))}
@@ -377,7 +562,10 @@ export default function BookingDetailPage() {
                     <div className="flex gap-3 mt-2">
                       {[true, false].map(v => (
                         <button key={String(v)} onClick={() => setPickupCondition(p => ({ ...p, challan: v }))}
-                          className={cn("flex-1 py-2 rounded-xl text-xs font-bold border transition-colors", pickupCondition.challan === v ? "bg-[#EF4444] text-white border-[#EF4444]" : "border-[#E4E5EF] text-[#4A4A6A]")}>
+                          className={cn("flex-1 py-2 rounded-xl text-xs font-bold border transition-colors",
+                            pickupCondition.challan === v
+                              ? v ? "bg-[#EF4444] text-white border-[#EF4444]" : "bg-[#10B981] text-white border-[#10B981]"
+                              : "border-[#E4E5EF] text-[#4A4A6A] hover:bg-[#F8F9FC]")}>
                           {v ? "Yes" : "No"}
                         </button>
                       ))}
@@ -387,16 +575,16 @@ export default function BookingDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Damage Notes</label>
-                    <textarea value={pickupCondition.damage} onChange={e => setPickupCondition(p => ({ ...p, damage: e.target.value }))} placeholder="Any pre-existing scratches or damage..." rows={2}
+                    <textarea value={pickupCondition.damage} onChange={e => setPickupCondition(p => ({ ...p, damage: e.target.value }))} placeholder="Any pre-existing damage..." rows={2}
                       className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none resize-none" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Extra Accessories</label>
-                    <textarea value={pickupCondition.extras} onChange={e => setPickupCondition(p => ({ ...p, extras: e.target.value }))} placeholder="FastTag, toolkit, umbrella, etc." rows={2}
+                    <textarea value={pickupCondition.extras} onChange={e => setPickupCondition(p => ({ ...p, extras: e.target.value }))} placeholder="FastTag, toolkit, etc." rows={2}
                       className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none resize-none" />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex flex-wrap gap-2">
                   {[{ label: "AC Working", field: "ac" as const }, { label: "Docs Present", field: "documents" as const }].map(({ label, field }) => (
                     <button key={field} onClick={() => setPickupCondition(p => ({ ...p, [field]: !p[field] }))}
                       className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-colors", pickupCondition[field] ? "bg-[#D1FAE5] text-[#065F46] border-[#10B981]/30" : "bg-[#FEE2E2] text-[#991B1B] border-[#EF4444]/30")}>
@@ -404,41 +592,52 @@ export default function BookingDetailPage() {
                     </button>
                   ))}
                 </div>
-                {/* Video Upload */}
+
+                {/* Pickup Video Upload → Cloudinary */}
                 <div>
-                  <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block flex items-center gap-1.5"><Video size={13} /> Handover Video Evidence</label>
-                  <p className="text-xs text-[#9090A8] mb-2">Record the car from all angles right before handover — this is your proof against later damage claims.</p>
-                  <label className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-4 cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
-                    <input type="file" multiple accept="video/*" className="sr-only" onChange={e => { setPickupVideos(e.target.files ? Array.from(e.target.files) : []); setPickupVideosSaved(false); }} />
+                  <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 flex items-center gap-1.5"><Video size={13} /> Handover Video Evidence (saved to Cloud)</label>
+                  <p className="text-xs text-[#9090A8] mb-2">Upload video/photos before handing over the car.</p>
+                  <input ref={pickupInputRef} type="file" multiple accept="video/*,image/*" className="hidden"
+                    onChange={e => setPickupFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                  <div onClick={() => pickupInputRef.current?.click()} className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-4 cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
                     <Camera size={20} className="text-[#9090A8]" />
                     <div>
-                      <p className="text-sm font-semibold text-[#4A4A6A]">Upload handover videos</p>
-                      <p className="text-xs text-[#9090A8]">MP4, MOV — multiple angles supported</p>
+                      <p className="text-sm font-semibold text-[#4A4A6A]">Select handover files</p>
+                      <p className="text-xs text-[#9090A8]">Videos (MP4, MOV) or photos — multiple supported</p>
                     </div>
-                    {pickupVideos.length > 0 && <span className="ml-auto text-xs font-bold text-[#10B981]">{pickupVideos.length} selected</span>}
-                  </label>
-                  {pickupVideos.length > 0 && (
-                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                      {pickupVideos.map((file, idx) => (
-                        <div key={idx} className="relative bg-[#0F0F1A] rounded-xl overflow-hidden aspect-video flex items-center justify-center group">
-                          <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
-                          <button onClick={() => removePickupVideo(idx)}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <XIcon size={12} />
-                          </button>
-                          <span className="absolute bottom-1.5 left-1.5 text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded truncate max-w-[90%]">{file.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {pickupVideos.length > 0 && (
-                    <button onClick={savePickupVideos}
-                      className={cn("mt-3 flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors", pickupVideosSaved ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]")}>
-                      {pickupVideosSaved ? <CheckCircle size={15} /> : <Upload size={15} />}
-                      {pickupVideosSaved ? `${pickupVideos.length} video(s) saved` : "Save Handover Videos"}
+                    {pickupFiles.length > 0 && <span className="ml-auto text-xs font-bold text-[#10B981]">{pickupFiles.length} selected</span>}
+                  </div>
+                  {pickupFiles.length > 0 && (
+                    <button onClick={() => uploadMedia("pickup")} disabled={pickupUploading}
+                      className="mt-3 flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-[#7C3AED] text-white hover:bg-[#6D28D9] disabled:opacity-60 transition-colors">
+                      {pickupUploading ? <><Loader2 size={14} className="animate-spin" /> Uploading...</> : <><Upload size={14} /> Upload {pickupFiles.length} file(s) to Cloud</>}
                     </button>
                   )}
+                  {/* Already-saved pickup media */}
+                  {pickupSaved.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-bold text-[#9090A8]">{pickupSaved.reduce((a, m) => a + m.urls.length, 0)} file(s) saved to Cloudinary</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {pickupSaved.flatMap((m) => m.urls.map((url: string) => ({ url, mediaId: m._id }))).slice(0, 6).map(({ url, mediaId }, i) => (
+                          <div key={i} className="relative aspect-video bg-[#0F0F1A] rounded-xl overflow-hidden flex items-center justify-center group">
+                            <a href={url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center">
+                              {url.match(/\.(mp4|mov|avi|webm)/) ? (
+                                <><Video size={20} className="text-white/60" /><span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1 rounded">Video</span></>
+                              ) : (
+                                <img src={url} alt="" className="w-full h-full object-cover" />
+                              )}
+                            </a>
+                            <button onClick={() => deleteMedia(mediaId, url)}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10">
+                              <span className="text-[10px] font-bold">✕</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
+
                 <button onClick={() => { setCarReceived(true); toast.success("Car marked as handed over"); }}
                   className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm">
                   <CheckCircle size={16} /> Mark Car Handed Over
@@ -447,7 +646,35 @@ export default function BookingDetailPage() {
             )}
           </div>
 
-          {/* Return Section */}
+          {/* ── Compare Photos Card ────────────────────────────────────────── */}
+          {(pickupSaved.length > 0 || returnSaved.length > 0) && (
+            <div className="bg-gradient-to-r from-[#1E1040] to-[#2D1A60] rounded-2xl p-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-bold text-white flex items-center gap-2"><ScanSearch size={18} className="text-[#A78BFA]" /> Dent Comparison & AI Analysis</p>
+                <p className="text-white/50 text-xs mt-0.5">
+                  {pickupSaved.length > 0 && returnSaved.length > 0
+                    ? "Pickup + Return media ready — Compare in full screen and detect dents with AI"
+                    : pickupSaved.length > 0
+                      ? `${pickupSaved.reduce((a, m) => a + m.urls.length, 0)} pickup file(s) — Return media not uploaded yet`
+                      : `${returnSaved.reduce((a, m) => a + m.urls.length, 0)} return file(s) — Pickup media not uploaded yet`}
+                </p>
+                {damageReport && (
+                  <p className={cn("text-xs font-bold mt-1.5", damageReport.newDamageDetected ? "text-[#FCA5A5]" : "text-[#6EE7B7]")}>
+                    {damageReport.newDamageDetected ? "⚠ AI: New damage detected" : "✓ AI: No new damage"} · {new Date(damageReport.analyzedAt).toLocaleString("en-IN")}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => setShowCompareModal(true)}
+                className="shrink-0 flex items-center gap-2 px-5 py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-bold text-sm rounded-xl transition-colors"
+              >
+                <ScanSearch size={16} />
+                Compare Full Screen
+              </button>
+            </div>
+          )}
+
+          {/* ── Return Section ──────────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
             <button onClick={() => setShowReturnChecklist(!showReturnChecklist)}
               className="w-full flex items-center justify-between px-6 py-4 hover:bg-[#F8F9FC] transition-colors">
@@ -457,7 +684,7 @@ export default function BookingDetailPage() {
                 </div>
                 <div className="text-left">
                   <p className="font-bold text-[#0F0F1A]">Car Return Verification</p>
-                  <p className="text-[#9090A8] text-xs">Condition check when car is returned by customer</p>
+                  <p className="text-[#9090A8] text-xs">Condition when customer returns the car</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -472,20 +699,36 @@ export default function BookingDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="col-span-2 sm:col-span-1">
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Fuel Level on Return</label>
-                    <input value={returnCondition.fuel} onChange={e => setReturnCondition(p => ({ ...p, fuel: e.target.value }))} placeholder="e.g., Half"
-                      className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none" />
+                    <div className="relative">
+                      <Fuel size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                      <input value={returnCondition.fuel} onChange={e => setReturnCondition(p => ({ ...p, fuel: e.target.value }))} placeholder="Full / Half / Empty"
+                        className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none" />
+                    </div>
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Odometer on Return</label>
-                    <input value={returnCondition.odometer} onChange={e => setReturnCondition(p => ({ ...p, odometer: e.target.value }))} placeholder="e.g. 48900"
-                      className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none" />
+                    <div className="relative">
+                      <Gauge size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                      <input value={returnCondition.odometer} onChange={e => setReturnCondition(p => ({ ...p, odometer: e.target.value }))} placeholder="e.g. 48900"
+                        className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none" />
+                    </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">New Challan Received</label>
-                    <div className="flex gap-3 mt-2">
+                    <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Tyre Condition</label>
+                    <select value={returnCondition.tyres} onChange={e => setReturnCondition(p => ({ ...p, tyres: e.target.value }))}
+                      className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none bg-white">
+                      {["Good", "Fair", "Poor"].map(t => <option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">New Challan</label>
+                    <div className="flex gap-2 mt-1">
                       {[true, false].map(v => (
                         <button key={String(v)} onClick={() => setReturnCondition(p => ({ ...p, challan: v }))}
-                          className={cn("flex-1 py-2 rounded-xl text-xs font-bold border transition-colors", returnCondition.challan === v ? "bg-[#EF4444] text-white border-[#EF4444]" : "border-[#E4E5EF] text-[#4A4A6A]")}>
+                          className={cn("flex-1 py-2 rounded-xl text-xs font-bold border transition-colors",
+                            returnCondition.challan === v
+                              ? v ? "bg-[#EF4444] text-white border-[#EF4444]" : "bg-[#10B981] text-white border-[#10B981]"
+                              : "border-[#E4E5EF] text-[#4A4A6A] hover:bg-[#F8F9FC]")}>
                           {v ? "Yes" : "No"}
                         </button>
                       ))}
@@ -495,50 +738,71 @@ export default function BookingDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Damage on Return</label>
-                    <textarea value={returnCondition.damage} onChange={e => setReturnCondition(p => ({ ...p, damage: e.target.value }))} placeholder="Any new damage found on return..." rows={2}
+                    <textarea value={returnCondition.damage} onChange={e => setReturnCondition(p => ({ ...p, damage: e.target.value }))} placeholder="Any new damage..." rows={2}
                       className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none resize-none" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Extra Charges</label>
-                    <textarea value={returnCondition.extras} onChange={e => setReturnCondition(p => ({ ...p, extras: e.target.value }))} placeholder="Extra KM charges, cleaning, fuel deficit..." rows={2}
+                    <textarea value={returnCondition.extras} onChange={e => setReturnCondition(p => ({ ...p, extras: e.target.value }))} placeholder="Extra KM, cleaning, fuel..." rows={2}
                       className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none resize-none" />
                   </div>
                 </div>
+
+                {/* AC + Docs toggle */}
+                <div className="flex flex-wrap gap-2">
+                  {[{ label: "AC Working", field: "ac" as const }, { label: "Docs Present", field: "documents" as const }].map(({ label, field }) => (
+                    <button key={field} onClick={() => setReturnCondition(p => ({ ...p, [field]: !p[field] }))}
+                      className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-colors", returnCondition[field] ? "bg-[#D1FAE5] text-[#065F46] border-[#10B981]/30" : "bg-[#FEE2E2] text-[#991B1B] border-[#EF4444]/30")}>
+                      {returnCondition[field] ? <CheckCircle size={13} /> : <XCircle size={13} />} {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Return Video Upload → Cloudinary */}
                 <div>
-                  <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block flex items-center gap-1.5"><Video size={13} /> Return Video Evidence</label>
-                  <p className="text-xs text-[#9090A8] mb-2">Capture the car from all angles on return — compare against the handover video for any new dents or damage.</p>
-                  <label className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-4 cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
-                    <input type="file" multiple accept="video/*" className="sr-only" onChange={e => { setReturnVideos(e.target.files ? Array.from(e.target.files) : []); setReturnVideosSaved(false); }} />
+                  <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 flex items-center gap-1.5"><Video size={13} /> Return Video Evidence (saved to Cloud)</label>
+                  <p className="text-xs text-[#9090A8] mb-2">Upload video/photos after car is returned — used for dent comparison.</p>
+                  <input ref={returnInputRef} type="file" multiple accept="video/*,image/*" className="hidden"
+                    onChange={e => setReturnFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                  <div onClick={() => returnInputRef.current?.click()} className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-4 cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
                     <Upload size={20} className="text-[#9090A8]" />
                     <div>
-                      <p className="text-sm font-semibold text-[#4A4A6A]">Upload return videos</p>
-                      <p className="text-xs text-[#9090A8]">MP4, MOV — multiple angles supported</p>
+                      <p className="text-sm font-semibold text-[#4A4A6A]">Select return files</p>
+                      <p className="text-xs text-[#9090A8]">Compare against pickup footage for dent analysis</p>
                     </div>
-                    {returnVideos.length > 0 && <span className="ml-auto text-xs font-bold text-[#10B981]">{returnVideos.length} selected</span>}
-                  </label>
-                  {returnVideos.length > 0 && (
-                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                      {returnVideos.map((file, idx) => (
-                        <div key={idx} className="relative bg-[#0F0F1A] rounded-xl overflow-hidden aspect-video flex items-center justify-center group">
-                          <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" muted />
-                          <button onClick={() => removeReturnVideo(idx)}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <XIcon size={12} />
-                          </button>
-                          <span className="absolute bottom-1.5 left-1.5 text-[10px] text-white bg-black/50 px-1.5 py-0.5 rounded truncate max-w-[90%]">{file.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {returnVideos.length > 0 && (
-                    <button onClick={saveReturnVideos}
-                      className={cn("mt-3 flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-colors", returnVideosSaved ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]")}>
-                      {returnVideosSaved ? <CheckCircle size={15} /> : <Upload size={15} />}
-                      {returnVideosSaved ? `${returnVideos.length} video(s) saved` : "Save Return Videos"}
+                    {returnFiles.length > 0 && <span className="ml-auto text-xs font-bold text-[#10B981]">{returnFiles.length} selected</span>}
+                  </div>
+                  {returnFiles.length > 0 && (
+                    <button onClick={() => uploadMedia("return")} disabled={returnUploading}
+                      className="mt-3 flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-[#7C3AED] text-white hover:bg-[#6D28D9] disabled:opacity-60 transition-colors">
+                      {returnUploading ? <><Loader2 size={14} className="animate-spin" /> Uploading...</> : <><Upload size={14} /> Upload {returnFiles.length} file(s) to Cloud</>}
                     </button>
                   )}
+                  {returnSaved.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-bold text-[#9090A8]">{returnSaved.reduce((a, m) => a + m.urls.length, 0)} return file(s) saved</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {returnSaved.flatMap((m) => m.urls.map((url: string) => ({ url, mediaId: m._id }))).slice(0, 6).map(({ url, mediaId }, i) => (
+                          <div key={i} className="relative aspect-video bg-[#0F0F1A] rounded-xl overflow-hidden flex items-center justify-center group">
+                            <a href={url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center">
+                              {url.match(/\.(mp4|mov|avi|webm)/) ? (
+                                <><Video size={20} className="text-white/60" /><span className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1 rounded">Video</span></>
+                              ) : (
+                                <img src={url} alt="" className="w-full h-full object-cover" />
+                              )}
+                            </a>
+                            <button onClick={() => deleteMedia(mediaId, url)}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10">
+                              <span className="text-[10px] font-bold">✕</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-3">
+
+                <div className="flex gap-3 flex-wrap">
                   <button onClick={() => { setCarReturned(true); toast.success("Car marked as returned"); }}
                     className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm">
                     <CheckCircle size={16} /> Mark Car Returned
@@ -561,55 +825,172 @@ export default function BookingDetailPage() {
         </div>
       )}
 
-      {/* Documents Tab */}
-      {activeTab === "documents" && (
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* User KYC Docs Tab — dynamic, shows what user actually uploaded        */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "userdocs" && (
+        <div className="space-y-5">
+          <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5">
+            <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2 mb-1">
+              <FileCheck size={16} className="text-[#E8540A]" /> Customer KYC Documents
+            </h3>
+            <p className="text-[#9090A8] text-xs mb-5">Documents uploaded by {booking.customer.name}</p>
+
+            {userDocsLoading && (
+              <div className="flex items-center gap-2 text-[#9090A8] py-8 justify-center">
+                <Loader2 size={18} className="animate-spin" /> Loading documents...
+              </div>
+            )}
+
+            {!userDocsLoading && !userDocs && (
+              <div className="text-center py-8 text-[#9090A8]">
+                <FileText size={32} className="mx-auto mb-2 opacity-40" />
+                <p className="font-semibold">No documents uploaded yet</p>
+              </div>
+            )}
+
+            {!userDocsLoading && userDocs && (
+              <div className="space-y-6">
+                {/* Aadhaar */}
+                {(userDocs.aadhaar?.front || userDocs.aadhaar?.back) && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="font-bold text-sm text-[#0F0F1A]">Aadhaar Card</p>
+                      <span className={cn("text-xs font-bold px-3 py-1 rounded-full bg-[#F1F2F7]", DOC_STATUS_CONFIG[userDocs.aadhaar?.status || "not_uploaded"]?.color)}>
+                        {DOC_STATUS_CONFIG[userDocs.aadhaar?.status || "not_uploaded"]?.label}
+                      </span>
+                    </div>
+                    {userDocs.aadhaar?.number && (
+                      <p className="text-xs text-[#9090A8] mb-3">Number: {userDocs.aadhaar.number}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      {[{ label: "Front", url: userDocs.aadhaar.front }, { label: "Back", url: userDocs.aadhaar.back }].map(({ label, url }) => url && (
+                        <a key={label} href={url} target="_blank" rel="noreferrer"
+                          className="relative group overflow-hidden rounded-xl border border-[#E4E5EF] hover:border-[#E8540A] transition-colors">
+                          <img src={url} alt={`Aadhaar ${label}`} className="w-full h-32 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder-doc.png"; }} />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                            <Eye size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                          <p className="text-xs font-semibold text-[#4A4A6A] text-center py-2">{label}</p>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* PAN */}
+                {userDocs.pan?.photo && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="font-bold text-sm text-[#0F0F1A]">PAN Card</p>
+                      <span className={cn("text-xs font-bold px-3 py-1 rounded-full bg-[#F1F2F7]", DOC_STATUS_CONFIG[userDocs.pan?.status || "not_uploaded"]?.color)}>
+                        {DOC_STATUS_CONFIG[userDocs.pan?.status || "not_uploaded"]?.label}
+                      </span>
+                    </div>
+                    {userDocs.pan?.number && <p className="text-xs text-[#9090A8] mb-3">Number: {userDocs.pan.number}</p>}
+                    <a href={userDocs.pan.photo} target="_blank" rel="noreferrer"
+                      className="relative group inline-block w-48 overflow-hidden rounded-xl border border-[#E4E5EF] hover:border-[#E8540A]">
+                      <img src={userDocs.pan.photo} alt="PAN Card" className="w-full h-28 object-cover" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-colors">
+                        <Eye size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </a>
+                  </div>
+                )}
+
+                {/* Driving Licence */}
+                {(userDocs.dl?.front || userDocs.dl?.back) && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="font-bold text-sm text-[#0F0F1A]">Driving Licence</p>
+                      <span className={cn("text-xs font-bold px-3 py-1 rounded-full bg-[#F1F2F7]", DOC_STATUS_CONFIG[userDocs.dl?.status || "not_uploaded"]?.color)}>
+                        {DOC_STATUS_CONFIG[userDocs.dl?.status || "not_uploaded"]?.label}
+                      </span>
+                    </div>
+                    {userDocs.dl?.number && <p className="text-xs text-[#9090A8] mb-1">DL No: {userDocs.dl.number}</p>}
+                    {userDocs.dl?.validity && <p className="text-xs text-[#9090A8] mb-3">Valid till: {new Date(userDocs.dl.validity).toLocaleDateString("en-IN")}</p>}
+                    <div className="grid grid-cols-2 gap-3">
+                      {[{ label: "Front", url: userDocs.dl.front }, { label: "Back", url: userDocs.dl.back }].map(({ label, url }) => url && (
+                        <a key={label} href={url} target="_blank" rel="noreferrer"
+                          className="relative group overflow-hidden rounded-xl border border-[#E4E5EF] hover:border-[#E8540A] transition-colors">
+                          <img src={url} alt={`DL ${label}`} className="w-full h-32 object-cover" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-colors">
+                            <Eye size={18} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                          <p className="text-xs font-semibold text-[#4A4A6A] text-center py-2">{label}</p>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No docs uploaded at all */}
+                {!userDocs.aadhaar?.front && !userDocs.pan?.photo && !userDocs.dl?.front && (
+                  <div className="text-center py-8 text-[#9090A8]">
+                    <ImageIcon size={32} className="mx-auto mb-2 opacity-40" />
+                    <p className="font-semibold">Customer hasn&apos;t uploaded any documents yet</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Car Documents Tab — send to customer via WhatsApp                     */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === "cardocs" && (
         <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-5">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2"><FileCheck size={16} className="text-[#E8540A]" /> Car Documents</h3>
-              <p className="text-[#9090A8] text-xs mt-1">Send the booked car&apos;s documents to {booking.customer.name} the moment they book.</p>
+              <p className="text-[#9090A8] text-xs mt-1">Send the booked car documents to {booking.customer.name} via WhatsApp</p>
             </div>
-            <button onClick={sendAllDocuments}
-              className="flex items-center gap-2 btn-gradient px-5 py-2.5 rounded-xl text-white font-bold text-sm">
-              <Send size={14} /> Send All to Customer
+            <button onClick={sendAllCarDocs} disabled={sendingAllDocs}
+              className="flex items-center gap-2 btn-gradient px-5 py-2.5 rounded-xl text-white font-bold text-sm disabled:opacity-60">
+              {sendingAllDocs ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              Send All via WhatsApp
             </button>
           </div>
 
           <div className="space-y-3">
-            {CAR_DOCUMENTS.map((doc) => {
+            {carDocsList.map((doc) => {
               const sent = sentDocs.includes(doc.key);
+              const sending = sendingDocKey === doc.key;
+              const available = Boolean(doc.url);
               return (
                 <div key={doc.key} className="flex items-center justify-between gap-3 p-4 rounded-xl border border-[#E4E5EF]">
                   <div className="flex items-center gap-3">
-                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center", doc.available ? "bg-[#FFF3ED]" : "bg-[#F1F2F7]")}>
-                      <FileText size={16} className={doc.available ? "text-[#E8540A]" : "text-[#9090A8]"} />
+                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center", available ? "bg-[#FFF3ED]" : "bg-[#F1F2F7]")}>
+                      <FileText size={16} className={available ? "text-[#E8540A]" : "text-[#9090A8]"} />
                     </div>
                     <div>
                       <p className="font-semibold text-sm text-[#0F0F1A]">{doc.label}</p>
-                      <p className={cn("text-xs", doc.available ? "text-[#10B981]" : "text-[#9090A8]")}>
-                        {doc.available ? "Available on file" : "Not uploaded yet"}
+                      <p className={cn("text-xs", available ? "text-[#10B981]" : "text-[#9090A8]")}>
+                        {available
+                          ? doc.expiry ? `Valid till ${new Date(doc.expiry).toLocaleDateString("en-IN")}` : "Available on file"
+                          : "Not uploaded yet"}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {sent && (
-                      <span className="flex items-center gap-1 text-[#10B981] text-xs font-bold">
-                        <CheckCircle size={13} /> Sent
-                      </span>
+                    {sent && <span className="flex items-center gap-1 text-[#10B981] text-xs font-bold"><CheckCircle size={13} /> Sent</span>}
+                    {available && (
+                      <a href={doc.url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#F8F9FC] text-[#4A4A6A] hover:bg-[#FFF3ED] hover:text-[#E8540A] transition-colors">
+                        <Eye size={12} /> View
+                      </a>
                     )}
-                    <button
-                      disabled={!doc.available}
-                      onClick={() => sendDocument(doc.key, doc.label)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors",
-                        !doc.available
-                          ? "bg-[#F1F2F7] text-[#D1D5DB] cursor-not-allowed"
-                          : sent
-                            ? "bg-[#F8F9FC] text-[#4A4A6A] hover:bg-[#FFF3ED] hover:text-[#E8540A]"
+                    <button disabled={!available || sending}
+                      onClick={() => sendSingleDoc(doc.key, doc.label)}
+                      className={cn("flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition-colors",
+                        !available ? "bg-[#F1F2F7] text-[#D1D5DB] cursor-not-allowed"
+                          : sent ? "bg-[#F8F9FC] text-[#4A4A6A] hover:bg-[#FFF3ED] hover:text-[#E8540A]"
                             : "bg-[#FFF3ED] text-[#E8540A] hover:bg-[#E8540A] hover:text-white"
-                      )}
-                    >
-                      <Send size={12} /> {sent ? "Resend" : "Send to Customer"}
+                      )}>
+                      {sending ? <Loader2 size={11} className="animate-spin" /> : <Send size={12} />}
+                      {sent ? "Resend" : "Send"}
                     </button>
                   </div>
                 </div>
@@ -619,20 +1000,22 @@ export default function BookingDetailPage() {
         </div>
       )}
 
-      {/* Payment Tab */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Payment Tab                                                           */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === "payment" && (
         <div className="grid lg:grid-cols-2 gap-5">
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5">
             <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2 mb-4"><IndianRupee size={16} className="text-[#E8540A]" /> Payment Summary</h3>
             <div className="space-y-3">
               {[
-                { label: "Booking Amount", value: `Rs. ${booking.payment.total.toLocaleString("en-IN")}`, color: "text-[#0F0F1A]" },
-                { label: "Amount Received", value: `Rs. ${booking.payment.received.toLocaleString("en-IN")}`, color: "text-[#10B981]" },
-                { label: "Balance Due", value: `Rs. ${balance.toLocaleString("en-IN")}`, color: balance > 0 ? "text-[#EF4444]" : "text-[#10B981]" },
-                { label: "Security Deposit", value: `Rs. ${booking.securityDeposit.toLocaleString("en-IN")}`, color: "text-[#F59E0B]" },
-                { label: "Home Delivery", value: `Rs. ${booking.homeDelivery.toLocaleString("en-IN")}`, color: "text-[#4A4A6A]" },
-                { label: "Payment Mode", value: booking.payment.mode, color: "text-[#4A4A6A]" },
-                { label: "Payment Status", value: booking.payment.status, color: booking.payment.status === "Success" ? "text-[#10B981]" : "text-[#EF4444]" },
+                { label: "Booking Amount",    value: `Rs. ${booking.payment.total.toLocaleString("en-IN")}`,    color: "text-[#0F0F1A]" },
+                { label: "Amount Received",   value: `Rs. ${booking.payment.received.toLocaleString("en-IN")}`, color: "text-[#10B981]" },
+                { label: "Balance Due",       value: `Rs. ${balance.toLocaleString("en-IN")}`,                  color: balance > 0 ? "text-[#EF4444]" : "text-[#10B981]" },
+                { label: "Security Deposit",  value: `Rs. ${booking.securityDeposit.toLocaleString("en-IN")}`,  color: "text-[#F59E0B]" },
+                { label: "Home Delivery",     value: `Rs. ${booking.homeDelivery.toLocaleString("en-IN")}`,     color: "text-[#4A4A6A]" },
+                { label: "Payment Mode",      value: booking.payment.mode,                                      color: "text-[#4A4A6A]" },
+                { label: "Payment Status",    value: booking.payment.status, color: booking.payment.status === "Success" ? "text-[#10B981]" : "text-[#EF4444]" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex justify-between items-center py-2.5 border-b border-[#F1F2F7]">
                   <span className="text-[#9090A8] text-sm">{label}</span>
@@ -644,21 +1027,14 @@ export default function BookingDetailPage() {
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5">
             <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2 mb-4"><Shield size={16} className="text-[#E8540A]" /> Quick Actions</h3>
             <div className="space-y-3">
-              <a href={`https://wa.me/${booking.customer.mobile}?text=${whatsappMsg}`} target="_blank" rel="noreferrer"
+              <a href={`https://wa.me/${booking.customer.mobile}?text=${waText}`} target="_blank" rel="noreferrer"
                 className="flex items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#10B981]/20 hover:bg-[#D1FAE5] transition-colors">
                 <Phone size={18} className="text-[#10B981]" />
                 <div>
                   <p className="font-semibold text-sm text-[#0F0F1A]">Send WhatsApp Bill</p>
-                  <p className="text-xs text-[#9090A8]">Send booking summary & bill to customer</p>
+                  <p className="text-xs text-[#9090A8]">Send booking summary to customer</p>
                 </div>
               </a>
-              <button className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#EDE9FE] border border-[#7C3AED]/20 hover:bg-[#DDD6FE] transition-colors text-left">
-                <IndianRupee size={18} className="text-[#7C3AED]" />
-                <div>
-                  <p className="font-semibold text-sm text-[#0F0F1A]">Create Payment Link</p>
-                  <p className="text-xs text-[#9090A8]">Generate Razorpay link for balance amount</p>
-                </div>
-              </button>
               <button onClick={() => window.print()} className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors text-left">
                 <Printer size={18} className="text-[#4A4A6A]" />
                 <div>
@@ -671,7 +1047,9 @@ export default function BookingDetailPage() {
         </div>
       )}
 
-      {/* Timeline Tab */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Timeline Tab                                                          */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === "timeline" && (
         <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6">
           <h3 className="font-bold text-[#0F0F1A] mb-5">Booking Timeline</h3>
@@ -713,109 +1091,351 @@ export default function BookingDetailPage() {
       )}
     </div>
 
-      {/* ── Edit Booking Modal ── */}
-      {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl my-4">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Edit Booking</h3>
-                <p className="text-[#9090A8] text-xs mt-0.5">#{rawBooking?.bookingId || rawBooking?._id?.slice(-8)}</p>
-              </div>
-              <button onClick={() => setShowEditModal(false)} className="text-[#9090A8] hover:text-[#0F0F1A] transition-colors">
-                <XIcon size={20} />
-              </button>
+    {/* ═══════════════════════════════════════════════════════════════════════ */}
+    {/* Dent Comparison Full-Screen Modal                                       */}
+    {/* ═══════════════════════════════════════════════════════════════════════ */}
+    {showCompareModal && (
+      <DentComparisonModal
+        bookingId={id}
+        pickupMedia={pickupSaved}
+        returnMedia={returnSaved}
+        damageReport={damageReport}
+        onAnalysisDone={setDamageReport}
+        onClose={() => setShowCompareModal(false)}
+      />
+    )}
+
+    {/* ═══════════════════════════════════════════════════════════════════════ */}
+    {/* Edit Booking Modal                                                      */}
+    {/* ═══════════════════════════════════════════════════════════════════════ */}
+    {showEditModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto">
+        <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl my-4">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Edit Booking</h3>
+              <p className="text-[#9090A8] text-xs mt-0.5">#{rawBooking?.bookingId || rawBooking?._id?.slice(-8)}</p>
             </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Pickup Date & Time</label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.startTime}
-                    onChange={e => setEditForm(f => ({ ...f, startTime: e.target.value }))}
-                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Return Date & Time</label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.endTime}
-                    onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
-                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Total Amount (Rs.)</label>
-                  <input
-                    type="number"
-                    value={editForm.totalAmount}
-                    onChange={e => setEditForm(f => ({ ...f, totalAmount: e.target.value }))}
-                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Amount Paid (Rs.)</label>
-                  <input
-                    type="number"
-                    value={editForm.amountPaid}
-                    onChange={e => setEditForm(f => ({ ...f, amountPaid: e.target.value }))}
-                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
+            <button onClick={() => setShowEditModal(false)} className="text-[#9090A8] hover:text-[#0F0F1A] transition-colors"><XIcon size={20} /></button>
+          </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Mode</label>
-                <select
-                  value={editForm.paymentMode}
-                  onChange={e => setEditForm(f => ({ ...f, paymentMode: e.target.value }))}
-                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none bg-white"
-                >
-                  <option value="online">Online / Razorpay</option>
-                  <option value="offline_cash">Cash</option>
-                  <option value="offline_qr">UPI / QR</option>
-                </select>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Pickup Date & Time</label>
+                <input type="datetime-local" value={editForm.startTime} onChange={e => setEditForm(f => ({ ...f, startTime: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Remarks / Notes</label>
-                <textarea
-                  value={editForm.notes}
-                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={3}
-                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
-                  placeholder="Internal notes or challan details..."
-                />
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Return Date & Time</label>
+                <input type="datetime-local" value={editForm.endTime} onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
               </div>
             </div>
-
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditSave}
-                disabled={editLoading}
-                className="flex-1 py-2.5 rounded-xl btn-gradient text-white font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {editLoading && <Loader2 size={14} className="animate-spin" />}
-                Save Changes
-              </button>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Total Amount (Rs.)</label>
+                <input type="number" value={editForm.totalAmount} onChange={e => setEditForm(f => ({ ...f, totalAmount: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Amount Paid (Rs.)</label>
+                <input type="number" value={editForm.amountPaid} onChange={e => setEditForm(f => ({ ...f, amountPaid: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Mode</label>
+              <select value={editForm.paymentMode} onChange={e => setEditForm(f => ({ ...f, paymentMode: e.target.value }))}
+                className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none bg-white">
+                <option value="online">Online / Razorpay</option>
+                <option value="offline_cash">Cash</option>
+                <option value="offline_qr">UPI / QR</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Remarks / Notes</label>
+              <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={3}
+                className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
+                placeholder="Internal notes or challan details..." />
             </div>
           </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setShowEditModal(false)} className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A] hover:bg-[#F8F9FC]">
+              Cancel
+            </button>
+            <button onClick={handleEditSave} disabled={editLoading} className="flex-1 py-3 rounded-xl btn-gradient text-white font-bold text-sm disabled:opacity-60">
+              {editLoading ? <><Loader2 size={14} className="animate-spin inline mr-1" />Saving...</> : "Save Changes"}
+            </button>
+          </div>
         </div>
-      )}
+      </div>
+    )}
     </>
+  );
+}
+
+// ─── Dent Comparison Full-Screen Modal ────────────────────────────────────────
+function isVideoUrl(url: string): boolean {
+  return url.match(/\.(mp4|mov|avi|webm)/i) !== null || url.includes("/video/upload/");
+}
+
+function getThumbnailUrl(url: string): string {
+  if (!isVideoUrl(url)) return url;
+  try {
+    const parts = url.split("/upload/");
+    if (parts.length !== 2) return url;
+    const base = parts[1].replace(/\.(mp4|mov|avi|webm)$/i, "");
+    return `${parts[0]}/upload/so_3,w_800,h_600,c_fill,f_jpg/${base}.jpg`;
+  } catch { return url; }
+}
+
+interface Pred { x: number; y: number; width: number; height: number; confidence: number; class: string; }
+
+function PhotoWithBoxes({ url, predictions, imgW, imgH }: { url: string; predictions: Pred[]; imgW: number; imgH: number; }) {
+  return (
+    <div className="relative w-full">
+      <img
+        src={getThumbnailUrl(url)}
+        alt=""
+        className="w-full rounded-xl object-contain max-h-[55vh]"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+      {predictions.map((p, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${((p.x - p.width / 2) / imgW) * 100}%`,
+            top: `${((p.y - p.height / 2) / imgH) * 100}%`,
+            width: `${(p.width / imgW) * 100}%`,
+            height: `${(p.height / imgH) * 100}%`,
+            border: "2px solid #EF4444",
+            borderRadius: 4,
+          }}
+        >
+          <span style={{
+            position: "absolute", top: -18, left: 0,
+            background: "#EF4444", color: "#fff",
+            fontSize: 10, padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap",
+          }}>
+            {p.class} {Math.round(p.confidence * 100)}%
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MediaItem({ url, active, onClick }: { url: string; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className={cn("w-16 h-11 rounded-lg overflow-hidden border-2 transition-all shrink-0 bg-black",
+        active ? "border-white opacity-100 scale-105" : "border-white/10 opacity-50 hover:opacity-80")}>
+      <img src={getThumbnailUrl(url)} alt="" className="w-full h-full object-cover"
+        onError={(e) => { (e.target as HTMLImageElement).src = ""; }} />
+    </button>
+  );
+}
+
+function MediaViewer({ url, predictions, imgW, imgH }: { url: string; predictions: Pred[]; imgW: number; imgH: number }) {
+  if (isVideoUrl(url)) {
+    return (
+      <div className="relative w-full rounded-xl overflow-hidden bg-black">
+        <video src={url} controls className="w-full max-h-[60vh] object-contain" />
+      </div>
+    );
+  }
+  return <PhotoWithBoxes url={url} predictions={predictions} imgW={imgW} imgH={imgH} />;
+}
+
+function DentComparisonModal({
+  bookingId, pickupMedia, returnMedia, damageReport, onAnalysisDone, onClose,
+}: {
+  bookingId: string;
+  pickupMedia: MediaRecord[];
+  returnMedia: MediaRecord[];
+  damageReport: DamageReport | null;
+  onAnalysisDone: (r: DamageReport) => void;
+  onClose: () => void;
+}) {
+  const pickupUrls = pickupMedia.flatMap((m) => m.urls);
+  const returnUrls = returnMedia.flatMap((m) => m.urls);
+
+  const [selPickup, setSelPickup] = useState(0);
+  const [selReturn, setSelReturn] = useState(0);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [localReport, setLocalReport] = useState<DamageReport | null>(damageReport);
+
+  const runAnalysis = async () => {
+    setAnalyzing(true);
+    try {
+      const { data } = await bookingsApi.analyzeDamage(bookingId);
+      setLocalReport(data.data);
+      onAnalysisDone(data.data);
+      toast.success("Analysis complete!");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Analysis failed — check API config");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const pickupPredictions = localReport?.pickup.predictions || [];
+  const returnPredictions = localReport?.return.predictions || [];
+  const pickupImgW = localReport?.pickup.imageWidth || 640;
+  const pickupImgH = localReport?.pickup.imageHeight || 480;
+  const returnImgW = localReport?.return.imageWidth || 640;
+  const returnImgH = localReport?.return.imageHeight || 480;
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-[#050508] flex flex-col" style={{ fontFamily: "inherit" }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-[#0A0A14] shrink-0">
+        <div className="flex items-center gap-3">
+          <ScanSearch size={17} className="text-[#A78BFA]" />
+          <div>
+            <p className="text-white font-bold text-sm">Dent Comparison</p>
+            <p className="text-white/30 text-[10px]">{pickupUrls.length} pickup · {returnUrls.length} return files</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={runAnalysis}
+            disabled={analyzing || pickupUrls.length === 0 || returnUrls.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-colors">
+            {analyzing ? <><Loader2 size={11} className="animate-spin" /> Analyzing...</> : <><Zap size={11} /> Run AI Analysis</>}
+          </button>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
+            <XIcon size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* Split view */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+
+        {/* Pickup side */}
+        <div className="flex-1 flex flex-col border-r border-white/[0.08] overflow-hidden">
+          <div className="px-4 py-2 bg-emerald-950/60 border-b border-emerald-900/40 shrink-0 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <span className="text-emerald-400 text-xs font-bold tracking-wider">PICKUP</span>
+              <span className="text-emerald-600 text-[10px]">{pickupUrls.length} file{pickupUrls.length !== 1 ? "s" : ""}</span>
+            </div>
+            {pickupUrls.length > 1 && (
+              <div className="flex items-center gap-1">
+                <button onClick={() => setSelPickup(p => Math.max(0, p - 1))} disabled={selPickup === 0}
+                  className="w-6 h-6 rounded bg-white/5 flex items-center justify-center text-white/40 hover:text-white disabled:opacity-20">
+                  <ChevronLeft size={12} />
+                </button>
+                <span className="text-white/30 text-[10px] w-8 text-center">{selPickup + 1}/{pickupUrls.length}</span>
+                <button onClick={() => setSelPickup(p => Math.min(pickupUrls.length - 1, p + 1))} disabled={selPickup === pickupUrls.length - 1}
+                  className="w-6 h-6 rounded bg-white/5 flex items-center justify-center text-white/40 hover:text-white disabled:opacity-20">
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 overflow-auto p-3 space-y-3">
+            {pickupUrls[selPickup] ? (
+              <MediaViewer url={pickupUrls[selPickup]} predictions={pickupPredictions} imgW={pickupImgW} imgH={pickupImgH} />
+            ) : (
+              <div className="flex items-center justify-center h-64 text-white/20">
+                <div className="text-center"><Camera size={32} className="mx-auto mb-2 opacity-40" /><p className="text-xs">No pickup media</p></div>
+              </div>
+            )}
+            {pickupUrls.length > 1 && (
+              <div className="flex gap-1.5 flex-wrap">
+                {pickupUrls.map((url, i) => (
+                  <MediaItem key={i} url={url} active={selPickup === i} onClick={() => setSelPickup(i)} />
+                ))}
+              </div>
+            )}
+            {pickupPredictions.length > 0 && (
+              <div className="bg-emerald-950/50 rounded-xl p-3 border border-emerald-500/20">
+                <p className="text-emerald-400 text-[10px] font-bold mb-1">PICKUP — Detected</p>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(new Set(pickupPredictions.map(p => p.class))).map(cls => (
+                    <span key={cls} className="px-2 py-0.5 bg-emerald-900/50 text-emerald-300 text-[10px] rounded-full capitalize">{cls}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Return side */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-4 py-2 bg-red-950/60 border-b border-red-900/40 shrink-0 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+              <span className="text-red-400 text-xs font-bold tracking-wider">RETURN</span>
+              <span className="text-red-600 text-[10px]">{returnUrls.length} file{returnUrls.length !== 1 ? "s" : ""}</span>
+            </div>
+            {returnUrls.length > 1 && (
+              <div className="flex items-center gap-1">
+                <button onClick={() => setSelReturn(p => Math.max(0, p - 1))} disabled={selReturn === 0}
+                  className="w-6 h-6 rounded bg-white/5 flex items-center justify-center text-white/40 hover:text-white disabled:opacity-20">
+                  <ChevronLeft size={12} />
+                </button>
+                <span className="text-white/30 text-[10px] w-8 text-center">{selReturn + 1}/{returnUrls.length}</span>
+                <button onClick={() => setSelReturn(p => Math.min(returnUrls.length - 1, p + 1))} disabled={selReturn === returnUrls.length - 1}
+                  className="w-6 h-6 rounded bg-white/5 flex items-center justify-center text-white/40 hover:text-white disabled:opacity-20">
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 overflow-auto p-3 space-y-3">
+            {returnUrls[selReturn] ? (
+              <MediaViewer url={returnUrls[selReturn]} predictions={returnPredictions} imgW={returnImgW} imgH={returnImgH} />
+            ) : (
+              <div className="flex items-center justify-center h-64 text-white/20">
+                <div className="text-center"><Camera size={32} className="mx-auto mb-2 opacity-40" /><p className="text-xs">No return media uploaded</p></div>
+              </div>
+            )}
+            {returnUrls.length > 1 && (
+              <div className="flex gap-1.5 flex-wrap">
+                {returnUrls.map((url, i) => (
+                  <MediaItem key={i} url={url} active={selReturn === i} onClick={() => setSelReturn(i)} />
+                ))}
+              </div>
+            )}
+            {returnPredictions.length > 0 && (
+              <div className="bg-red-950/50 rounded-xl p-3 border border-red-500/20">
+                <p className="text-red-400 text-[10px] font-bold mb-1">RETURN — Detected</p>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(new Set(returnPredictions.map(p => p.class))).map(cls => (
+                    <span key={cls} className="px-2 py-0.5 bg-red-900/50 text-red-300 text-[10px] rounded-full capitalize">{cls}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Verdict bar */}
+      <div className="border-t border-white/10 bg-[#0A0A14] px-5 py-2.5 shrink-0">
+        {localReport ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border",
+              localReport.newDamageDetected
+                ? "bg-red-950/70 text-red-300 border-red-500/30"
+                : "bg-emerald-950/70 text-emerald-300 border-emerald-500/30")}>
+              {localReport.newDamageDetected ? <AlertTriangle size={13} /> : <CheckCircle size={13} />}
+              {localReport.newDamageDetected ? "New damage detected!" : "No new damage found"}
+            </div>
+            <span className="text-white/30 text-[10px]">Pickup: {localReport.pickup.score}% · Return: {localReport.return.score}% · {new Date(localReport.analyzedAt).toLocaleString("en-IN")}</span>
+            {localReport.return.damageLabels?.length > 0 && localReport.return.damageLabels.map(l => (
+              <span key={l} className="px-2 py-0.5 bg-red-900/50 text-red-300 text-[10px] rounded-full capitalize">{l}</span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-white/30 text-xs">
+            {pickupUrls.length > 0 && returnUrls.length > 0 ? 'Click "Run AI Analysis" to detect dents' : "Upload both pickup and return media to compare"}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

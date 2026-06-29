@@ -99,8 +99,9 @@ export default function TempoDetailPage() {
   const kmPerDay = tripType === "local" ? 200 : 250;
   const kmIncluded = kmPerDay * days;
   const baseFare = tempo ? tempo.basePrice + (tempo.pricePerDay * Math.max(0, days - 1)) : 0;
-  const totalAmount = baseFare + (tempo?.tollForExtraTrip || 0);
-  const tokenAmount = Math.round(totalAmount * 0.3);
+  const securityDeposit = tempo?.refundableDeposit || 0;
+  const totalAmount = baseFare + (tempo?.tollForExtraTrip || 0) + securityDeposit;
+  const tokenAmount = Math.round(totalAmount * 0.10);
   const balanceDue = totalAmount - tokenAmount;
   const toPay = paymentMode === "token" ? tokenAmount : totalAmount;
 
@@ -133,6 +134,7 @@ export default function TempoDetailPage() {
         totalAmount,
         tokenAmount,
         balanceDue,
+        securityDeposit,
         paymentMode: "online",
       });
 
@@ -140,7 +142,7 @@ export default function TempoDetailPage() {
       const { data: orderRes } = await api.post("/api/payments/create-order", {
         amount: toPay,
         bookingId: bookingRes.data._id,
-        type: "tempo",
+        purpose: "tempo_booking",
       });
 
       // 3. Open Razorpay
@@ -424,6 +426,12 @@ export default function TempoDetailPage() {
                       <span>Toll</span><span className="font-semibold">₹{tempo.tollForExtraTrip.toLocaleString("en-IN")}</span>
                     </div>
                   )}
+                  {securityDeposit > 0 && (
+                    <div className="flex justify-between text-[#4A4A6A]">
+                      <span className="flex items-center gap-1"><Shield size={11} className="text-[#10B981]" /> Security Deposit (Refundable)</span>
+                      <span className="font-semibold text-[#10B981]">₹{securityDeposit.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
                   <div className="border-t border-[#7C3AED]/20 pt-2 flex justify-between font-black text-[#0F0F1A]">
                     <span>Total</span><span className="text-[#7C3AED]">₹{totalAmount.toLocaleString("en-IN")}</span>
                   </div>
@@ -433,8 +441,8 @@ export default function TempoDetailPage() {
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-[#4A4A6A]">Pay Now</p>
                   {[
-                    { value: "token", label: "Token Amount (30%)", amount: tokenAmount, desc: `Pay ₹${tokenAmount.toLocaleString("en-IN")} now · ₹${balanceDue.toLocaleString("en-IN")} later` },
-                    { value: "full", label: "Full Payment", amount: totalAmount, desc: "Pay full amount now" },
+                    { value: "token", label: "Token Amount (10%)", amount: tokenAmount, desc: `Pay ₹${tokenAmount.toLocaleString("en-IN")} now · ₹${balanceDue.toLocaleString("en-IN")} on pickup` },
+                    { value: "full", label: "Full Payment", amount: totalAmount, desc: "Pay full amount now (deposit included)" },
                   ].map(opt => (
                     <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${paymentMode === opt.value ? "border-[#7C3AED] bg-[#F5F3FF]" : "border-[#E4E5EF] hover:border-[#7C3AED]/40"}`}>
                       <input type="radio" name="payMode" value={opt.value} checked={paymentMode === opt.value} onChange={() => setPaymentMode(opt.value as "token" | "full")} className="mt-0.5 accent-[#7C3AED]" />

@@ -25,7 +25,8 @@ export default function GoogleSuccessPage() {
     usersAPI
       .getProfile()
       .then((res) => {
-        localStorage.setItem("vk_user", JSON.stringify(res.data.data.user));
+        const user = res.data.data.user;
+        localStorage.setItem("vk_user", JSON.stringify(user));
         router.replace("/account");
       })
       .catch(() => {

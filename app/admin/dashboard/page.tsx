@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell
@@ -12,6 +13,7 @@ import {
   Zap, Navigation
 } from "lucide-react";
 import Link from "next/link";
+import { adminDashboardAPI } from "@/lib/api";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -31,20 +33,18 @@ const fleetData = [
   { name: "Maintenance", value: 14, color: "#F59E0B" },
 ];
 
-const recentBookings = [
-  { id: "DL_HyundaiCreta_PrincK_7823", customer: "Prince Kumar", car: "Hyundai Creta", city: "Delhi", amount: 4504, status: "confirmed", time: "2m ago" },
-  { id: "DL_MarutiSwift_RahulS_3421", customer: "Rahul Sharma", car: "Maruti Swift", city: "Noida", amount: 2890, status: "active", time: "45m ago" },
-  { id: "DL_KiaSeltos_AnkitV_8821", customer: "Ankit Verma", car: "Kia Seltos", city: "Gurgaon", amount: 5200, status: "completed", time: "2h ago" },
-  { id: "DL_HyundaiI20_SumitK_5512", customer: "Sumit Kapoor", car: "Hyundai i20", city: "Delhi", amount: 1780, status: "pending", time: "3h ago" },
-  { id: "DL_HondaCity_PriyaM_9912", customer: "Priya Mehta", car: "Honda City", city: "Delhi", amount: 3400, status: "cancelled", time: "5h ago" },
-];
+type RecentBooking = { id: string; bookingId: string; customer: string; car: string; city: string; amount: number; status: string; createdAt: string; };
+type ExpiryAlert = { carId: string; car: string; plate: string; doc: string; expiry: string; daysLeft: number; level: string; };
 
-const expiryAlerts = [
-  { car: "Hyundai Creta", plate: "DL01AB1234", doc: "Insurance", expiry: "Jun 25, 2026", daysLeft: 10, level: "critical" },
-  { car: "Maruti Swift", plate: "DL02CD5678", doc: "PUC Certificate", expiry: "Jul 1, 2026", daysLeft: 16, level: "warning" },
-  { car: "Kia Seltos", plate: "DL04EF9012", doc: "Fitness Certificate", expiry: "Jul 10, 2026", daysLeft: 25, level: "ok" },
-  { car: "Honda City", plate: "DL05GH3456", doc: "Road Tax", expiry: "Jul 18, 2026", daysLeft: 33, level: "ok" },
-];
+const timeAgo = (d: string) => {
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
 
 const quickActions = [
   { label: "Add Booking", icon: Plus, href: "/admin/bookings/offline", color: "#E8540A", bg: "#FFF3ED" },
@@ -85,8 +85,18 @@ const fadeUp = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
+  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
+  const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlert[]>([]);
+
+  useEffect(() => {
+    adminDashboardAPI.getStats().then(({ data }) => {
+      if (data.data.recentBookings) setRecentBookings(data.data.recentBookings);
+      if (data.data.expiryAlerts) setExpiryAlerts(data.data.expiryAlerts);
+    }).catch(() => {});
+  }, []);
+
   return (
-    <div className="p-6 space-y-6 min-h-screen">
+    <div className="p-6 space-y-6">
 
       {/* ── Page Header ── */}
       <div className="flex items-start justify-between">
@@ -306,7 +316,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-[#0F0F1A] text-sm">₹{b.amount.toLocaleString("en-IN")}</p>
-                    <p className="text-[#9090A8] text-[10px]">{b.time}</p>
+                    <p className="text-[#9090A8] text-[10px]">{timeAgo(b.createdAt)}</p>
                   </div>
                   <div className="shrink-0">
                     <span

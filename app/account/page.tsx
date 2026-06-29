@@ -81,6 +81,7 @@ export default function AccountPage() {
   const [memberSince, setMemberSince] = useState("");
   const [totalBookings, setTotalBookings] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
 
   const applyUser = (user: any) => {
     const next = {
@@ -90,7 +91,10 @@ export default function AccountPage() {
     };
     setProfile(next);
     setTemp(next);
-    setMobile(user.mobile || "");
+    const rawMobile = user.mobile || "";
+    const isGoogle = rawMobile.startsWith("google_");
+    setIsGoogleUser(isGoogle);
+    setMobile(isGoogle ? "" : rawMobile);
     setTotalBookings(user.totalBookings || 0);
     if (user.createdAt) {
       setMemberSince(new Date(user.createdAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" }));
@@ -140,6 +144,24 @@ export default function AccountPage() {
     <PageLayout>
       <div className="min-h-screen bg-[#F8F9FC] pt-24 pb-16">
         <div className="max-w-7xl mx-auto px-4 lg:px-8">
+          {/* Mobile number banner for Google users */}
+          {isGoogleUser && (
+            <div className="mb-5 flex items-center justify-between gap-3 bg-[#FFF3ED] border border-[#E8540A]/30 rounded-2xl px-5 py-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📱</span>
+                <div>
+                  <p className="text-sm font-semibold text-[#0F0F1A]">Add your mobile number</p>
+                  <p className="text-xs text-[#9090A8] mt-0.5">Required to receive booking confirmations on WhatsApp</p>
+                </div>
+              </div>
+              <a
+                href="/auth/add-mobile"
+                className="shrink-0 px-4 py-2 bg-[#E8540A] text-white text-xs font-semibold rounded-xl hover:bg-[#c94508] transition-colors"
+              >
+                Add Now
+              </a>
+            </div>
+          )}
           <div className="flex gap-6">
             {/* Sidebar */}
             <aside className="hidden lg:block w-64 shrink-0">
@@ -151,7 +173,7 @@ export default function AccountPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-white font-semibold text-sm truncate">{profile.name || "—"}</p>
-                    <p className="text-white/50 text-xs mt-0.5">{mobile}</p>
+                    <p className="text-white/50 text-xs mt-0.5">{mobile || "Phone not added"}</p>
                   </div>
                 </div>
 
@@ -244,7 +266,7 @@ export default function AccountPage() {
                     {/* Danger Zone */}
                     <div className="mt-6 pt-5 border-t border-[#E4E5EF]">
                       <p className="text-[#9090A8] text-xs">
-                        {memberSince ? `Member since ${memberSince}` : "Member"} &bull; {mobile} &bull; {totalBookings} booking{totalBookings !== 1 ? "s" : ""} made
+                        {memberSince ? `Member since ${memberSince}` : "Member"} &bull; {mobile || "Phone not added"} &bull; {totalBookings} booking{totalBookings !== 1 ? "s" : ""} made
                       </p>
                     </div>
                   </div>

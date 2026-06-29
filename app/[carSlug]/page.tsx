@@ -78,21 +78,34 @@ export default function CarSlugPage() {
   const [doorstep, setDoorstep] = useState(false);
   const [coupon, setCoupon] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
+  const [couponData, setCouponData] = useState<{ discountType: string; discountValue: number; maxDiscount?: number; discountAmount?: number } | null>(null);
   const [paymentMode, setPaymentMode] = useState<"token" | "full">("token");
   const [showKmModal, setShowKmModal] = useState(false);
   const [kmPolicy, setKmPolicy] = useState({ includedKmPerDay: 250, extraKmRate: 12 });
+  const [doorstepCharge, setDoorstepCharge] = useState(500);
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryAddressError, setDeliveryAddressError] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [apiCar, setApiCar] = useState<any>(null);
   const [carFetchDone, setCarFetchDone] = useState(!!localCar);
 
-  // Fetch from API when car is not in local static data (e.g., new cars added via admin)
+  const SESSION_KEY = `vk_booking_${carSlug}`;
+
+  // Always fetch car from API when carId is available so admin changes to pricing are reflected
   useEffect(() => {
-    if (!localCar && carId) {
+    if (carId) {
       carsAPI.getById(carId)
-        .then(({ data }) => setApiCar(data.data))
+        .then(({ data }) => {
+          setApiCar(data.data);
+          if (data.data?.doorstepDeliveryCharge !== undefined) {
+            setDoorstepCharge(data.data.doorstepDeliveryCharge);
+          } else if (data.data?.cityId?.deliveryCharge !== undefined) {
+            setDoorstepCharge(data.data.cityId.deliveryCharge);
+          }
+        })
         .catch(() => {})
-        .finally(() => setCarFetchDone(true));
-    } else if (!localCar && !carId) {
+        .finally(() => setCarFetchDone(!!localCar || true));
+    } else if (!localCar) {
       setCarFetchDone(true);
     }
   }, []);
@@ -104,9 +117,34 @@ export default function CarSlugPage() {
           includedKmPerDay: data.data.includedKmPerDay || 250,
           extraKmRate: data.data.extraKmRate || 12,
         });
+        // Only use global setting if no carId (can't fetch car-specific charge)
+        if (!carId && data.data.doorstepDeliveryCharge) {
+          setDoorstepCharge(data.data.doorstepDeliveryCharge);
+        }
       }
     }).catch(() => {});
   }, []);
+  // Restore saved state on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const s = JSON.parse(saved);
+        if (s.coupon) setCoupon(s.coupon);
+        if (s.couponApplied) setCouponApplied(s.couponApplied);
+        if (s.couponData) setCouponData(s.couponData);
+        if (s.doorstep) setDoorstep(s.doorstep);
+        if (s.deliveryAddress) setDeliveryAddress(s.deliveryAddress);
+      }
+    } catch {}
+  }, []);
+
+  // Persist state on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ coupon, couponApplied, couponData, doorstep, deliveryAddress }));
+    } catch {}
+  }, [coupon, couponApplied, couponData, doorstep, deliveryAddress]);
 
   // Show spinner while fetching non-local car from API
   if (!localCar && !carFetchDone) {
@@ -117,24 +155,25 @@ export default function CarSlugPage() {
     );
   }
 
-  // Merge local static data with API data (API car wins for new admin-added cars)
-  const CAR = localCar ?? (apiCar ? {
-    name: apiCar.name,
-    type: apiCar.type,
-    fuel: apiCar.fuel,
-    transmission: apiCar.transmission,
-    seats: apiCar.seats,
-    pricePerHr: apiCar.regularPrice,
-    securityDeposit: apiCar.securityDeposit || 10000,
-    year: apiCar.modelYear || 2023,
-    image: apiCar.images?.[0] || "",
-    gradient: "from-[#1C1C2E] to-[#242438]",
-    badge: apiCar.type,
-    badgeColor: "#E8540A",
-    rating: 4.8,
-    reviews: 0,
-    kmPackage: apiCar.kmPackage || "250 km/day",
-  } : null);
+  // API pricing overrides static data so admin changes always reflect on booking page
+  const CAR = (localCar || apiCar) ? {
+    name: apiCar?.name || localCar?.name,
+    type: apiCar?.type || localCar?.type,
+    fuel: apiCar?.fuel || localCar?.fuel,
+    transmission: apiCar?.transmission || localCar?.transmission,
+    seats: apiCar?.seats || localCar?.seats,
+    pricePerHr: apiCar?.regularPrice || localCar?.pricePerHr,
+    securityDeposit: apiCar?.securityDeposit ?? localCar?.securityDeposit ?? 10000,
+    doorstepDeliveryCharge: apiCar?.doorstepDeliveryCharge ?? 500,
+    year: apiCar?.modelYear || localCar?.year || 2023,
+    image: apiCar?.images?.[0] || localCar?.image || "",
+    gradient: localCar?.gradient || "from-[#1C1C2E] to-[#242438]",
+    badge: apiCar?.type || localCar?.badge,
+    badgeColor: localCar?.badgeColor || "#E8540A",
+    rating: localCar?.rating || 4.8,
+    reviews: localCar?.reviews || 0,
+    kmPackage: apiCar?.kmPackage || (localCar?.kmIncluded ? `${localCar.kmIncluded} km/day` : "250 km/day"),
+  } : null;
 
   if (!CAR) notFound();
 
@@ -156,6 +195,11 @@ export default function CarSlugPage() {
     if (!token) {
       toast.error("Please login to continue booking");
       router.push(`/login?redirect=/${carSlug}?city=${city}&start=${startSlot}&end=${endSlot}`);
+      return;
+    }
+
+    if (doorstep && !deliveryAddress.trim()) {
+      setDeliveryAddressError(true);
       return;
     }
 
@@ -181,8 +225,9 @@ export default function CarSlugPage() {
         carId: realCarId,
         startTime: startISO,
         endTime: endISO,
-        pickupLocation: doorstep ? "Doorstep Delivery" : (PICKUP_LOCATIONS.find(l => l.id === pickupLocation)?.address || pickupLocation),
+        pickupLocation: doorstep ? (deliveryAddress || "Doorstep Delivery") : (PICKUP_LOCATIONS.find(l => l.id === pickupLocation)?.address || pickupLocation),
         doorstepDelivery: doorstep,
+        deliveryAddress: doorstep ? deliveryAddress : undefined,
         couponCode: couponApplied ? coupon : undefined,
       });
 
@@ -208,7 +253,7 @@ export default function CarSlugPage() {
         order_id: razorpayOrderId,
         prefill: {
           name:    user?.name  || "",
-          contact: user?.mobile || "",
+          contact: (user?.mobile && !user.mobile.startsWith("google_")) ? user.mobile : "",
           email:   user?.email  || "",
         },
         theme: { color: "#E8540A" },
@@ -245,21 +290,41 @@ export default function CarSlugPage() {
   };
 
   const baseFare = CAR.pricePerHr * hours;
-  const doorstepFee = doorstep ? 500 : 0;
-  const discount = couponApplied ? 200 : 0;
+  const doorstepFee = doorstep ? doorstepCharge : 0;
+
+  const calcDiscount = () => {
+    if (!couponApplied || !couponData) return 0;
+    if (couponData.discountAmount !== undefined) return couponData.discountAmount;
+    if (couponData.discountType === "percentage") {
+      const raw = Math.round((baseFare * couponData.discountValue) / 100);
+      return couponData.maxDiscount ? Math.min(raw, couponData.maxDiscount) : raw;
+    }
+    return Math.min(couponData.discountValue, baseFare);
+  };
+  const discount = calcDiscount();
   const total = baseFare + CAR.securityDeposit + doorstepFee - discount;
-  const tokenAmount = Math.min(1000, Math.round(total * 0.2));
+  const tokenAmount = Math.round(total * 0.25);
   const balanceDue = total - tokenAmount;
 
   const applyCoupon = async () => {
     if (!coupon) return;
     try {
-      await api.post("/api/coupons/validate", { code: coupon.toUpperCase() });
+      const { data } = await api.post("/api/coupons/validate", {
+        code: coupon.toUpperCase(),
+        bookingAmount: baseFare,
+      });
+      setCouponData(data.data);
       setCouponApplied(true);
       toast.success("Coupon applied!");
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Invalid coupon code");
     }
+  };
+
+  const removeCoupon = () => {
+    setCoupon("");
+    setCouponApplied(false);
+    setCouponData(null);
   };
 
   return (
@@ -303,7 +368,6 @@ export default function CarSlugPage() {
                       </div>
                     </div>
                   </div>
-
                   {/* Timeline */}
                   <div className="relative">
                     <div className="flex items-center gap-4">
@@ -371,7 +435,6 @@ export default function CarSlugPage() {
                   </p>
                 </div>
               </div>
-
               {/* Card 4: Terms */}
               <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] p-6">
                 <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-4 flex items-center gap-2">
@@ -440,31 +503,49 @@ export default function CarSlugPage() {
                       </label>
                     ))}
                   </div>
-
                   {/* Doorstep Toggle */}
-                  <div className="flex items-center justify-between p-3 bg-[#F8F9FC] rounded-xl border border-[#E4E5EF]">
-                    <div className="flex items-center gap-2">
-                      <Truck size={16} className="text-[#E8540A]" />
-                      <div>
-                        <p className="text-[#0F0F1A] text-sm font-semibold">Doorstep Delivery</p>
-                        <p className="text-[#9090A8] text-xs">+Rs. 500</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 bg-[#F8F9FC] rounded-xl border border-[#E4E5EF]">
+                      <div className="flex items-center gap-2">
+                        <Truck size={16} className="text-[#E8540A]" />
+                        <div>
+                          <p className="text-[#0F0F1A] text-sm font-semibold">Doorstep Delivery</p>
+                          <p className="text-[#9090A8] text-xs">+Rs. {doorstepCharge}</p>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setDoorstep(!doorstep)}
+                        className={cn(
+                          "w-11 h-6 rounded-full transition-all relative",
+                          doorstep ? "bg-[#E8540A]" : "bg-[#E4E5EF]"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all",
+                          doorstep ? "left-5" : "left-0.5"
+                        )} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setDoorstep(!doorstep)}
-                      className={cn(
-                        "w-11 h-6 rounded-full transition-all relative",
-                        doorstep ? "bg-[#E8540A]" : "bg-[#E4E5EF]"
-                      )}
-                    >
-                      <div className={cn(
-                        "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all",
-                        doorstep ? "left-5" : "left-0.5"
-                      )} />
-                    </button>
+                    {doorstep && (
+                      <div>
+                        <input
+                          type="text"
+                          value={deliveryAddress}
+                          onChange={e => { setDeliveryAddress(e.target.value); setDeliveryAddressError(false); }}
+                          placeholder="Enter full delivery address *"
+                          className={cn(
+                            "w-full border-[1.5px] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none placeholder:text-[#9090A8]",
+                            deliveryAddressError ? "border-red-500 focus:border-red-500" : "border-[#E8540A]/50 focus:border-[#E8540A]"
+                          )}
+                        />
+                        {deliveryAddressError && (
+                          <p className="text-red-500 text-xs mt-1 font-medium">Please enter your delivery address</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
-
                 {/* Fare Breakdown */}
                 <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] p-5">
                   <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-4">Fare Breakdown</h3>
@@ -482,8 +563,8 @@ export default function CarSlugPage() {
 
                     {couponApplied && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-[#10B981] flex items-center gap-1"><Tag size={12} /> Discount (VKFIRST)</span>
-                        <span className="text-[#10B981] font-semibold">- Rs. {discount}</span>
+                        <span className="text-[#10B981] flex items-center gap-1"><Tag size={12} /> Discount ({coupon})</span>
+                        <span className="text-[#10B981] font-semibold">- Rs. {discount.toLocaleString("en-IN")}</span>
                       </div>
                     )}
 
@@ -522,23 +603,27 @@ export default function CarSlugPage() {
                       type="text"
                       value={coupon}
                       onChange={(e) => setCoupon(e.target.value.toUpperCase())}
-                      placeholder="Enter code (try VKFIRST)"
-                      className="flex-1 border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2 text-sm text-[#0F0F1A] placeholder:text-[#9090A8]"
+                      placeholder="Enter promo code"
+                      className="flex-1 border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2 text-sm text-[#0F0F1A] placeholder:text-[#9090A8] uppercase"
                       disabled={couponApplied}
                     />
-                    <button
-                      onClick={applyCoupon}
-                      disabled={couponApplied || !coupon}
-                      className={cn(
-                        "px-4 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap",
-                        couponApplied
-                          ? "bg-[#D1FAE5] text-[#065F46]"
-                          : "btn-gradient text-white"
-                      )}
-                    >
-                      {couponApplied ? "Applied ✓" : "Apply"}
-                    </button>
+                    {couponApplied ? (
+                      <button onClick={removeCoupon}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#D1FAE5] text-[#065F46] whitespace-nowrap">
+                        Applied ✓
+                      </button>
+                    ) : (
+                      <button onClick={applyCoupon} disabled={!coupon}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold btn-gradient text-white whitespace-nowrap disabled:opacity-50">
+                        Apply
+                      </button>
+                    )}
                   </div>
+                  {couponApplied && (
+                    <button onClick={removeCoupon} className="text-xs text-[#9090A8] hover:text-[#EF4444] mt-1 transition-colors">
+                      Remove coupon
+                    </button>
+                  )}
                 </div>
 
                 {/* Payment Toggle + Pay Button */}

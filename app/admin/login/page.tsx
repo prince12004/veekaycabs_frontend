@@ -22,7 +22,9 @@ export default function AdminLoginPage() {
       localStorage.setItem("vk_admin_token", token);
       localStorage.setItem("vk_admin_refresh_token", refreshToken);
       localStorage.setItem("vk_admin_user", JSON.stringify(user));
-      router.push("/admin/dashboard");
+      const redirect = localStorage.getItem("vk_admin_redirect") || "/admin/dashboard";
+      localStorage.removeItem("vk_admin_redirect");
+      router.push(redirect);
     } catch (err: any) {
       setError(err.response?.data?.message || "Login failed");
     } finally {

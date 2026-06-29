@@ -212,7 +212,7 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <p className="font-semibold text-[#0F0F1A] text-sm">{b.userId?.name || "—"}</p>
-                        <p className="text-[#9090A8] text-xs">{b.userId?.mobile || ""}</p>
+                        <p className="text-[#9090A8] text-xs">{(b.userId?.mobile && !b.userId.mobile.startsWith("google_")) ? b.userId.mobile : "Google user"}</p>
                       </td>
                       <td className="px-4 py-4">
                         <p className="font-medium text-[#0F0F1A] text-sm">{b.carId?.name || "—"}</p>

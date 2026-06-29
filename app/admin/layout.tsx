@@ -11,8 +11,10 @@ import {
   ChevronRight, Activity, ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adminDashboardAPI } from "@/lib/api";
 
-const navGroups = [
+// badge keys map to dynamic counts fetched from API
+const buildNavGroups = (counts: Record<string, number>) => [
   {
     label: "Overview",
     items: [{ href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null }],
@@ -20,14 +22,15 @@ const navGroups = [
   {
     label: "Fleet",
     items: [
-      { href: "/admin/cars", label: "Car Listing", icon: List, badge: "101" },
+      { href: "/admin/cars", label: "Car Listing", icon: List, badge: counts.totalCars || null },
       { href: "/admin/cars/add", label: "Add Car", icon: Plus, badge: null },
+      { href: "/admin/cars/documents", label: "Car Documents", icon: FileCheck, badge: null },
     ],
   },
   {
     label: "Bookings",
     items: [
-      { href: "/admin/bookings", label: "All Bookings", icon: Calendar, badge: "6" },
+      { href: "/admin/bookings", label: "All Bookings", icon: Calendar, badge: counts.pendingBookings || null },
       { href: "/admin/bookings/offline", label: "Offline Booking", icon: Activity, badge: null },
     ],
   },
@@ -35,7 +38,7 @@ const navGroups = [
     label: "Users & KYC",
     items: [
       { href: "/admin/users", label: "User List", icon: Users, badge: null },
-      { href: "/admin/documents", label: "KYC Review", icon: FileCheck, badge: "8" },
+      { href: "/admin/documents", label: "KYC Review", icon: FileCheck, badge: counts.pendingKyc || null },
     ],
   },
   {
@@ -62,7 +65,7 @@ const navGroups = [
       { href: "/admin/policy-pages", label: "Policy Pages", icon: Info, badge: null },
       { href: "/admin/coupons", label: "Coupons", icon: Tag, badge: null },
       { href: "/admin/cities", label: "Manage Cities", icon: MapPin, badge: null },
-      { href: "/admin/contact-requests", label: "Contact Requests", icon: MessageSquare, badge: "3" },
+      { href: "/admin/contact-requests", label: "Contact Requests", icon: MessageSquare, badge: counts.newContacts || null },
       { href: "/admin/seo", label: "SEO Pages", icon: Globe, badge: null },
     ],
   },
@@ -72,6 +75,7 @@ const navGroups = [
       { href: "/admin/basic-details", label: "Basic Details", icon: Info, badge: null },
       { href: "/admin/social-media", label: "Social Media", icon: Share2, badge: null },
       { href: "/admin/manage-admins", label: "Manage Admins", icon: Users, badge: null },
+      { href: "/admin/whatsapp-test", label: "WhatsApp Test", icon: MessageSquare, badge: null },
     ],
   },
 ];
@@ -83,11 +87,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [adminUser, setAdminUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (isLoginPage) return;
     const token = localStorage.getItem("vk_admin_token");
     if (!token) {
+      localStorage.setItem("vk_admin_redirect", pathname);
       router.replace("/admin/login");
       return;
     }
@@ -95,6 +101,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (rawUser) setAdminUser(JSON.parse(rawUser));
     setAuthChecked(true);
   }, [isLoginPage, router]);
+
+  // Fetch sidebar counts on mount and every 60 seconds
+  useEffect(() => {
+    if (isLoginPage) return;
+    const fetchCounts = async () => {
+      try {
+        const { data } = await adminDashboardAPI.getSidebarCounts();
+        if (data?.data) setCounts(data.data);
+      } catch { /* silently ignore */ }
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 60000);
+    return () => clearInterval(interval);
+  }, [isLoginPage]);
 
   const handleLogout = () => {
     localStorage.removeItem("vk_admin_token");
@@ -106,6 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isLoginPage) return <>{children}</>;
   if (!authChecked) return null;
 
+  const navGroups = buildNavGroups(counts);
   const allItems = navGroups.flatMap(g => g.items);
   const currentPage = allItems.find(
     item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"))
@@ -311,8 +332,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto">
-          {children}
+        <div className="flex-1 overflow-y-auto bg-[#F0F1F6] h-full">
+          <div className="min-h-full">
+            {children}
+          </div>
         </div>
       </div>
     </div>

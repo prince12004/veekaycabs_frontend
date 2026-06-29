@@ -12,7 +12,7 @@ type Form = {
   phone1: string; phone2: string; phone3: string; whatsapp: string;
   email: string; website: string;
   addressDelhi: string; addressLucknow: string;
-  includedKmPerDay: string; extraKmRate: string;
+  includedKmPerDay: string; extraKmRate: string; doorstepDeliveryCharge: string;
 };
 
 const EMPTY: Form = {
@@ -24,7 +24,7 @@ const EMPTY: Form = {
   addressDelhi: "A 13, 1st Floor, Ganesh Nagar, New Delhi 110092",
   addressLucknow: "Flat 1007, Skyline Plaza-3, Sushant Golf City, Lucknow",
   gstNumber: "", upiId: "",
-  includedKmPerDay: "250", extraKmRate: "12",
+  includedKmPerDay: "250", extraKmRate: "12", doorstepDeliveryCharge: "500",
 };
 
 const sections = [
@@ -53,9 +53,10 @@ const sections = [
     ],
   },
   {
-    title: "KM Policy", icon: Globe, fields: [
+    title: "KM Policy & Charges", icon: Globe, fields: [
       { field: "includedKmPerDay" as keyof Form, label: "Included KM per Day" },
       { field: "extraKmRate" as keyof Form, label: "Extra KM Rate (₹/km)" },
+      { field: "doorstepDeliveryCharge" as keyof Form, label: "Doorstep Delivery Charge (₹)" },
     ],
   },
 ];
@@ -83,6 +84,9 @@ export default function BasicDetailsPage() {
         website: d.website || EMPTY.website,
         addressDelhi: d.addressDelhi || EMPTY.addressDelhi,
         addressLucknow: d.addressLucknow || "",
+        includedKmPerDay: String(d.includedKmPerDay ?? EMPTY.includedKmPerDay),
+        extraKmRate: String(d.extraKmRate ?? EMPTY.extraKmRate),
+        doorstepDeliveryCharge: String(d.doorstepDeliveryCharge ?? EMPTY.doorstepDeliveryCharge),
       });
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);

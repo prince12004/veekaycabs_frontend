@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Upload, AlertTriangle, CheckCircle, Wrench, Loader2 } from "lucide-react";
@@ -55,23 +55,23 @@ export default function EditCarPage() {
   const [car, setCar] = useState<any>(null);
   const [cities, setCities] = useState<{ _id: string; name: string }[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
+  const imgInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     name: "", registrationNo: "", modelYear: "", type: "SUV",
     fuel: "Petrol", transmission: "Automatic", seats: "5",
     cityId: "", gpsDeviceId: "",
-    regularPrice: "", weekendPrice: "", securityDeposit: "", kmPackage: "",
+    regularPrice: "", weekendPrice: "", securityDeposit: "", doorstepDeliveryCharge: "500", kmPackage: "",
     insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "",
     isActive: true,
   });
 
   useEffect(() => {
     Promise.all([
-      adminCarsApi.getAll(),
-      fetch("http://localhost:5000/api/cities").then(r => r.json()),
-    ]).then(([carsRes, citiesRes]) => {
-      const allCars: any[] = carsRes.data.data || [];
-      const found = allCars.find((c: any) => c._id === carId);
+      adminCarsApi.getOne(carId),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/cities`).then(r => r.json()),
+    ]).then(([carRes, citiesRes]) => {
+      const found = carRes.data?.data;
       if (found) {
         setCar(found);
         setForm({
@@ -87,6 +87,7 @@ export default function EditCarPage() {
           regularPrice: String(found.regularPrice || ""),
           weekendPrice: String(found.weekendPrice || ""),
           securityDeposit: String(found.securityDeposit || ""),
+          doorstepDeliveryCharge: String(found.doorstepDeliveryCharge ?? 500),
           kmPackage: found.kmPackage || "",
           insuranceExpiry: toDateInput(found.documents?.insurance?.expiry),
           pucExpiry:       toDateInput(found.documents?.puc?.expiry),
@@ -121,6 +122,7 @@ export default function EditCarPage() {
       fd.append("regularPrice", form.regularPrice);
       fd.append("weekendPrice", form.weekendPrice);
       fd.append("securityDeposit", form.securityDeposit);
+      fd.append("doorstepDeliveryCharge", form.doorstepDeliveryCharge);
       fd.append("kmPackage", form.kmPackage);
       fd.append("isActive", String(form.isActive));
       fd.append("documents", JSON.stringify({
@@ -159,6 +161,15 @@ export default function EditCarPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 size={36} className="animate-spin text-[#E8540A]" />
+      </div>
+    );
+  }
+
+  if (!car) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-[#9090A8] text-lg font-semibold">Car not found.</p>
+        <Link href="/admin/cars" className="mt-4 inline-block text-[#E8540A] font-bold">← Back to Car Listing</Link>
       </div>
     );
   }
@@ -242,13 +253,14 @@ export default function EditCarPage() {
           <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Pricing</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {([
-              ["regularPrice",   "Regular Price/hr"],
-              ["weekendPrice",   "Weekend Price/hr"],
-              ["securityDeposit","Security Deposit"],
-              ["kmPackage",      "KM Package"],
-            ] as [keyof typeof form, string][]).map(([field, label]) => (
-              <FieldGroup key={field} label={label} required>
-                <input type={field === "kmPackage" ? "text" : "number"} value={form[field] as string} onChange={update(field)} className={inputCls} placeholder={field === "kmPackage" ? "250 km/day" : undefined} required />
+              ["regularPrice",          "Regular Price/hr",        false],
+              ["weekendPrice",          "Weekend Price/hr",         false],
+              ["securityDeposit",       "Security Deposit",         false],
+              ["doorstepDeliveryCharge","Doorstep Delivery Charge", false],
+              ["kmPackage",             "KM Package",               true],
+            ] as [keyof typeof form, string, boolean][]).map(([field, label, isText]) => (
+              <FieldGroup key={field} label={label} required={!isText}>
+                <input type={isText ? "text" : "number"} value={form[field] as string} onChange={update(field)} className={inputCls} placeholder={isText ? "250 km/day" : "0"} required={!isText} />
               </FieldGroup>
             ))}
           </div>
@@ -264,12 +276,22 @@ export default function EditCarPage() {
               ))}
             </div>
           )}
-          <label className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#E4E5EF] rounded-2xl cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
-            <input type="file" multiple accept="image/*" className="sr-only" onChange={e => setNewImages(e.target.files ? Array.from(e.target.files) : [])} />
+          <input
+            ref={imgInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            className="hidden"
+            onChange={e => setNewImages(e.target.files ? Array.from(e.target.files) : [])}
+          />
+          <div
+            onClick={() => imgInputRef.current?.click()}
+            className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-[#E4E5EF] rounded-2xl cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all"
+          >
             <Upload size={22} className="text-[#9090A8] mb-1.5" />
             <p className="text-sm font-semibold text-[#4A4A6A]">{newImages.length > 0 ? `${newImages.length} new image(s) selected` : "Upload new car images"}</p>
             <p className="text-xs text-[#9090A8]">Adds to existing images</p>
-          </label>
+          </div>
         </div>
 
         {/* Documents */}
