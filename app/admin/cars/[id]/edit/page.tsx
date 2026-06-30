@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Upload, AlertTriangle, CheckCircle, Wrench, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Upload, AlertTriangle, CheckCircle, Wrench, Loader2, X } from "lucide-react";
 import { adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -55,6 +55,7 @@ export default function EditCarPage() {
   const [car, setCar] = useState<any>(null);
   const [cities, setCities] = useState<{ _id: string; name: string }[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
   const imgInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -105,8 +106,14 @@ export default function EditCarPage() {
   const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(prev => ({ ...prev, [field]: field === "isActive" ? (e.target as HTMLInputElement).checked : e.target.value }));
 
+  const remainingImageCount = (car?.images?.length || 0) - removedImages.length + newImages.length;
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (remainingImageCount < 1) {
+      toast.error("At least one image is required");
+      return;
+    }
     setSaving(true);
     try {
       const fd = new FormData();
@@ -133,6 +140,7 @@ export default function EditCarPage() {
         rc:        { expiry: form.rcExpiry        || null },
       }));
       newImages.forEach(img => fd.append("images", img));
+      if (removedImages.length > 0) fd.append("removeImages", JSON.stringify(removedImages));
 
       await adminCarsApi.update(carId, fd);
       toast.success("Car updated successfully!");
@@ -268,13 +276,47 @@ export default function EditCarPage() {
 
         {/* Car Images */}
         <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
-          <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Car Images</h3>
+          <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">
+            Car Images <span className="text-[#EF4444]">*</span>
+          </h3>
           {car?.images?.length > 0 && (
-            <div className="flex gap-3 mb-4">
-              {car.images.map((img: string, i: number) => (
-                <img key={i} src={img} alt="" className="w-24 h-16 rounded-xl object-cover border border-[#E4E5EF]" />
-              ))}
+            <div className="flex flex-wrap gap-3 mb-4">
+              {car.images.map((img: string, i: number) => {
+                const isRemoved = removedImages.includes(img);
+                return (
+                  <div key={i} className="relative">
+                    <img
+                      src={img}
+                      alt=""
+                      className={`w-24 h-16 rounded-xl object-cover border border-[#E4E5EF] ${isRemoved ? "opacity-30" : ""}`}
+                    />
+                    {!isRemoved ? (
+                      <button
+                        type="button"
+                        onClick={() => setRemovedImages(prev => [...prev, img])}
+                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[#EF4444] text-white flex items-center justify-center shadow-md hover:bg-[#DC2626] transition-colors"
+                        title="Remove image"
+                      >
+                        <X size={12} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setRemovedImages(prev => prev.filter(u => u !== img))}
+                        className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-[#4A4A6A] bg-white/60 rounded-xl"
+                      >
+                        Undo
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+          )}
+          {remainingImageCount < 1 && (
+            <p className="text-xs font-semibold text-[#EF4444] mb-3 flex items-center gap-1">
+              <AlertTriangle size={11} /> At least one image is required
+            </p>
           )}
           <input
             ref={imgInputRef}
@@ -306,7 +348,7 @@ export default function EditCarPage() {
 
         {/* Save Actions */}
         <div className="flex items-center gap-4">
-          <button type="submit" disabled={saving} className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm shadow-[0_8px_24px_rgba(232,84,10,0.35)] disabled:opacity-60">
+          <button type="submit" disabled={saving || remainingImageCount < 1} className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm shadow-[0_8px_24px_rgba(232,84,10,0.35)] disabled:opacity-60">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? "Saving..." : "Save Changes"}
           </button>

@@ -93,7 +93,7 @@ export const bookingsApi = {
     }),
   analyzeDamage: (id: string) => adminApi.post(`/api/admin/bookings/${id}/analyze-damage`, {}),
   runDentDetection: (id: string, force?: boolean) =>
-    adminApi.post(`/api/admin/bookings/${id}/dent-detection`, force ? { force: true } : {}),
+    adminApi.post(`/api/admin/bookings/${id}/dent-detection`, force ? { force: true } : {}, { timeout: 90000 }),
   deleteMedia: (id: string, mediaId: string, url: string) =>
     adminApi.delete(`/api/admin/bookings/${id}/media/${mediaId}`, { data: { url } }),
   // User KYC documents for this booking's customer
@@ -141,6 +141,18 @@ export const adminCarsApi = {
     }),
 };
 
+// RC verification / Challan check for ANY registration number — fleet car or
+// not. Results are cached server-side by registration number; pass force to
+// bypass the cache and re-run.
+export const vehicleVerificationApi = {
+  verifyRC: (registrationNo: string, chassisNumber: string, engineNumber: string, force?: boolean) =>
+    adminApi.post("/api/admin/vehicle-verification/rc", { registrationNo, chassisNumber, engineNumber, force }, { timeout: 60000 }),
+  checkChallan: (registrationNo: string, force?: boolean) =>
+    adminApi.post("/api/admin/vehicle-verification/challan", { registrationNo, force }, { timeout: 60000 }),
+  list: (params?: { page?: number; limit?: number }) =>
+    adminApi.get("/api/admin/vehicle-verification", { params }),
+};
+
 export const bookingsAPI = {
   create: (data: Record<string, unknown>) =>
     api.post("/api/bookings/create", data),
@@ -167,6 +179,14 @@ export const documentsAPI = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
   submit: () => api.patch("/api/documents/submit"),
+  sendAadhaarOtp: (aadhaarNumber: string) =>
+    api.post("/api/documents/aadhaar/send-otp", { aadhaarNumber }, { timeout: 30000 }),
+  verifyAadhaarOtp: (otp: string) =>
+    api.post("/api/documents/aadhaar/verify-otp", { otp }, { timeout: 30000 }),
+  verifyPan: (panNumber: string) =>
+    api.post("/api/documents/pan/verify", { panNumber }, { timeout: 30000 }),
+  verifyDL: (licenseNumber: string, dob?: string) =>
+    api.post("/api/documents/dl/verify", { licenseNumber, dob }, { timeout: 30000 }),
 };
 
 export const adminDocumentsApi = {

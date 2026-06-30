@@ -8,7 +8,7 @@ import {
   Link as LinkIcon, Navigation, BarChart3, BookOpen, Tag,
   MapPin, MessageSquare, LogOut, Menu, X,
   Plus, List, Info, Share2, Globe, Bell, Search,
-  ChevronRight, Activity, ExternalLink
+  ChevronRight, Activity, ExternalLink, ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminDashboardAPI } from "@/lib/api";
@@ -25,6 +25,7 @@ const buildNavGroups = (counts: Record<string, number>) => [
       { href: "/admin/cars", label: "Car Listing", icon: List, badge: counts.totalCars || null },
       { href: "/admin/cars/add", label: "Add Car", icon: Plus, badge: null },
       { href: "/admin/cars/documents", label: "Car Documents", icon: FileCheck, badge: null },
+      { href: "/admin/cars/verification", label: "Vehicle Verification", icon: ShieldCheck, badge: null },
     ],
   },
   {

@@ -163,17 +163,7 @@ export default function AdminDocumentsPage() {
       </div>
 
       {/* API Notice */}
-      <div className="mb-5 bg-gradient-to-r from-[#EDE9FE] to-[#DDD6FE] border border-[#7C3AED]/20 rounded-2xl p-4 flex items-center gap-3">
-        <Shield size={18} className="text-[#7C3AED] shrink-0" />
-        <div className="flex-1">
-          <p className="font-bold text-[#4C1D95] text-sm">3rd Party API Verification Available</p>
-          <p className="text-xs text-[#6D28D9] mt-0.5">Aadhaar (DigiLocker / Karza), PAN (Quicko / Surepass), DL (Vahan API)</p>
-        </div>
-        <a href="https://karza.in" target="_blank" rel="noreferrer"
-          className="flex items-center gap-1 text-xs text-[#7C3AED] font-bold whitespace-nowrap hover:underline">
-          API Docs <ExternalLink size={10} />
-        </a>
-      </div>
+
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-[#E4E5EF] p-4 mb-5 flex flex-wrap gap-3 items-center shadow-sm">
