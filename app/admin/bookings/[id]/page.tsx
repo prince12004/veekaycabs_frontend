@@ -36,10 +36,39 @@ interface DamageReport {
   analyzedAt: string;
   apiUsed: string;
 }
+interface DentDamage { location: string; type: string; severity: string; description: string; }
+interface PartCheck {
+  part: string;
+  pickupStatus: "ok" | "minor_mark" | "damaged" | "not_visible";
+  returnStatus: "ok" | "minor_mark" | "damaged" | "not_visible";
+  newDamage: boolean;
+  lowConfidence: boolean;
+  note: string;
+}
+interface DentDetectionResult {
+  newDamageFound: boolean;
+  damageCount: number;
+  damages: DentDamage[];
+  partsChecked?: PartCheck[];
+  summary: string;
+  confidenceNote: string;
+  analyzedAt: string;
+  model: string;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDT = (d: string) =>
   new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+
+const humanizePart = (part: string) =>
+  part.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+
+const PART_STATUS_STYLE: Record<PartCheck["pickupStatus"], string> = {
+  ok: "bg-[#D1FAE5] text-[#065F46]",
+  minor_mark: "bg-[#FEF3C7] text-[#92400E]",
+  damaged: "bg-[#FEE2E2] text-[#991B1B]",
+  not_visible: "bg-[#F1F2F7] text-[#9090A8]",
+};
 
 const fmtMode = (m: string) =>
   m === "online" ? "Online" : m === "offline_cash" ? "Offline Cash" : m === "offline_qr" ? "UPI/QR" : m;
@@ -86,6 +115,12 @@ export default function BookingDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
 
+  // Claude AI dent detection (Return Verification panel)
+  const [dentResult, setDentResult] = useState<DentDetectionResult | null>(null);
+  const [dentLoading, setDentLoading] = useState(false);
+  const [dentError, setDentError] = useState<string | null>(null);
+  const [showPartsChecklist, setShowPartsChecklist] = useState(false);
+
   // User KYC docs
   const [userDocs, setUserDocs] = useState<UserDoc | null>(null);
   const [userDocsLoading, setUserDocsLoading] = useState(false);
@@ -110,6 +145,7 @@ export default function BookingDetailPage() {
         setCarReceived(b?.odometerStart != null);
         setCarReturned(b?.odometerEnd != null);
         if (b?.odometerStart) setPickupCondition(p => ({ ...p, odometer: String(b.odometerStart) }));
+        if (b?.dentDetectionResult?.analyzedAt) setDentResult(b.dentDetectionResult);
       })
       .catch(() => setRawBooking(null))
       .finally(() => setLoadingPage(false));
@@ -197,6 +233,19 @@ export default function BookingDetailPage() {
       toast.error(e?.response?.data?.message || "Analysis failed");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const runDentDetection = async (force = false) => {
+    setDentLoading(true);
+    setDentError(null);
+    try {
+      const { data } = await bookingsApi.runDentDetection(id, force);
+      setDentResult(data.data);
+    } catch (e: any) {
+      setDentError(e?.response?.data?.message || "AI dent detection failed. Try again.");
+    } finally {
+      setDentLoading(false);
     }
   };
 
@@ -801,6 +850,100 @@ export default function BookingDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {/* AI Dent Detection (Claude vision — pickup vs return) */}
+                {pickupSaved.length > 0 && returnSaved.length > 0 && (
+                  <div className="border-t border-[#E4E5EF] pt-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-bold text-[#0F0F1A] flex items-center gap-1.5"><Zap size={14} className="text-[#7C3AED]" /> AI Dent Detection</p>
+                        <p className="text-xs text-[#9090A8]">Claude compares pickup vs return photos for new damage</p>
+                      </div>
+                      {dentResult && (
+                        <button onClick={() => runDentDetection(true)} disabled={dentLoading}
+                          className="text-xs font-bold text-[#7C3AED] hover:underline disabled:opacity-50 shrink-0">
+                          {dentLoading ? "Running..." : "Re-run"}
+                        </button>
+                      )}
+                    </div>
+
+                    {!dentResult && (
+                      <button onClick={() => runDentDetection(false)} disabled={dentLoading}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-[#7C3AED] text-white hover:bg-[#6D28D9] disabled:opacity-60 transition-colors">
+                        {dentLoading ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : <><Zap size={14} /> Run AI Dent Detection</>}
+                      </button>
+                    )}
+
+                    {dentError && (
+                      <p className="text-xs text-[#EF4444] font-semibold mt-2 flex items-center gap-1.5"><AlertTriangle size={13} /> {dentError}</p>
+                    )}
+
+                    {dentResult && (
+                      <div className="mt-2 space-y-3">
+                        <span className={cn("inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full",
+                          dentResult.newDamageFound ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]")}>
+                          {dentResult.newDamageFound ? <AlertTriangle size={13} /> : <CheckCircle size={13} />}
+                          {dentResult.newDamageFound ? `${dentResult.damageCount} new damage found` : "No new damage found"}
+                        </span>
+                        {dentResult.summary && <p className="text-xs text-[#4A4A6A]">{dentResult.summary}</p>}
+                        {dentResult.damages?.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {dentResult.damages.map((d, i) => (
+                              <div key={i} className="border border-[#E4E5EF] rounded-xl p-3">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-bold text-[#0F0F1A]">{d.location}</p>
+                                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
+                                    d.severity === "severe" ? "bg-[#FEE2E2] text-[#991B1B]" :
+                                    d.severity === "moderate" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#F1F2F7] text-[#4A4A6A]")}>
+                                    {d.severity}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-[#9090A8] mt-1">{d.type}</p>
+                                <p className="text-xs text-[#4A4A6A] mt-1">{d.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(dentResult.partsChecked?.length ?? 0) > 0 && (() => {
+                          const partsChecked = dentResult.partsChecked!;
+                          return (
+                            <div>
+                              <button onClick={() => setShowPartsChecklist(!showPartsChecklist)}
+                                className="flex items-center gap-1.5 text-xs font-bold text-[#7C3AED] hover:underline">
+                                {showPartsChecklist ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                {showPartsChecklist ? "Hide" : "Show"} full {partsChecked.length}-part checklist
+                              </button>
+                              {showPartsChecklist && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
+                                  {partsChecked.map((p, i) => (
+                                    <div key={i} className={cn(
+                                      "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-[#E4E5EF] text-xs",
+                                      p.newDamage && "border-l-2 border-l-[#EF4444]"
+                                    )}>
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        {p.newDamage && <AlertTriangle size={11} className="text-[#EF4444] shrink-0" />}
+                                        <span className="font-semibold text-[#0F0F1A] truncate">{humanizePart(p.part)}</span>
+                                        {p.lowConfidence && <span title="Low confidence — pickup angle unclear"><Eye size={11} className="text-[#9090A8] shrink-0" /></span>}
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full", PART_STATUS_STYLE[p.pickupStatus])}>{p.pickupStatus}</span>
+                                        <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full", PART_STATUS_STYLE[p.returnStatus])}>{p.returnStatus}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {dentResult.confidenceNote && (
+                          <p className="text-[11px] text-[#9090A8] italic">{dentResult.confidenceNote}</p>
+                        )}
+                        <p className="text-[10px] text-[#9090A8]">Analyzed {new Date(dentResult.analyzedAt).toLocaleString("en-IN")} · {dentResult.model}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-3 flex-wrap">
                   <button onClick={() => { setCarReturned(true); toast.success("Car marked as returned"); }}

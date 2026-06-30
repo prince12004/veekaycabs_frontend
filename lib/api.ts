@@ -92,6 +92,8 @@ export const bookingsApi = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
   analyzeDamage: (id: string) => adminApi.post(`/api/admin/bookings/${id}/analyze-damage`, {}),
+  runDentDetection: (id: string, force?: boolean) =>
+    adminApi.post(`/api/admin/bookings/${id}/dent-detection`, force ? { force: true } : {}),
   deleteMedia: (id: string, mediaId: string, url: string) =>
     adminApi.delete(`/api/admin/bookings/${id}/media/${mediaId}`, { data: { url } }),
   // User KYC documents for this booking's customer
