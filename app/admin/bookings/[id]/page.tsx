@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { bookingsApi } from "@/lib/api";
+import { bookingsApi, settingsApi } from "@/lib/api";
+import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import {
   ArrowLeft, Phone, FileText, Car, User, Calendar, IndianRupee,
   Video, Upload, CheckCircle, XCircle, Clock,
@@ -136,6 +137,10 @@ export default function BookingDetailPage() {
   const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", amountPaid: "", paymentMode: "online", notes: "" });
   const [editLoading, setEditLoading] = useState(false);
 
+  // Invoice PDF
+  const [companySettings, setCompanySettings] = useState<Record<string, any> | null>(null);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
+
   // ── Load booking ────────────────────────────────────────────────────────────
   useEffect(() => {
     bookingsApi.getById(id)
@@ -150,6 +155,13 @@ export default function BookingDetailPage() {
       .catch(() => setRawBooking(null))
       .finally(() => setLoadingPage(false));
   }, [id]);
+
+  // ── Load company settings (for invoice branding) ────────────────────────────
+  useEffect(() => {
+    settingsApi.get()
+      .then(({ data }) => setCompanySettings(data.data || null))
+      .catch(() => setCompanySettings(null));
+  }, []);
 
   // ── Load saved media ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -385,6 +397,55 @@ export default function BookingDetailPage() {
     `*Veekay Cabs — Booking Confirmation* ✅\n\nBooking ID: ${booking.id}\nCar: ${booking.car.name} (${booking.car.regNo})\nCustomer: ${booking.customer.name}\n\nPickup: ${new Date(booking.start).toLocaleString("en-IN")}\nReturn: ${new Date(booking.end).toLocaleString("en-IN")}\nLocation: ${booking.doorstep ? booking.deliveryAddress || "Doorstep" : booking.pickupLocation}\n\nTotal: Rs. ${booking.payment.total.toLocaleString("en-IN")}\nPaid: Rs. ${booking.payment.received.toLocaleString("en-IN")}\nBalance: Rs. ${balance.toLocaleString("en-IN")}\n\nVeekay Cabs | +91 99999 26867`
   );
 
+  const handleDownloadInvoice = async () => {
+    setGeneratingInvoice(true);
+    try {
+      await downloadInvoicePdf({
+        bookingId: booking.id,
+        invoiceNo: `INV-${String(booking.id).replace(/\W/g, "").slice(-8).toUpperCase()}`,
+        invoiceDate: new Date().toISOString(),
+        status: booking.status,
+        customer: booking.customer,
+        car: booking.car,
+        start: booking.start,
+        end: booking.end,
+        nights,
+        bookingType: booking.bookingType,
+        doorstep: booking.doorstep,
+        pickupLocation: booking.pickupLocation,
+        deliveryAddress: booking.deliveryAddress,
+        payment: {
+          bookingFare: rawBooking.bookingFare ?? 0,
+          gst: rawBooking.gst ?? 0,
+          discount: rawBooking.discount ?? 0,
+          doorstepCharge: rawBooking.doorstepCharge ?? 0,
+          extraKmCharge: rawBooking.extraKmCharge ?? 0,
+          securityDeposit: rawBooking.securityDeposit ?? 0,
+          totalAmount: rawBooking.totalAmount ?? 0,
+          amountPaid: rawBooking.amountPaid ?? 0,
+          balanceDue: rawBooking.balanceDue ?? (rawBooking.totalAmount ?? 0) - (rawBooking.amountPaid ?? 0),
+          mode: booking.payment.mode,
+          status: booking.payment.status,
+        },
+        company: {
+          companyName: companySettings?.companyName || "Veekay Cabs",
+          tagline: companySettings?.tagline,
+          gstNumber: companySettings?.gstNumber,
+          phone1: companySettings?.phone1 || "+91 99999 26867",
+          phone2: companySettings?.phone2,
+          email: companySettings?.email || "sales@veekaycabs.com",
+          website: companySettings?.website || "https://veekaycabs.com",
+          addressDelhi: companySettings?.addressDelhi || "A 13, 1st Floor, Ganesh Nagar, New Delhi 110092",
+        },
+      });
+      toast.success("Invoice PDF downloaded");
+    } catch {
+      toast.error("Failed to generate invoice PDF");
+    } finally {
+      setGeneratingInvoice(false);
+    }
+  };
+
   // Car documents list (dynamic from car data)
   const carDocsList = [
     { key: "rc",        label: "RC (Registration Certificate)", url: booking.car.documents?.rc?.url,        expiry: booking.car.documents?.rc?.expiry },
@@ -424,8 +485,9 @@ export default function BookingDetailPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] text-white font-semibold text-sm">
             <Phone size={14} /> WhatsApp Bill
           </a>
-          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm">
-            <Printer size={14} /> Print
+          <button onClick={handleDownloadInvoice} disabled={generatingInvoice}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm disabled:opacity-60">
+            {generatingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Print
           </button>
           <button onClick={openEditModal}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors">
@@ -1178,11 +1240,12 @@ export default function BookingDetailPage() {
                   <p className="text-xs text-[#9090A8]">Send booking summary to customer</p>
                 </div>
               </a>
-              <button onClick={() => window.print()} className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors text-left">
-                <Printer size={18} className="text-[#4A4A6A]" />
+              <button onClick={handleDownloadInvoice} disabled={generatingInvoice}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors text-left disabled:opacity-60">
+                {generatingInvoice ? <Loader2 size={18} className="text-[#4A4A6A] animate-spin" /> : <Printer size={18} className="text-[#4A4A6A]" />}
                 <div>
-                  <p className="font-semibold text-sm text-[#0F0F1A]">Print Invoice</p>
-                  <p className="text-xs text-[#9090A8]">Print full booking invoice</p>
+                  <p className="font-semibold text-sm text-[#0F0F1A]">{generatingInvoice ? "Generating PDF..." : "Print Invoice"}</p>
+                  <p className="text-xs text-[#9090A8]">Download a professional invoice PDF</p>
                 </div>
               </button>
             </div>
