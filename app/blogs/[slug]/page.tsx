@@ -99,7 +99,7 @@ export default function BlogDetailPage() {
 
       {/* Hero */}
       <section className="bg-gradient-to-b from-[#0F0F1A] to-[#1C1C2E] pt-32 pb-16">
-        <div className="max-w-4xl mx-auto px-6">
+        <div className="max-w-4xl blog_details mx-auto px-6">
           <Link href="/blogs" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-8 text-sm">
             <ArrowLeft size={16} /> Back to Blog
           </Link>
@@ -118,9 +118,20 @@ export default function BlogDetailPage() {
       </section>
 
       {/* Cover */}
-      <div className="max-w-4xl mx-auto px-6 -mt-8 mb-0">
-        <div className="h-72 lg:h-96 bg-gradient-to-br from-[#242438] to-[#1C1C2E] rounded-2xl flex items-center justify-center border border-[#2E2E45]">
-          <span className="text-9xl">{BLOG_CONTENT.emoji}</span>
+      <div className="max-w-4xl blog_details mx-auto px-6 -mt-8 mb-0">
+        <div className="relative h-72 lg:h-96 bg-gradient-to-br from-[#242438] via-[#1C1C2E] to-[#0F0F1A] rounded-2xl flex items-center justify-center border border-[#2E2E45] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+          {/* Decorative glow */}
+          <div className="absolute -top-16 -right-16 w-64 h-64 bg-[#E8540A] rounded-full opacity-[0.15] blur-[90px] pointer-events-none" />
+          <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-[#FF9A3C] rounded-full opacity-[0.08] blur-[100px] pointer-events-none" />
+          {/* Dot grid pattern */}
+          <div
+            className="absolute inset-0 opacity-[0.06]"
+            style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+          />
+          {/* Emoji badge */}
+          <div className="relative w-40 h-40 lg:w-52 lg:h-52 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center shadow-[0_8px_40px_rgba(232,84,10,0.15)]">
+            <span className="text-7xl lg:text-8xl drop-shadow-lg">{BLOG_CONTENT.emoji}</span>
+          </div>
         </div>
       </div>
 

@@ -9,32 +9,50 @@ import {
 import {
   TrendingUp, Car, Users, FileCheck, AlertTriangle,
   ArrowUpRight, ArrowDownRight, Activity, MapPin,
-  Clock, CheckCircle, RefreshCw, Plus, Eye, Phone,
-  Zap, Navigation
+  CheckCircle, RefreshCw, Plus, Eye, MessageSquare,
+  Navigation
 } from "lucide-react";
 import Link from "next/link";
 import { adminDashboardAPI } from "@/lib/api";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const revenueData = [
-  { day: "Mon", revenue: 12400, bookings: 8 },
-  { day: "Tue", revenue: 18200, bookings: 12 },
-  { day: "Wed", revenue: 15800, bookings: 10 },
-  { day: "Thu", revenue: 21000, bookings: 14 },
-  { day: "Fri", revenue: 28500, bookings: 19 },
-  { day: "Sat", revenue: 35200, bookings: 24 },
-  { day: "Sun", revenue: 32100, bookings: 22 },
-];
-
-const fleetData = [
-  { name: "Active", value: 32, color: "#10B981" },
-  { name: "Available", value: 55, color: "#E8540A" },
-  { name: "Maintenance", value: 14, color: "#F59E0B" },
-];
-
 type RecentBooking = { id: string; bookingId: string; customer: string; car: string; city: string; amount: number; status: string; createdAt: string; };
 type ExpiryAlert = { carId: string; car: string; plate: string; doc: string; expiry: string; daysLeft: number; level: string; };
+type DayRevenue = { day: string; date: string; revenue: number; bookings: number };
+
+type DashboardStats = {
+  todayRevenue: number;
+  revenueTrendPct: number;
+  activeBookings: number;
+  newUsersToday: number;
+  newUsersTrend: number;
+  pendingKyc: number;
+  totalCars: number;
+  activeCars: number;
+  inactiveCars: number;
+  fleetUtilization: number;
+  totalBookings: number;
+  completedBookings: number;
+  last7Days: DayRevenue[];
+  last7DaysRevenue: number;
+  last7DaysBookings: number;
+  last7DaysTrendPct: number;
+  citiesActive: number;
+  kycApprovedToday: number;
+  newContactsToday: number;
+  pendingRefunds: number;
+  recentBookings: RecentBooking[];
+  expiryAlerts: ExpiryAlert[];
+};
+
+const emptyStats: DashboardStats = {
+  todayRevenue: 0, revenueTrendPct: 0, activeBookings: 0, newUsersToday: 0, newUsersTrend: 0,
+  pendingKyc: 0, totalCars: 0, activeCars: 0, inactiveCars: 0, fleetUtilization: 0,
+  totalBookings: 0, completedBookings: 0, last7Days: [], last7DaysRevenue: 0, last7DaysBookings: 0,
+  last7DaysTrendPct: 0, citiesActive: 0, kycApprovedToday: 0, newContactsToday: 0, pendingRefunds: 0,
+  recentBookings: [], expiryAlerts: [],
+};
 
 const timeAgo = (d: string) => {
   const diff = Date.now() - new Date(d).getTime();
@@ -53,14 +71,6 @@ const quickActions = [
   { label: "GPS Track", icon: Navigation, href: "/admin/gps", color: "#10B981", bg: "#D1FAE5" },
   { label: "Refunds", icon: RefreshCw, href: "/admin/refunds", color: "#F59E0B", bg: "#FEF3C7" },
   { label: "Reports", icon: TrendingUp, href: "/admin/reports", color: "#EC4899", bg: "#FCE7F3" },
-];
-
-const statCards = [
-  { label: "Today's Revenue", value: "₹32,100", sub: "Sunday", icon: TrendingUp, color: "#10B981", bg: "#D1FAE5", trend: "+18%", up: true, href: "/admin/reports" },
-  { label: "Active Bookings", value: "11", sub: "3 pickups due today", icon: Activity, color: "#3B82F6", bg: "#DBEAFE", trend: "+3", up: true, href: "/admin/bookings" },
-  { label: "New Users Today", value: "24", sub: "12 KYC pending", icon: Users, color: "#F59E0B", bg: "#FEF3C7", trend: "+12%", up: true, href: "/admin/users" },
-  { label: "Pending KYC", value: "8", sub: "Needs review", icon: FileCheck, color: "#8B5CF6", bg: "#EDE9FE", trend: "-2", up: false, href: "/admin/documents" },
-  { label: "Fleet Online", value: "79%", sub: "87/101 cars active", icon: Car, color: "#E8540A", bg: "#FFF3ED", trend: "+5%", up: true, href: "/admin/gps" },
 ];
 
 const statusConfig: Record<string, { bg: string; text: string; dot: string }> = {
@@ -85,15 +95,50 @@ const fadeUp = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
-  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
-  const [expiryAlerts, setExpiryAlerts] = useState<ExpiryAlert[]>([]);
+  const [stats, setStats] = useState<DashboardStats>(emptyStats);
 
   useEffect(() => {
     adminDashboardAPI.getStats().then(({ data }) => {
-      if (data.data.recentBookings) setRecentBookings(data.data.recentBookings);
-      if (data.data.expiryAlerts) setExpiryAlerts(data.data.expiryAlerts);
+      if (data.data) setStats({ ...emptyStats, ...data.data });
     }).catch(() => {});
   }, []);
+
+  const todayLabel = new Date().toLocaleDateString("en-IN", { weekday: "long" });
+
+  const statCards = [
+    {
+      label: "Today's Revenue", value: `₹${stats.todayRevenue.toLocaleString("en-IN")}`, sub: todayLabel,
+      icon: TrendingUp, color: "#10B981", bg: "#D1FAE5", trend: stats.revenueTrendPct, href: "/admin/reports",
+    },
+    {
+      label: "Active Bookings", value: String(stats.activeBookings), sub: "Currently in progress",
+      icon: Activity, color: "#3B82F6", bg: "#DBEAFE", trend: null, href: "/admin/bookings",
+    },
+    {
+      label: "New Users Today", value: String(stats.newUsersToday), sub: `${stats.pendingKyc} KYC pending`,
+      icon: Users, color: "#F59E0B", bg: "#FEF3C7", trend: stats.newUsersTrend, href: "/admin/users",
+    },
+    {
+      label: "Pending KYC", value: String(stats.pendingKyc), sub: "Needs review",
+      icon: FileCheck, color: "#8B5CF6", bg: "#EDE9FE", trend: null, href: "/admin/documents",
+    },
+    {
+      label: "Fleet Online", value: `${stats.fleetUtilization}%`, sub: `${stats.activeCars}/${stats.totalCars} cars active`,
+      icon: Car, color: "#E8540A", bg: "#FFF3ED", trend: null, href: "/admin/gps",
+    },
+  ];
+
+  const fleetData = [
+    { name: "Active", value: stats.activeCars, color: "#10B981" },
+    { name: "Inactive", value: stats.inactiveCars, color: "#9090A8" },
+  ];
+
+  const liveMetrics = [
+    { icon: MapPin, label: "Cities Active", value: String(stats.citiesActive), color: "#E8540A" },
+    { icon: CheckCircle, label: "KYC Approved Today", value: String(stats.kycApprovedToday), color: "#10B981" },
+    { icon: MessageSquare, label: "New Contact Requests", value: String(stats.newContactsToday), color: "#3B82F6" },
+    { icon: RefreshCw, label: "Pending Refunds", value: String(stats.pendingRefunds), color: "#F59E0B" },
+  ];
 
   return (
     <div className="p-6 space-y-6">
@@ -121,6 +166,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
         {statCards.map((stat, i) => {
           const Icon = stat.icon;
+          const up = (stat.trend ?? 0) >= 0;
           return (
             <motion.div
               key={stat.label}
@@ -140,10 +186,12 @@ export default function AdminDashboard() {
                   >
                     <Icon size={20} style={{ color: stat.color }} />
                   </div>
-                  <span className={`text-xs font-bold flex items-center gap-0.5 ${stat.up ? "text-[#10B981]" : "text-[#EF4444]"}`}>
-                    {stat.up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-                    {stat.trend}
-                  </span>
+                  {stat.trend !== null && (
+                    <span className={`text-xs font-bold flex items-center gap-0.5 ${up ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                      {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                      {up ? "+" : ""}{stat.trend}{stat.label === "Today's Revenue" ? "%" : ""}
+                    </span>
+                  )}
                 </div>
                 <p className="text-2xl font-black text-[#0F0F1A] font-syne group-hover:text-[#E8540A] transition-colors">
                   {stat.value}
@@ -194,12 +242,14 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="font-bold text-[#0F0F1A] font-syne">Revenue — Last 7 Days</h3>
-              <p className="text-[#9090A8] text-sm mt-0.5">Total: <span className="font-semibold text-[#0F0F1A]">₹1,63,200</span></p>
+              <p className="text-[#9090A8] text-sm mt-0.5">Total: <span className="font-semibold text-[#0F0F1A]">₹{stats.last7DaysRevenue.toLocaleString("en-IN")}</span></p>
             </div>
-            <span className="text-xs bg-[#D1FAE5] text-[#065F46] font-bold px-3 py-1.5 rounded-full">+22% vs last week</span>
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${stats.last7DaysTrendPct >= 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
+              {stats.last7DaysTrendPct >= 0 ? "+" : ""}{stats.last7DaysTrendPct}% vs last week
+            </span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={revenueData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <AreaChart data={stats.last7Days} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#E8540A" stopOpacity={0.25} />
@@ -227,7 +277,7 @@ export default function AdminDashboard() {
           className="bg-white rounded-2xl border border-[#E4E5EF] p-6"
         >
           <h3 className="font-bold text-[#0F0F1A] font-syne mb-1">Fleet Status</h3>
-          <p className="text-[#9090A8] text-sm mb-5">101 total cars</p>
+          <p className="text-[#9090A8] text-sm mb-5">{stats.totalCars} total cars</p>
           <div className="flex justify-center mb-4">
             <PieChart width={160} height={160}>
               <Pie
@@ -250,7 +300,7 @@ export default function AdminDashboard() {
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                 <span className="text-[#4A4A6A] text-sm flex-1">{item.name}</span>
                 <span className="font-bold text-[#0F0F1A] text-sm">{item.value}</span>
-                <span className="text-[#9090A8] text-xs">{Math.round(item.value / 101 * 100)}%</span>
+                <span className="text-[#9090A8] text-xs">{stats.totalCars > 0 ? Math.round(item.value / stats.totalCars * 100) : 0}%</span>
               </div>
             ))}
           </div>
@@ -267,14 +317,14 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="font-bold text-[#0F0F1A] font-syne">Bookings — Last 7 Days</h3>
-            <p className="text-[#9090A8] text-sm mt-0.5">Total: <span className="font-semibold text-[#0F0F1A]">109 bookings</span></p>
+            <p className="text-[#9090A8] text-sm mt-0.5">Total: <span className="font-semibold text-[#0F0F1A]">{stats.last7DaysBookings} bookings</span></p>
           </div>
           <Link href="/admin/bookings" className="text-[#E8540A] text-sm font-semibold hover:underline">
             View All →
           </Link>
         </div>
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={revenueData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+          <BarChart data={stats.last7Days} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#F1F2F7" vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#9090A8" }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: "#9090A8" }} axisLine={false} tickLine={false} />
@@ -303,7 +353,7 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="divide-y divide-[#F1F2F7]">
-            {recentBookings.map((b) => {
+            {stats.recentBookings.map((b) => {
               const s = statusConfig[b.status];
               return (
                 <div key={b.id} className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#FAFAFA] transition-colors">
@@ -353,7 +403,7 @@ export default function AdminDashboard() {
             <h3 className="font-bold text-[#0F0F1A] font-syne text-sm">Expiry Alerts</h3>
           </div>
           <div className="divide-y divide-[#F1F2F7]">
-            {expiryAlerts.map((alert) => {
+            {stats.expiryAlerts.map((alert) => {
               const lc = levelConfig[alert.level];
               return (
                 <div key={alert.car + alert.doc} className="px-5 py-3.5 hover:bg-[#FAFAFA] transition-colors">
@@ -404,12 +454,7 @@ export default function AdminDashboard() {
         className="bg-gradient-to-r from-[#0F0F1A] to-[#1C1C2E] rounded-2xl p-5"
       >
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-          {[
-            { icon: Zap, label: "WhatsApp Msgs Today", value: "47", color: "#25D366" },
-            { icon: Phone, label: "Calls Received", value: "23", color: "#3B82F6" },
-            { icon: MapPin, label: "Cities Active", value: "5", color: "#E8540A" },
-            { icon: CheckCircle, label: "KYC Approved Today", value: "12", color: "#10B981" },
-          ].map(({ icon: Icon, label, value, color }) => (
+          {liveMetrics.map(({ icon: Icon, label, value, color }) => (
             <div key={label} className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center" style={{ backgroundColor: color + "20" }}>
                 <Icon size={18} style={{ color }} />

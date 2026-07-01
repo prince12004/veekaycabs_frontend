@@ -125,3 +125,6 @@ input:focus, select:focus, textarea:focus {
   padding-left: 0px !important;
   padding-right: 0px !important;
 }
+.blog_details{
+   max-width: 90% !important;
+}
