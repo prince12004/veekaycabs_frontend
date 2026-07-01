@@ -7,17 +7,33 @@ import { cn } from "@/lib/utils";
 export interface RcResult {
   status: "verified" | "failed" | "not_run";
   ownerName?: string;
+  fatherName?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
   registrationDate?: string;
+  rcStatus?: string;
+  ownerNumber?: string;
+  rtoCode?: string;
+  registeredAt?: string;
   vehicleClass?: string;
   vehicleModel?: string;
+  makerDescription?: string;
+  bodyType?: string;
   fuelType?: string;
   color?: string;
+  seatCapacity?: number;
+  cubicCapacity?: string;
+  manufacturingDate?: string;
   chassisNumber?: string;
   engineNumber?: string;
   insuranceCompany?: string;
+  insurancePolicyNumber?: string;
   insuranceValidUpto?: string;
   fitnessValidUpto?: string;
+  taxUpto?: string;
+  puccUpto?: string;
   financer?: string;
+  blacklistStatus?: string;
   analyzedAt?: string;
   error?: string;
 }
@@ -130,21 +146,38 @@ export function CheckedVehiclesTable({
                 {isOpen && (
                   <tr className="border-b border-[#E4E5EF]">
                     <td colSpan={5} className="bg-[#F8F9FC] p-4">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                         {/* RC details */}
                         <div className="bg-white rounded-xl border border-[#E4E5EF] p-3 space-y-2">
                           <p className="font-bold text-[#0F0F1A]">RC Verification</p>
                           {entry.rcVerification?.status === "verified" ? (
                             <div className="grid grid-cols-2 gap-2">
                               <Field label="Owner Name" value={entry.rcVerification.ownerName} />
+                              <Field label="Father Name" value={entry.rcVerification.fatherName} />
+                              <Field label="RC Status" value={entry.rcVerification.rcStatus} />
+                              <Field label="Owner No." value={entry.rcVerification.ownerNumber} />
                               <Field label="Vehicle Model" value={entry.rcVerification.vehicleModel} />
+                              <Field label="Maker" value={entry.rcVerification.makerDescription} />
+                              <Field label="Body Type" value={entry.rcVerification.bodyType} />
                               <Field label="Fuel Type" value={entry.rcVerification.fuelType} />
                               <Field label="Color" value={entry.rcVerification.color} />
+                              <Field label="Seats" value={entry.rcVerification.seatCapacity?.toString()} />
+                              <Field label="Mfg. Date" value={entry.rcVerification.manufacturingDate} />
+                              <Field label="RTO Code" value={entry.rcVerification.rtoCode} />
                               <Field label="Chassis No." value={entry.rcVerification.chassisNumber} />
                               <Field label="Engine No." value={entry.rcVerification.engineNumber} />
                               <Field label="Insurance Co." value={entry.rcVerification.insuranceCompany} />
                               <Field label="Insurance Upto" value={fmtDate(entry.rcVerification.insuranceValidUpto)} />
                               <Field label="Fitness Upto" value={fmtDate(entry.rcVerification.fitnessValidUpto)} />
+                              <Field label="Tax Upto" value={fmtDate(entry.rcVerification.taxUpto)} />
+                              <Field label="PUCC Upto" value={fmtDate(entry.rcVerification.puccUpto)} />
+                              <Field label="Financer" value={entry.rcVerification.financer || "None"} />
+                              <Field label="Blacklist" value={entry.rcVerification.blacklistStatus || "None"} />
+                              {entry.rcVerification.presentAddress && (
+                                <div className="col-span-2">
+                                  <Field label="Address" value={entry.rcVerification.presentAddress} />
+                                </div>
+                              )}
                               <Field label="Checked At" value={fmtDateTime(entry.rcVerification.analyzedAt)} />
                             </div>
                           ) : entry.rcVerification?.status === "failed" ? (

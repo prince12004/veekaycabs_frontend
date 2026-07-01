@@ -45,17 +45,19 @@ export default function VehicleVerificationPage() {
       showToast("Enter a registration number first", "error");
       return;
     }
-    if (!chassisNumber.trim() || !engineNumber.trim()) {
-      showToast("Chassis number and engine number (last 5 characters each) are both required by QuickEKYC", "error");
-      return;
-    }
     setRcLoading(true);
     try {
       const { data } = await vehicleVerificationApi.verifyRC(regNo.trim(), chassisNumber.trim(), engineNumber.trim(), force);
       setRcResult(data.data);
-      showToast("RC verification complete!");
+      if (data.data?.status === "verified") {
+        showToast(data.cached ? "Loaded from cache" : "RC verification complete!");
+      } else {
+        showToast(data.data?.error || "RC verification failed", "error");
+      }
       loadRecentList();
     } catch (err: any) {
+      const errData = err?.response?.data?.data;
+      if (errData) setRcResult(errData);
       showToast(err?.response?.data?.message || "RC verification failed", "error");
     } finally {
       setRcLoading(false);
@@ -71,9 +73,15 @@ export default function VehicleVerificationPage() {
     try {
       const { data } = await vehicleVerificationApi.checkChallan(regNo.trim(), force);
       setChallanResult(data.data);
-      showToast("Challan check complete!");
+      if (data.data?.status === "checked") {
+        showToast(data.cached ? "Loaded from cache" : "Challan check complete!");
+      } else {
+        showToast(data.data?.error || "Challan check failed", "error");
+      }
       loadRecentList();
     } catch (err: any) {
+      const errData = err?.response?.data?.data;
+      if (errData) setChallanResult(errData);
       showToast(err?.response?.data?.message || "Challan check failed", "error");
     } finally {
       setChallanLoading(false);
@@ -131,7 +139,7 @@ export default function VehicleVerificationPage() {
       )}
 
       {(regNo.trim() || rc || challan) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {/* RC Verification Card */}
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -159,23 +167,42 @@ export default function VehicleVerificationPage() {
             {rc?.status === "verified" && (
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <Field label="Owner Name" value={rc.ownerName} />
+                <Field label="Father Name" value={rc.fatherName} />
+                <Field label="RC Status" value={rc.rcStatus} />
+                <Field label="Owner No." value={rc.ownerNumber} />
                 <Field label="Vehicle Model" value={rc.vehicleModel} />
+                <Field label="Maker" value={rc.makerDescription} />
+                <Field label="Body Type" value={rc.bodyType} />
                 <Field label="Vehicle Class" value={rc.vehicleClass} />
                 <Field label="Fuel Type" value={rc.fuelType} />
                 <Field label="Color" value={rc.color} />
-                <Field label="Registration Date" value={fmtDate(rc.registrationDate)} />
+                <Field label="Seats" value={rc.seatCapacity?.toString()} />
+                <Field label="CC" value={rc.cubicCapacity} />
+                <Field label="Mfg. Date" value={rc.manufacturingDate} />
+                <Field label="Reg. Date" value={fmtDate(rc.registrationDate)} />
+                <Field label="RTO Code" value={rc.rtoCode} />
+                <Field label="Registered At" value={rc.registeredAt} />
                 <Field label="Chassis No." value={rc.chassisNumber} />
                 <Field label="Engine No." value={rc.engineNumber} />
                 <Field label="Insurance Co." value={rc.insuranceCompany} />
+                <Field label="Policy No." value={rc.insurancePolicyNumber} />
                 <Field label="Insurance Upto" value={fmtDate(rc.insuranceValidUpto)} />
                 <Field label="Fitness Upto" value={fmtDate(rc.fitnessValidUpto)} />
+                <Field label="Tax Upto" value={fmtDate(rc.taxUpto)} />
+                <Field label="PUCC Upto" value={fmtDate(rc.puccUpto)} />
                 <Field label="Financer" value={rc.financer || "None"} />
+                <Field label="Blacklist" value={rc.blacklistStatus || "None"} />
+                {rc.presentAddress && (
+                  <div className="col-span-2">
+                    <Field label="Address" value={rc.presentAddress} />
+                  </div>
+                )}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-[10px] font-semibold text-[#4A4A6A] mb-1">Chassis No. (last 5 chars) *</label>
+                <label className="block text-[10px] font-semibold text-[#4A4A6A] mb-1">Chassis No. (last 5 chars) <span className="text-[#9090A8] font-normal">optional</span></label>
                 <input
                   value={chassisNumber}
                   onChange={(e) => setChassisNumber(e.target.value.toUpperCase())}
@@ -185,7 +212,7 @@ export default function VehicleVerificationPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-semibold text-[#4A4A6A] mb-1">Engine No. (last 5 chars) *</label>
+                <label className="block text-[10px] font-semibold text-[#4A4A6A] mb-1">Engine No. (last 5 chars) <span className="text-[#9090A8] font-normal">optional</span></label>
                 <input
                   value={engineNumber}
                   onChange={(e) => setEngineNumber(e.target.value.toUpperCase())}
@@ -199,7 +226,7 @@ export default function VehicleVerificationPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => runRC(false)}
-                disabled={rcLoading || !regNo.trim() || !chassisNumber.trim() || !engineNumber.trim()}
+                disabled={rcLoading || !regNo.trim()}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-50 transition-colors"
               >
                 {rcLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
