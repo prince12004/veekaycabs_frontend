@@ -134,7 +134,7 @@ export default function Navbar() {
               </div>
             ) : (
               <Link
-                href="/login"
+                href={`/login?redirect=${encodeURIComponent(pathname)}`}
                 className="btn-gradient px-5 py-2 rounded-xl text-white font-semibold text-sm"
               >
                 Login / My Account
@@ -242,7 +242,7 @@ export default function Navbar() {
                   </>
                 ) : (
                   <Link
-                    href="/login"
+                    href={`/login?redirect=${encodeURIComponent(pathname)}`}
                     onClick={() => setMobileOpen(false)}
                     className="btn-gradient w-full py-3 rounded-xl text-white font-semibold text-sm text-center block"
                   >

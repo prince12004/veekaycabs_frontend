@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { bookingsApi, settingsApi } from "@/lib/api";
-import { downloadInvoicePdf } from "@/lib/invoicePdf";
+import { downloadInvoicePdf, generateInvoiceBlob } from "@/lib/invoicePdf";
 import {
   ArrowLeft, Phone, FileText, Car, User, Calendar, IndianRupee,
   Video, Upload, CheckCircle, XCircle, Clock,
@@ -95,8 +95,9 @@ export default function BookingDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [carReceived, setCarReceived] = useState(false);
   const [carReturned, setCarReturned] = useState(false);
-  const [pickupCondition, setPickupCondition] = useState({ fuel: "", odometer: "", challan: false, damage: "", extras: "", tyres: "Good", ac: true, documents: true });
-  const [returnCondition, setReturnCondition] = useState({ fuel: "", odometer: "", challan: false, damage: "", extras: "", tyres: "", ac: true, documents: true });
+  const [pickupCondition, setPickupCondition] = useState<Record<string, any>>({ fuel: 100, odometer: "", challan: false, damage: "", extras: "", tyres: "Good", ac: true, documents: true });
+  const [returnCondition, setReturnCondition] = useState<Record<string, any>>({ fuel: 100, odometer: "", challan: false, damage: "", extras: "", tyres: "", ac: true, documents: true });
+  const [savingVerification, setSavingVerification] = useState(false);
   const [showPickupChecklist, setShowPickupChecklist] = useState(false);
   const [showReturnChecklist, setShowReturnChecklist] = useState(false);
   const [refundInitiated, setRefundInitiated] = useState(false);
@@ -140,6 +141,7 @@ export default function BookingDetailPage() {
   // Invoice PDF
   const [companySettings, setCompanySettings] = useState<Record<string, any> | null>(null);
   const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [sendingInvoiceWhatsApp, setSendingInvoiceWhatsApp] = useState(false);
 
   // ── Load booking ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -147,9 +149,26 @@ export default function BookingDetailPage() {
       .then(({ data }) => {
         const b = data.data;
         setRawBooking(b);
-        setCarReceived(b?.odometerStart != null);
-        setCarReturned(b?.odometerEnd != null);
-        if (b?.odometerStart) setPickupCondition(p => ({ ...p, odometer: String(b.odometerStart) }));
+        setCarReceived(!!b?.pickupCondition?.recordedAt || b?.odometerStart != null);
+        setCarReturned(!!b?.returnCondition?.recordedAt || b?.odometerEnd != null);
+        if (b?.pickupCondition) {
+          setPickupCondition(p => ({
+            ...p, ...b.pickupCondition,
+            fuel: b.pickupCondition.fuel ?? p.fuel,
+            odometer: b.pickupCondition.odometer != null ? String(b.pickupCondition.odometer) : (b?.odometerStart ? String(b.odometerStart) : p.odometer),
+          }));
+        } else if (b?.odometerStart) {
+          setPickupCondition(p => ({ ...p, odometer: String(b.odometerStart) }));
+        }
+        if (b?.returnCondition) {
+          setReturnCondition(p => ({
+            ...p, ...b.returnCondition,
+            fuel: b.returnCondition.fuel ?? p.fuel,
+            odometer: b.returnCondition.odometer != null ? String(b.returnCondition.odometer) : (b?.odometerEnd ? String(b.odometerEnd) : p.odometer),
+          }));
+        } else if (b?.odometerEnd) {
+          setReturnCondition(p => ({ ...p, odometer: String(b.odometerEnd) }));
+        }
         if (b?.dentDetectionResult?.analyzedAt) setDentResult(b.dentDetectionResult);
       })
       .catch(() => setRawBooking(null))
@@ -392,57 +411,68 @@ export default function BookingDetailPage() {
   const nights  = Math.round((new Date(booking.end).getTime() - new Date(booking.start).getTime()) / (1000 * 60 * 60 * 24));
   const balance = booking.payment.total - booking.payment.received;
 
-  // WhatsApp bill text (fallback session message link)
-  const waText = encodeURIComponent(
-    `*Veekay Cabs — Booking Confirmation* ✅\n\nBooking ID: ${booking.id}\nCar: ${booking.car.name} (${booking.car.regNo})\nCustomer: ${booking.customer.name}\n\nPickup: ${new Date(booking.start).toLocaleString("en-IN")}\nReturn: ${new Date(booking.end).toLocaleString("en-IN")}\nLocation: ${booking.doorstep ? booking.deliveryAddress || "Doorstep" : booking.pickupLocation}\n\nTotal: Rs. ${booking.payment.total.toLocaleString("en-IN")}\nPaid: Rs. ${booking.payment.received.toLocaleString("en-IN")}\nBalance: Rs. ${balance.toLocaleString("en-IN")}\n\nVeekay Cabs | +91 99999 26867`
-  );
+  const buildInvoiceData = () => ({
+    bookingId: booking.id,
+    invoiceNo: `INV-${String(booking.id).replace(/\W/g, "").slice(-8).toUpperCase()}`,
+    invoiceDate: new Date().toISOString(),
+    status: booking.status,
+    customer: booking.customer,
+    car: booking.car,
+    start: booking.start,
+    end: booking.end,
+    nights,
+    bookingType: booking.bookingType,
+    doorstep: booking.doorstep,
+    pickupLocation: booking.pickupLocation,
+    deliveryAddress: booking.deliveryAddress,
+    payment: {
+      bookingFare: rawBooking.bookingFare ?? 0,
+      gst: rawBooking.gst ?? 0,
+      discount: rawBooking.discount ?? 0,
+      doorstepCharge: rawBooking.doorstepCharge ?? 0,
+      extraKmCharge: rawBooking.extraKmCharge ?? 0,
+      securityDeposit: rawBooking.securityDeposit ?? 0,
+      totalAmount: rawBooking.totalAmount ?? 0,
+      amountPaid: rawBooking.amountPaid ?? 0,
+      balanceDue: rawBooking.balanceDue ?? (rawBooking.totalAmount ?? 0) - (rawBooking.amountPaid ?? 0),
+      mode: booking.payment.mode,
+      status: booking.payment.status,
+    },
+    company: {
+      companyName: companySettings?.companyName || "Veekay Cabs",
+      tagline: companySettings?.tagline,
+      gstNumber: companySettings?.gstNumber,
+      phone1: companySettings?.phone1 || "+91 99999 26867",
+      phone2: companySettings?.phone2,
+      email: companySettings?.email || "sales@veekaycabs.com",
+      website: companySettings?.website || "https://veekaycabs.com",
+      addressDelhi: companySettings?.addressDelhi || "A 13, 1st Floor, Ganesh Nagar, New Delhi 110092",
+    },
+  });
 
   const handleDownloadInvoice = async () => {
     setGeneratingInvoice(true);
     try {
-      await downloadInvoicePdf({
-        bookingId: booking.id,
-        invoiceNo: `INV-${String(booking.id).replace(/\W/g, "").slice(-8).toUpperCase()}`,
-        invoiceDate: new Date().toISOString(),
-        status: booking.status,
-        customer: booking.customer,
-        car: booking.car,
-        start: booking.start,
-        end: booking.end,
-        nights,
-        bookingType: booking.bookingType,
-        doorstep: booking.doorstep,
-        pickupLocation: booking.pickupLocation,
-        deliveryAddress: booking.deliveryAddress,
-        payment: {
-          bookingFare: rawBooking.bookingFare ?? 0,
-          gst: rawBooking.gst ?? 0,
-          discount: rawBooking.discount ?? 0,
-          doorstepCharge: rawBooking.doorstepCharge ?? 0,
-          extraKmCharge: rawBooking.extraKmCharge ?? 0,
-          securityDeposit: rawBooking.securityDeposit ?? 0,
-          totalAmount: rawBooking.totalAmount ?? 0,
-          amountPaid: rawBooking.amountPaid ?? 0,
-          balanceDue: rawBooking.balanceDue ?? (rawBooking.totalAmount ?? 0) - (rawBooking.amountPaid ?? 0),
-          mode: booking.payment.mode,
-          status: booking.payment.status,
-        },
-        company: {
-          companyName: companySettings?.companyName || "Veekay Cabs",
-          tagline: companySettings?.tagline,
-          gstNumber: companySettings?.gstNumber,
-          phone1: companySettings?.phone1 || "+91 99999 26867",
-          phone2: companySettings?.phone2,
-          email: companySettings?.email || "sales@veekaycabs.com",
-          website: companySettings?.website || "https://veekaycabs.com",
-          addressDelhi: companySettings?.addressDelhi || "A 13, 1st Floor, Ganesh Nagar, New Delhi 110092",
-        },
-      });
+      await downloadInvoicePdf(buildInvoiceData());
       toast.success("Invoice PDF downloaded");
     } catch {
       toast.error("Failed to generate invoice PDF");
     } finally {
       setGeneratingInvoice(false);
+    }
+  };
+
+  const handleSendInvoiceWhatsApp = async () => {
+    if (!rawBooking) return;
+    setSendingInvoiceWhatsApp(true);
+    try {
+      const blob = await generateInvoiceBlob(buildInvoiceData());
+      await bookingsApi.sendInvoiceWhatsApp(rawBooking._id, blob);
+      toast.success("Invoice sent to customer via WhatsApp!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to send invoice via WhatsApp");
+    } finally {
+      setSendingInvoiceWhatsApp(false);
     }
   };
 
@@ -481,10 +511,10 @@ export default function BookingDetailPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <a href={`https://wa.me/${booking.customer.mobile}?text=${waText}`} target="_blank" rel="noreferrer"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] text-white font-semibold text-sm">
-            <Phone size={14} /> WhatsApp Bill
-          </a>
+          <button onClick={handleSendInvoiceWhatsApp} disabled={sendingInvoiceWhatsApp}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#128C7E] text-white font-semibold text-sm disabled:opacity-60">
+            {sendingInvoiceWhatsApp ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send Invoice via WhatsApp
+          </button>
           <button onClick={handleDownloadInvoice} disabled={generatingInvoice}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm disabled:opacity-60">
             {generatingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Print
@@ -648,8 +678,16 @@ export default function BookingDetailPage() {
             {showPickupChecklist && (
               <div className="border-t border-[#E4E5EF] p-6 space-y-5">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5"><Fuel size={13} className="text-[#9090A8]" /> Fuel Level</span>
+                      <span className="text-[#E8540A] font-bold">{pickupCondition.fuel}%</span>
+                    </label>
+                    <input type="range" min={0} max={100} step={5} value={pickupCondition.fuel}
+                      onChange={e => setPickupCondition(p => ({ ...p, fuel: Number(e.target.value) }))}
+                      className="w-full accent-[#E8540A] mt-2.5" />
+                  </div>
                   {[
-                    { label: "Fuel Level", field: "fuel" as const, placeholder: "Full / 3/4 / Half", icon: Fuel },
                     { label: "Odometer (km)", field: "odometer" as const, placeholder: "e.g. 48200", icon: Gauge },
                   ].map(({ label, field, icon: Icon, placeholder }) => (
                     <div key={field} className="col-span-2 sm:col-span-1">
@@ -749,9 +787,22 @@ export default function BookingDetailPage() {
                   )}
                 </div>
 
-                <button onClick={() => { setCarReceived(true); toast.success("Car marked as handed over"); }}
-                  className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm">
-                  <CheckCircle size={16} /> Mark Car Handed Over
+                <button onClick={async () => {
+                  if (!rawBooking) return;
+                  setSavingVerification(true);
+                  try {
+                    const { data } = await bookingsApi.updateVerification(rawBooking._id, "pickup", pickupCondition);
+                    setRawBooking(data.data);
+                    setCarReceived(true);
+                    toast.success("Car marked as handed over");
+                  } catch {
+                    toast.error("Failed to save pickup verification");
+                  } finally {
+                    setSavingVerification(false);
+                  }
+                }} disabled={savingVerification}
+                  className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm disabled:opacity-60">
+                  {savingVerification ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Mark Car Handed Over
                 </button>
               </div>
             )}
@@ -809,12 +860,13 @@ export default function BookingDetailPage() {
               <div className="border-t border-[#E4E5EF] p-6 space-y-5">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Fuel Level on Return</label>
-                    <div className="relative">
-                      <Fuel size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
-                      <input value={returnCondition.fuel} onChange={e => setReturnCondition(p => ({ ...p, fuel: e.target.value }))} placeholder="Full / Half / Empty"
-                        className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none" />
-                    </div>
+                    <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5"><Fuel size={13} className="text-[#9090A8]" /> Fuel Level on Return</span>
+                      <span className="text-[#E8540A] font-bold">{returnCondition.fuel}%</span>
+                    </label>
+                    <input type="range" min={0} max={100} step={5} value={returnCondition.fuel}
+                      onChange={e => setReturnCondition(p => ({ ...p, fuel: Number(e.target.value) }))}
+                      className="w-full accent-[#E8540A] mt-2.5" />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 block">Odometer on Return</label>
@@ -1008,9 +1060,22 @@ export default function BookingDetailPage() {
                 )}
 
                 <div className="flex gap-3 flex-wrap">
-                  <button onClick={() => { setCarReturned(true); toast.success("Car marked as returned"); }}
-                    className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm">
-                    <CheckCircle size={16} /> Mark Car Returned
+                  <button onClick={async () => {
+                    if (!rawBooking) return;
+                    setSavingVerification(true);
+                    try {
+                      const { data } = await bookingsApi.updateVerification(rawBooking._id, "return", returnCondition);
+                      setRawBooking(data.data);
+                      setCarReturned(true);
+                      toast.success("Car marked as returned");
+                    } catch {
+                      toast.error("Failed to save return verification");
+                    } finally {
+                      setSavingVerification(false);
+                    }
+                  }} disabled={savingVerification}
+                    className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm disabled:opacity-60">
+                    {savingVerification ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Mark Car Returned
                   </button>
                   {carReturned && !refundInitiated && (
                     <button onClick={() => setRefundInitiated(true)}
@@ -1232,14 +1297,14 @@ export default function BookingDetailPage() {
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5">
             <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2 mb-4"><Shield size={16} className="text-[#E8540A]" /> Quick Actions</h3>
             <div className="space-y-3">
-              <a href={`https://wa.me/${booking.customer.mobile}?text=${waText}`} target="_blank" rel="noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#10B981]/20 hover:bg-[#D1FAE5] transition-colors">
-                <Phone size={18} className="text-[#10B981]" />
+              <button onClick={handleSendInvoiceWhatsApp} disabled={sendingInvoiceWhatsApp}
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#10B981]/20 hover:bg-[#D1FAE5] transition-colors text-left disabled:opacity-60">
+                {sendingInvoiceWhatsApp ? <Loader2 size={18} className="text-[#10B981] animate-spin" /> : <Phone size={18} className="text-[#10B981]" />}
                 <div>
-                  <p className="font-semibold text-sm text-[#0F0F1A]">Send WhatsApp Bill</p>
-                  <p className="text-xs text-[#9090A8]">Send booking summary to customer</p>
+                  <p className="font-semibold text-sm text-[#0F0F1A]">{sendingInvoiceWhatsApp ? "Sending..." : "Send WhatsApp Bill"}</p>
+                  <p className="text-xs text-[#9090A8]">Send invoice PDF to customer via WhatsApp</p>
                 </div>
-              </a>
+              </button>
               <button onClick={handleDownloadInvoice} disabled={generatingInvoice}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors text-left disabled:opacity-60">
                 {generatingInvoice ? <Loader2 size={18} className="text-[#4A4A6A] animate-spin" /> : <Printer size={18} className="text-[#4A4A6A]" />}

@@ -51,6 +51,7 @@ const mapApiCar = (c: any) => {
     badgeColor: c.type === "SUV" || c.type === "MUV" ? "#E8540A" : c.type === "Luxury" ? "#6366F1" : "#10B981",
     gradient: "from-[#1C1C2E] to-[#242438]",
     image: c.images?.[0] || localMatch?.image || "",
+    isAvailable: c.isAvailable !== false,
   };
 };
 
@@ -96,11 +97,13 @@ function CarGridCard({
   bookUrl: string;
 }) {
   const totalPrice = Math.round(car.pricePerHr * hours);
+  const soldOut = car.isAvailable === false;
   return (
     <div
       ref={cardRef}
       className={cn(
         "bg-white rounded-2xl border shadow-[0_4px_24px_rgba(0,0,0,0.07)] overflow-hidden hover:shadow-[0_12px_40px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300 group flex flex-col",
+        soldOut && "opacity-60 grayscale-[0.4] hover:-translate-y-0",
         highlighted
           ? "border-[#E8540A] ring-4 ring-[#E8540A]/20"
           : "border-[#E4E5EF]",
@@ -127,6 +130,13 @@ function CarGridCard({
             (e.currentTarget as HTMLImageElement).style.opacity = "0";
           }}
         />
+        {soldOut && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="bg-[#0F0F1A] text-white text-xs font-bold px-4 py-1.5 rounded-full tracking-wide">
+              SOLD OUT
+            </span>
+          </div>
+        )}
         <div
           className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full text-white text-[10px] font-bold shadow"
           style={{ backgroundColor: car.badgeColor }}
@@ -197,12 +207,18 @@ function CarGridCard({
               estimated total · {hours}h
             </div>
           </div>
-          <Link
-            href={bookUrl}
-            className="btn-gradient px-5 py-2.5 rounded-xl text-white font-bold text-sm whitespace-nowrap"
-          >
-            Book Now
-          </Link>
+          {soldOut ? (
+            <span className="bg-[#F1F2F7] text-[#9090A8] px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap cursor-not-allowed">
+              Sold Out
+            </span>
+          ) : (
+            <Link
+              href={bookUrl}
+              className="btn-gradient px-5 py-2.5 rounded-xl text-white font-bold text-sm whitespace-nowrap"
+            >
+              Book Now
+            </Link>
+          )}
         </div>
       </div>
     </div>
@@ -326,6 +342,7 @@ function CarListingInner() {
     }
     return true;
   }).sort((a, b) => {
+    if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
     if (sort === "Price: Low to High") return a.pricePerHr - b.pricePerHr;
     if (sort === "Price: High to Low") return b.pricePerHr - a.pricePerHr;
     if (sort === "Rating") return b.rating - a.rating;

@@ -79,6 +79,8 @@ export const bookingsApi = {
   getById: (id: string) => adminApi.get(`/api/admin/bookings/${id}`),
   updateStatus: (id: string, data: { status?: string; amountPaid?: number; notes?: string }) =>
     adminApi.patch(`/api/admin/bookings/${id}/status`, data),
+  updateVerification: (id: string, stage: "pickup" | "return", condition: Record<string, unknown>) =>
+    adminApi.patch(`/api/admin/bookings/${id}/verification`, { stage, condition }),
   update: (id: string, data: Record<string, unknown>) =>
     adminApi.put(`/api/admin/bookings/${id}`, data),
   exportCsv: (params?: Record<string, string>) =>
@@ -101,6 +103,14 @@ export const bookingsApi = {
   // Send car documents to customer via WhatsApp
   sendCarDocs: (id: string, overrideMobile?: string) =>
     adminApi.post(`/api/admin/bookings/${id}/send-car-docs`, overrideMobile ? { overrideMobile } : {}),
+  // Upload invoice PDF + send to customer via WhatsApp
+  sendInvoiceWhatsApp: (id: string, file: Blob) => {
+    const formData = new FormData();
+    formData.append("file", file, "invoice.pdf");
+    return adminApi.post(`/api/admin/bookings/${id}/invoice/send-whatsapp`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };
 
 export const adminAdminsAPI = {
@@ -115,8 +125,8 @@ export const adminAdminsAPI = {
 export const carsAPI = {
   getAvailable: (params: Record<string, string>) =>
     api.get("/api/cars/available", { params }),
-  getPopular: (city: string, limit = 8) =>
-    api.get("/api/cars/popular", { params: { city, limit } }),
+  getPopular: (city: string, limit = 8, startTime?: string, endTime?: string) =>
+    api.get("/api/cars/popular", { params: { city, limit, ...(startTime && endTime ? { startTime, endTime } : {}) } }),
   getById: (id: string) => api.get(`/api/cars/${id}`),
 };
 
@@ -203,6 +213,7 @@ export const adminUsersApi = {
   toggleBlock: (id: string) => adminApi.patch(`/api/admin/users/${id}/block`, {}),
   update: (id: string, data: { name?: string; email?: string; mobile?: string; address?: string }) =>
     adminApi.put(`/api/admin/users/${id}`, data),
+  exportCsv: () => adminApi.get("/api/admin/users/export", { responseType: "blob" }),
 };
 
 export const couponsAPI = {
@@ -227,6 +238,18 @@ export const blogsAPI = {
   getBySlug: (slug: string) => api.get(`/api/blogs/${slug}`),
 };
 
+export const adminBlogsApi = {
+  getAll: (params?: Record<string, string | number>) =>
+    adminApi.get("/api/admin/blogs", { params }),
+  getOne: (id: string) => adminApi.get(`/api/admin/blogs/${id}`),
+  create: (data: FormData) =>
+    adminApi.post("/api/admin/blogs", data, { headers: { "Content-Type": "multipart/form-data" } }),
+  update: (id: string, data: FormData) =>
+    adminApi.put(`/api/admin/blogs/${id}`, data, { headers: { "Content-Type": "multipart/form-data" } }),
+  remove: (id: string) => adminApi.delete(`/api/admin/blogs/${id}`),
+  togglePublish: (id: string) => adminApi.patch(`/api/admin/blogs/${id}/publish`),
+};
+
 export const contactAPI = {
   submit: (data: Record<string, unknown>) => api.post("/api/contact", data),
 };
@@ -236,6 +259,7 @@ export const adminContactsAPI = {
     adminApi.get("/api/admin/contact-requests", { params }),
   updateStatus: (id: string, data: { status: string; adminNotes?: string }) =>
     adminApi.patch(`/api/admin/contact-requests/${id}`, data),
+  exportCsv: () => adminApi.get("/api/admin/contact-requests/export", { responseType: "blob" }),
 };
 
 export const adminDashboardAPI = {

@@ -22,15 +22,18 @@ export default function GoogleSuccessPage() {
     localStorage.setItem("vk_token", token);
     if (refreshToken) localStorage.setItem("vk_refresh_token", refreshToken);
 
+    const dest = localStorage.getItem("vk_login_redirect") || "/account";
+    localStorage.removeItem("vk_login_redirect");
+
     usersAPI
       .getProfile()
       .then((res) => {
         const user = res.data.data.user;
         localStorage.setItem("vk_user", JSON.stringify(user));
-        router.replace("/account");
+        router.replace(dest);
       })
       .catch(() => {
-        router.replace("/account");
+        router.replace(dest);
       });
   }, [router, searchParams]);
 

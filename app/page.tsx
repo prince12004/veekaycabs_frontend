@@ -280,13 +280,18 @@ interface HomeCar {
   gradient: string;
   image: string;
   kmPackage: string;
+  isAvailable: boolean;
 }
 
 function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
+  const soldOut = car.isAvailable === false;
   return (
     <motion.div
       variants={scaleIn}
-      className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.07)] card-hover border border-[#E4E5EF] group"
+      className={cn(
+        "bg-white rounded-2xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.07)] card-hover border border-[#E4E5EF] group",
+        soldOut && "opacity-60 grayscale-[0.4]"
+      )}
     >
       {/* Car Image */}
       <div
@@ -304,6 +309,13 @@ function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
             (e.currentTarget as HTMLImageElement).style.opacity = "0";
           }}
         />
+        {soldOut && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="bg-[#0F0F1A] text-white text-xs font-bold px-4 py-1.5 rounded-full tracking-wide">
+              SOLD OUT
+            </span>
+          </div>
+        )}
         {/* Badge */}
         <div
           className="absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold shadow-md"
@@ -366,12 +378,18 @@ function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
         </div>
 
         {/* CTA */}
-        <Link
-          href={bookUrl}
-          className="btn-gradient w-full py-3 rounded-xl text-white font-semibold text-sm text-center block hover:opacity-90 transition-opacity"
-        >
-          Book Now — Rs. {car.pricePerHr}/hr
-        </Link>
+        {soldOut ? (
+          <span className="w-full py-3 rounded-xl bg-[#F1F2F7] text-[#9090A8] font-semibold text-sm text-center block cursor-not-allowed">
+            Sold Out
+          </span>
+        ) : (
+          <Link
+            href={bookUrl}
+            className="btn-gradient w-full py-3 rounded-xl text-white font-semibold text-sm text-center block hover:opacity-90 transition-opacity"
+          >
+            Book Now — Rs. {car.pricePerHr}/hr
+          </Link>
+        )}
       </div>
     </motion.div>
   );
@@ -430,7 +448,9 @@ export default function HomePage() {
   const statsInView = useInView(statsRef, { once: true, margin: "-100px" });
 
   useEffect(() => {
-    carsAPI.getPopular(selectedCity, 8).then(({ data }) => {
+    const startTime = pickupDateTime ? new Date(pickupDateTime.replace(" ", "T")).toISOString() : undefined;
+    const endTime = dropDateTime ? new Date(dropDateTime.replace(" ", "T")).toISOString() : undefined;
+    carsAPI.getPopular(selectedCity, 8, startTime, endTime).then(({ data }) => {
       const cars: HomeCar[] = (data.data || []).map((c: any) => ({
         id: c.slug || c._id,
         _id: c._id,
@@ -448,10 +468,11 @@ export default function HomePage() {
         gradient: "from-[#1C1C2E] to-[#242438]",
         image: c.images?.[0] || "",
         kmPackage: c.kmPackage || "250 km/day",
+        isAvailable: c.isAvailable !== false,
       }));
       setPopularCars(cars);
     }).catch(() => setPopularCars([]));
-  }, [selectedCity]);
+  }, [selectedCity, pickupDateTime, dropDateTime]);
 
   const filteredCars =
     activeCarFilter === "All"

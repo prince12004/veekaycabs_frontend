@@ -271,6 +271,11 @@ export default function LoginPage() {
               <p className="text-[#9090A8] text-sm mb-8 text-center">Quick and secure login with your Google account</p>
               <a
                 href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/auth/google`}
+                onClick={() => {
+                  if (redirect && redirect !== "/account") {
+                    localStorage.setItem("vk_login_redirect", redirect);
+                  }
+                }}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-xl border-2 border-[#E4E5EF] bg-white text-[#0F0F1A] font-semibold text-sm hover:border-[#E8540A]/50 hover:shadow-md transition-all shadow-sm"
               >
                 {GOOGLE_SVG}

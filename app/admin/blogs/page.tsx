@@ -1,17 +1,23 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Plus, Search, Edit, Trash2, Eye, ImageIcon, ArrowLeft, Save, FileText, TrendingUp, Globe } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { Plus, Search, Edit, Trash2, Eye, ImageIcon, ArrowLeft, Save, FileText, TrendingUp, Globe, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import RichTextEditor from "@/components/ui/RichTextEditor";
+import toast from "react-hot-toast";
+import { adminBlogsApi } from "@/lib/api";
 
-const BLOGS = [
-  { id: 1, title: "Tempo Traveller in Faridabad: The Complete Guide to Group Travel in 2026", slug: "tempo-traveller-faridabad-guide", status: "published", views: 1240, createdAt: "Jun 8, 2026", image: "" },
-  { id: 2, title: "Self Drive Car Rentals Best Day Trip Destinations Under 7200 from Delhi NCR", slug: "self-drive-day-trips-delhi-ncr", status: "published", views: 980, createdAt: "Jun 5, 2026", image: "" },
-  { id: 3, title: "Best Hill Station Trips from Noida: Shimla and Mussoorie by Tempo Traveller", slug: "hill-station-trips-noida", status: "published", views: 756, createdAt: "Jun 1, 2026", image: "" },
-  { id: 4, title: "9 Seater vs 12 Seater vs 20 Seater Tempo Traveller — Which to Choose?", slug: "choose-tempo-traveller-seater", status: "draft", views: 0, createdAt: "Jun 14, 2026", image: "" },
-  { id: 5, title: "How to Plan a Romantic 3-Day Getaway from Delhi NCR with Self Drive Car", slug: "romantic-getaway-delhi-self-drive", status: "published", views: 1890, createdAt: "May 28, 2026", image: "" },
-];
+// Loaded only when the add/edit form actually mounts — keeps the list view
+// (and the heavy Quill editor bundle) out of the initial page load.
+const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), {
+  ssr: false,
+  loading: () => <div className="h-[350px] border-[1.5px] border-[#E4E5EF] rounded-xl animate-pulse bg-[#F8F9FC]" />,
+});
+
+interface BlogRow {
+  _id: string; title: string; slug: string; isPublished: boolean;
+  views: number; createdAt: string; coverImage?: string;
+}
 
 interface BlogForm {
   title: string; slug: string; content: string;
@@ -29,14 +35,30 @@ const inputCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] 
 
 const slugify = (str: string) => str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
 export default function BlogsPage() {
-  const [blogs, setBlogs] = useState(BLOGS);
+  const [blogs, setBlogs] = useState<BlogRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "add" | "edit">("list");
   const [form, setForm] = useState<BlogForm>(emptyForm);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [existingCoverImage, setExistingCoverImage] = useState<string>("");
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const fetchBlogs = useCallback(() => {
+    setLoading(true);
+    adminBlogsApi.getAll({ limit: 100 })
+      .then(({ data }) => setBlogs(data.data || []))
+      .catch(() => toast.error("Failed to load blogs"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { fetchBlogs(); }, [fetchBlogs]);
 
   const filtered = blogs.filter(b =>
     !search || b.title.toLowerCase().includes(search.toLowerCase()) || b.slug.includes(search)
@@ -57,29 +79,67 @@ export default function BlogsPage() {
     else setImagePreview("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editId !== null) {
-      setBlogs(prev => prev.map(b => b.id === editId ? { ...b, title: form.title, slug: form.slug, status: form.status } : b));
-    } else {
-      setBlogs(prev => [...prev, {
-        id: Date.now(), title: form.title, slug: form.slug, status: form.status,
-        views: 0, createdAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }), image: "",
-      }]);
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("title", form.title);
+      fd.append("slug", form.slug);
+      fd.append("content", form.content);
+      fd.append("seoTitle", form.metaTitle);
+      fd.append("seoKeywords", form.metaKeywords);
+      fd.append("seoDescription", form.metaDescription);
+      fd.append("isPublished", form.status === "published" ? "true" : "false");
+      if (form.image) fd.append("coverImage", form.image);
+
+      if (editId !== null) {
+        await adminBlogsApi.update(editId, fd);
+        toast.success("Blog updated!");
+      } else {
+        await adminBlogsApi.create(fd);
+        toast.success(form.status === "published" ? "Blog published!" : "Draft saved!");
+      }
+      fetchBlogs();
+      resetAndList();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to save blog");
+    } finally {
+      setSaving(false);
     }
-    resetAndList();
   };
 
-  const resetAndList = () => { setForm(emptyForm); setEditId(null); setView("list"); setImagePreview(""); };
+  const resetAndList = () => {
+    setForm(emptyForm); setEditId(null); setView("list");
+    setImagePreview(""); setExistingCoverImage("");
+  };
 
-  const deleteBlog = (id: number) => {
+  const deleteBlog = async (id: string) => {
     if (!confirm("Delete this blog post?")) return;
-    setBlogs(prev => prev.filter(b => b.id !== id));
+    try {
+      await adminBlogsApi.remove(id);
+      setBlogs(prev => prev.filter(b => b._id !== id));
+      toast.success("Blog deleted");
+    } catch {
+      toast.error("Failed to delete blog");
+    }
   };
 
-  const startEdit = (blog: typeof BLOGS[0]) => {
-    setForm({ ...emptyForm, title: blog.title, slug: blog.slug, status: blog.status as "published" | "draft" });
-    setEditId(blog.id); setView("edit");
+  const startEdit = async (blog: BlogRow) => {
+    setEditId(blog._id); setView("edit");
+    try {
+      const { data } = await adminBlogsApi.getOne(blog._id);
+      const b = data.data;
+      setForm({
+        title: b.title, slug: b.slug, content: b.content || "",
+        metaTitle: b.seoTitle || "", metaKeywords: b.seoKeywords || "", metaDescription: b.seoDescription || "",
+        image: null, status: b.isPublished ? "published" : "draft",
+      });
+      setExistingCoverImage(b.coverImage || "");
+    } catch {
+      toast.error("Failed to load blog details");
+      resetAndList();
+    }
   };
 
   // ── Add / Edit View ──
@@ -155,13 +215,13 @@ export default function BlogsPage() {
               {/* Featured Image */}
               <div>
                 <label className="block text-xs font-bold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Featured Image</label>
-                {imagePreview ? (
+                {imagePreview || existingCoverImage ? (
                   <div className="relative rounded-xl overflow-hidden border border-[#E4E5EF]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imagePreview} alt="preview" className="w-full h-48 object-cover" />
+                    <img src={imagePreview || existingCoverImage} alt="preview" className="w-full h-48 object-cover" />
                     <button
                       type="button"
-                      onClick={() => { setImagePreview(""); setForm(p => ({ ...p, image: null })); if (fileRef.current) fileRef.current.value = ""; }}
+                      onClick={() => { setImagePreview(""); setExistingCoverImage(""); setForm(p => ({ ...p, image: null })); if (fileRef.current) fileRef.current.value = ""; }}
                       className="absolute top-2 right-2 bg-white/90 rounded-full p-1 text-red-500 hover:bg-red-50"
                     >
                       <Trash2 size={14} />
@@ -252,8 +312,8 @@ export default function BlogsPage() {
               <option value="draft">Save as Draft</option>
               <option value="published">Publish</option>
             </select>
-            <button type="submit" className="flex items-center gap-2 btn-gradient px-8 py-3 rounded-xl text-white font-bold text-sm">
-              <Save size={15} /> {form.status === "published" ? "Publish Blog" : "Save Draft"}
+            <button type="submit" disabled={saving} className="flex items-center gap-2 btn-gradient px-8 py-3 rounded-xl text-white font-bold text-sm disabled:opacity-60">
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} {form.status === "published" ? "Publish Blog" : "Save Draft"}
             </button>
             <button type="button" onClick={resetAndList} className="px-6 py-3 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:bg-[#F8F9FC] transition-colors">Cancel</button>
           </div>
@@ -264,8 +324,8 @@ export default function BlogsPage() {
 
   // ── List View ──
   const total = blogs.length;
-  const published = blogs.filter(b => b.status === "published").length;
-  const totalViews = blogs.reduce((s, b) => s + b.views, 0);
+  const published = blogs.filter(b => b.isPublished).length;
+  const totalViews = blogs.reduce((s, b) => s + (b.views || 0), 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -319,10 +379,12 @@ export default function BlogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F2F7]">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={7} className="text-center py-12 text-[#9090A8] text-sm"><Loader2 size={18} className="animate-spin inline-block" /></td></tr>
+              ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-12 text-[#9090A8] text-sm">No blogs found</td></tr>
               ) : filtered.map((blog, i) => (
-                <tr key={blog.id} className={cn("hover:bg-[#FFF3ED] transition-colors", i % 2 === 1 ? "bg-[#F8F9FC]/40" : "")}>
+                <tr key={blog._id} className={cn("hover:bg-[#FFF3ED] transition-colors", i % 2 === 1 ? "bg-[#F8F9FC]/40" : "")}>
                   <td className="px-5 py-4 text-[#9090A8] text-sm font-mono">{i + 1}</td>
                   <td className="px-5 py-4 max-w-xs">
                     <p className="font-semibold text-sm text-[#0F0F1A] line-clamp-2">{blog.title}</p>
@@ -331,21 +393,21 @@ export default function BlogsPage() {
                     <span className="font-mono text-xs text-[#7C3AED] bg-[#F5F3FF] px-2 py-0.5 rounded-lg max-w-[160px] block truncate">/{blog.slug}</span>
                   </td>
                   <td className="px-5 py-4">
-                    <span className={cn("text-xs font-bold px-2.5 py-1 rounded-full", blog.status === "published" ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEF3C7] text-[#92400E]")}>
-                      {blog.status === "published" ? "Published" : "Draft"}
+                    <span className={cn("text-xs font-bold px-2.5 py-1 rounded-full", blog.isPublished ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEF3C7] text-[#92400E]")}>
+                      {blog.isPublished ? "Published" : "Draft"}
                     </span>
                   </td>
-                  <td className="px-5 py-4 font-semibold text-sm text-[#0F0F1A]">{blog.views.toLocaleString()}</td>
-                  <td className="px-5 py-4 text-xs text-[#4A4A6A]">{blog.createdAt}</td>
+                  <td className="px-5 py-4 font-semibold text-sm text-[#0F0F1A]">{(blog.views || 0).toLocaleString()}</td>
+                  <td className="px-5 py-4 text-xs text-[#4A4A6A]">{fmtDate(blog.createdAt)}</td>
                   <td className="px-5 py-4">
                     <div className="flex gap-1.5">
-                      <a href={`/blog/${blog.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#DBEAFE] text-[#1E40AF] hover:bg-[#1E40AF] hover:text-white transition-colors flex items-center justify-center" title="View live">
+                      <a href={`/blogs/${blog.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#DBEAFE] text-[#1E40AF] hover:bg-[#1E40AF] hover:text-white transition-colors flex items-center justify-center" title="View live">
                         <Eye size={13} />
                       </a>
                       <button onClick={() => startEdit(blog)} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center" title="Edit">
                         <Edit size={13} />
                       </button>
-                      <button onClick={() => deleteBlog(blog.id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center" title="Delete">
+                      <button onClick={() => deleteBlog(blog._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center" title="Delete">
                         <Trash2 size={13} />
                       </button>
                     </div>

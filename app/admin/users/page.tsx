@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search, Shield, ShieldOff, Eye, Users, CheckCircle, Clock,
   XCircle, X, Loader2, RefreshCw, Phone, Mail, Calendar,
-  FileText, Car, ChevronLeft, ChevronRight, Pencil, Save,
+  FileText, Car, ChevronLeft, ChevronRight, Pencil, Save, Download,
 } from "lucide-react";
 import { adminUsersApi } from "@/lib/api";
 import toast from "react-hot-toast";
@@ -149,6 +149,18 @@ export default function AdminUsersPage() {
     }
   };
 
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    try {
+      const res = await adminUsersApi.exportCsv();
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "users.csv"; a.click();
+    } catch {
+      toast.error("Failed to export users");
+    }
+  };
+
   // ── Open detail modal ───────────────────────────────────────────────────────
   const openDetail = async (id: string) => {
     setDetailLoading(true);
@@ -171,10 +183,16 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl font-black text-[#0F0F1A] font-syne">Users</h1>
           <p className="text-[#9090A8] text-sm">{total} registered users · live from database</p>
         </div>
-        <button onClick={() => fetchUsers(page, search, kycFilter)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-xs font-semibold text-[#4A4A6A] hover:bg-[#F8F9FC]">
-          <RefreshCw size={12} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport}
+            className="flex items-center gap-2 border-[1.5px] border-[#E8540A] text-[#E8540A] px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#FFF3ED] transition-colors">
+            <Download size={16} /> Export CSV
+          </button>
+          <button onClick={() => fetchUsers(page, search, kycFilter)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-xs font-semibold text-[#4A4A6A] hover:bg-[#F8F9FC]">
+            <RefreshCw size={12} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

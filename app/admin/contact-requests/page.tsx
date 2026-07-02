@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Phone, Mail, Trash2, MessageSquare, Send, ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
+import { Search, Phone, Mail, Trash2, MessageSquare, Send, ChevronLeft, ChevronRight, X, Loader2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminContactsAPI } from "@/lib/api";
 
@@ -79,6 +79,15 @@ export default function ContactRequestsPage() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const res = await adminContactsAPI.exportCsv();
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url; a.download = "contact-requests.csv"; a.click();
+    } catch {}
+  };
+
   const handleReply = async () => {
     if (!replyTo) return;
     await markStatus(replyTo._id, "contacted");
@@ -109,6 +118,10 @@ export default function ContactRequestsPage() {
           <h1 className="text-2xl font-black text-[#0F0F1A] font-syne">Contact Requests</h1>
           <p className="text-[#9090A8] text-sm">{total} total · {pendingCount} pending reply</p>
         </div>
+        <button onClick={handleExport}
+          className="flex items-center gap-2 border-[1.5px] border-[#E8540A] text-[#E8540A] px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#FFF3ED] transition-colors">
+          <Download size={16} /> Export CSV
+        </button>
       </div>
 
       {/* Stats */}
