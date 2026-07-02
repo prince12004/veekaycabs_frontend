@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Lock, Mail, Loader2, AlertCircle } from "lucide-react";
 import { adminAuthAPI } from "@/lib/api";
@@ -36,9 +37,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-[#0F0F1A] flex items-center justify-center px-4">
       <div className="w-full max-w-sm bg-[#17172A] border border-white/10 rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#E8540A] to-[#FF6B35] flex items-center justify-center mb-3">
-            <span className="text-white font-black font-syne">VK</span>
-          </div>
+          <Image src="/logowhite.png" alt="Veekay Cabs" width={160} height={29} className="h-9 w-auto object-contain mb-4" priority />
           <h1 className="text-white font-bold font-syne text-lg">Admin Login</h1>
           <p className="text-white/40 text-xs mt-1">Veekay Cabs Admin Panel</p>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Phone, Loader2 } from "lucide-react";
@@ -123,11 +124,8 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-2xl p-8 border border-[#E4E5EF]">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#E8540A] to-[#FF6B35] flex items-center justify-center shadow-lg shadow-orange-500/30">
-              <span className="text-white font-black text-xl font-syne">VK</span>
-            </div>
-            <span className="text-[#0F0F1A] font-bold text-2xl font-syne">Veekay Cabs</span>
+          <div className="flex items-center justify-center mb-8">
+            <Image src="/logo.png" alt="Veekay Cabs" width={180} height={40} className="h-10 w-auto object-contain" priority />
           </div>
 
           {/* Tabs */}
