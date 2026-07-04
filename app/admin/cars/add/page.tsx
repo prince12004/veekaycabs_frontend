@@ -173,8 +173,8 @@ export default function AddCarPage() {
                 {cities.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </FieldGroup>
-            <FieldGroup label="GPS Device ID">
-              <input type="text" value={form.gpsDeviceId} onChange={update("gpsDeviceId")} placeholder="GPS-001234" className={inputCls} />
+            <FieldGroup label="GPS Device IMEI">
+              <input type="text" value={form.gpsDeviceId} onChange={update("gpsDeviceId")} placeholder="e.g. 860187061953042" className={inputCls} />
             </FieldGroup>
           </div>
           <div className="mt-4">

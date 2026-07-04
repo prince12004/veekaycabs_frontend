@@ -154,6 +154,10 @@ export const adminCarsApi = {
 // RC verification / Challan check for ANY registration number — fleet car or
 // not. Results are cached server-side by registration number; pass force to
 // bypass the cache and re-run.
+export const adminGpsApi = {
+  getLive: () => adminApi.get("/api/admin/gps/live"),
+};
+
 export const vehicleVerificationApi = {
   verifyRC: (registrationNo: string, chassisNumber: string, engineNumber: string, force?: boolean) =>
     adminApi.post("/api/admin/vehicle-verification/rc", { registrationNo, chassisNumber, engineNumber, force }, { timeout: 60000 }),
