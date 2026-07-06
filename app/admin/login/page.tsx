@@ -3,13 +3,14 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, Loader2, AlertCircle } from "lucide-react";
+import { Lock, Mail, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { adminAuthAPI } from "@/lib/api";
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,13 +68,22 @@ export default function AdminLoginPage() {
             <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-white/[0.07] border border-white/15 focus-within:border-[#E8540A]/70">
               <Lock size={14} className="text-white/40" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="flex-1 bg-transparent text-white text-sm focus:outline-none"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="text-white/40 hover:text-white/70 transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
             </div>
           </div>
 
