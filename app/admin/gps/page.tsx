@@ -192,13 +192,34 @@ export default function GPSTrackingPage() {
                       </button>
                     );
                   })}
-                  <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-xs text-[#4A4A6A]">
-                    <p className="font-bold text-[#0F0F1A]">Live Map</p>
-                    <p>Relative positions — open in Maps for exact location</p>
-                  </div>
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5">
+                  {selected?.lat != null ? (
+                    <a
+                      href={`https://www.google.com/maps?q=${selected.lat},${selected.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-xs text-[#4A4A6A] hover:bg-white transition-colors"
+                    >
+                      <p className="font-bold text-[#0F0F1A]">Live Map</p>
+                      <p className="text-[#E8540A] font-semibold">Open in Maps for exact location →</p>
+                    </a>
+                  ) : (
+                    <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-xs text-[#4A4A6A]">
+                      <p className="font-bold text-[#0F0F1A]">Live Map</p>
+                      <p>Relative positions — select a car with a fix to open Maps</p>
+                    </div>
+                  )}
+                  <a
+                    href={selected?.lat != null ? `https://www.google.com/maps?q=${selected.lat},${selected.lng}` : undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-disabled={selected?.lat == null}
+                    className={cn(
+                      "absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 transition-colors",
+                      selected?.lat != null ? "hover:bg-white cursor-pointer" : "opacity-40 pointer-events-none"
+                    )}
+                  >
                     <Navigation size={14} className="text-[#E8540A]" />
-                  </div>
+                  </a>
                 </div>
               </div>
 
@@ -224,7 +245,7 @@ export default function GPSTrackingPage() {
                     {[
                       { label: "Speed", value: `${selected.speed} km/h`, icon: Gauge, color: "#3B82F6" },
                       { label: "Battery", value: selected.battery != null ? `${selected.battery}%` : "—", icon: Battery, color: (selected.battery ?? 100) < 20 ? "#EF4444" : "#10B981" },
-                      { label: "Ignition", value: selected.ignition ? "On" : "Off", icon: Wifi, color: "#8B5CF6" },
+                      { label: "Ignition", value: selected.ignition == null ? "—" : selected.ignition ? "On" : "Off", icon: Wifi, color: "#8B5CF6" },
                       { label: "Last Update", value: timeAgo(selected.lastUpdate), icon: Clock, color: "#F59E0B" },
                     ].map(({ label, value, icon: Icon, color }) => (
                       <div key={label} className="bg-[#F8F9FC] rounded-xl p-3">
