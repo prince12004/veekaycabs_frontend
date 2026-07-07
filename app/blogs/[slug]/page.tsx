@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -40,6 +40,40 @@ export default function BlogDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [related, setRelated] = useState<RelatedRow[]>([]);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [activeSection, setActiveSection] = useState("");
+
+  // Auto-generate a table of contents from the article's <h2> headings, and
+  // stamp matching ids onto them so the nav can scroll to each section.
+  const { contentHtml, toc } = useMemo(() => {
+    if (!blog?.content) return { contentHtml: "", toc: [] as { id: string; title: string }[] };
+    let i = 0;
+    const items: { id: string; title: string }[] = [];
+    const html = blog.content.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (_match, attrs, inner) => {
+      const id = `section-${i++}`;
+      const title = inner.replace(/<[^>]+>/g, "").trim();
+      if (title) items.push({ id, title });
+      const cleanAttrs = String(attrs).replace(/\sid="[^"]*"/i, "");
+      return `<h2${cleanAttrs} id="${id}">${inner}</h2>`;
+    });
+    return { contentHtml: html, toc: items };
+  }, [blog?.content]);
+
+  useEffect(() => {
+    if (toc.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        });
+      },
+      { rootMargin: "-100px 0px -70% 0px" }
+    );
+    toc.forEach((item) => {
+      const el = document.getElementById(item.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [toc]);
 
   useEffect(() => {
     setLoading(true);
@@ -150,9 +184,28 @@ export default function BlogDetailPage() {
       <section className="py-16 bg-[#F8F9FC]">
         <div className="max-w-6xl mx-auto px-6">
           <div className="lg:grid lg:grid-cols-4 lg:gap-10">
-            {/* Share sidebar */}
+            {/* TOC + Share sidebar */}
             <div className="hidden lg:block">
               <div className="sticky top-28">
+                {toc.length > 0 && (
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#9090A8] mb-4">Contents</p>
+                    <nav className="space-y-1 mb-8">
+                      {toc.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveSection(item.id);
+                            document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-all ${activeSection === item.id ? "bg-[#FFF3ED] text-[#E8540A] font-semibold" : "text-[#4A4A6A] hover:text-[#E8540A]"}`}
+                        >
+                          {item.title}
+                        </button>
+                      ))}
+                    </nav>
+                  </>
+                )}
                 <p className="text-xs font-bold uppercase tracking-widest text-[#9090A8] mb-3">Share</p>
                 <div className="flex gap-2">
                   <button onClick={copyLink} className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-[#E8540A] hover:text-[#E8540A] transition-all text-[#4A4A6A]">
@@ -173,7 +226,7 @@ export default function BlogDetailPage() {
               <div className="bg-white rounded-2xl border border-[#E4E5EF] p-8 lg:p-12 shadow-[0_2px_20px_rgba(0,0,0,0.06)]">
                 <div
                   className="blog-content text-[#4A4A6A] leading-relaxed [&_h2]:text-2xl [&_h2]:font-black [&_h2]:font-syne [&_h2]:text-[#0F0F1A] [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-[#0F0F1A] [&_h3]:mt-6 [&_h3]:mb-3 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_li]:mb-1.5 [&_strong]:text-[#0F0F1A] [&_strong]:font-bold [&_a]:text-[#E8540A] [&_a]:underline [&_img]:rounded-xl [&_img]:my-4"
-                  dangerouslySetInnerHTML={{ __html: blog.content }}
+                  dangerouslySetInnerHTML={{ __html: contentHtml }}
                 />
 
                 {/* Author */}
