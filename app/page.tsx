@@ -666,7 +666,7 @@ export default function HomePage() {
                 )}
 
                 {/* Row 2: Search button + quick cities */}
-                <div className="flex items-center gap-3 pt-3 border-t border-[#E4E5EF]">
+                <div className="res_buttons flex items-center gap-3 pt-3 border-t border-[#E4E5EF]">
                   <div className="flex items-center gap-1.5 flex-1 flex-wrap">
                     <span className="text-[#9090A8] text-[10px] font-semibold shrink-0">Quick city:</span>
                     {["Delhi", "Noida", "Gurgaon", "Ghaziabad"].map((c) => (
