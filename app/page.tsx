@@ -29,6 +29,7 @@ import DateTimePicker, { DateTimePickerHandle } from "@/components/ui/DateTimePi
 import { cn, addHoursToSlot, getEarliestPickup, getDefaultBookingWindow, isSlotBefore } from "@/lib/utils";
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
 import { carsAPI } from "@/lib/api";
+import { useActiveCities } from "@/lib/useActiveCities";
 
 // ─── Car Images (Unsplash) ────────────────────────────────────────────────────
 
@@ -438,6 +439,7 @@ export default function HomePage() {
   const router = useRouter();
   const [activeCarFilter, setActiveCarFilter] = useState("All");
   const [selectedCity, setSelectedCity] = useState("Delhi");
+  const activeCities = useActiveCities();
   const [pickupDateTime, setPickupDateTime] = useState("");
   const [dropDateTime, setDropDateTime] = useState("");
   const [searchError, setSearchError] = useState("");
@@ -619,8 +621,8 @@ export default function HomePage() {
                         onChange={(e) => setSelectedCity(e.target.value)}
                         className="flex-1 bg-transparent text-[#0F0F1A] font-medium appearance-none cursor-pointer focus:outline-none"
                       >
-                        {["Delhi", "Noida", "Gurgaon", "Ghaziabad", "Greater Noida"].map((c) => (
-                          <option key={c} value={c}>{c}</option>
+                        {activeCities.map((c) => (
+                          <option key={c.slug} value={c.name}>{c.name}</option>
                         ))}
                       </select>
                     </div>
@@ -669,18 +671,18 @@ export default function HomePage() {
                 <div className="res_buttons flex items-center gap-3 pt-3 border-t border-[#E4E5EF]">
                   <div className="flex items-center gap-1.5 flex-1 flex-wrap">
                     <span className="text-[#9090A8] text-[10px] font-semibold shrink-0">Quick city:</span>
-                    {["Delhi", "Noida", "Gurgaon", "Ghaziabad"].map((c) => (
+                    {activeCities.map((c) => (
                       <button
-                        key={c}
-                        onClick={() => setSelectedCity(c)}
+                        key={c.slug}
+                        onClick={() => setSelectedCity(c.name)}
                         className={cn(
                           "px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all",
-                          selectedCity === c
+                          selectedCity === c.name
                             ? "bg-[#E8540A] text-white"
                             : "bg-[#F8F9FC] text-[#9090A8] hover:bg-[#FFF3ED] hover:text-[#E8540A]"
                         )}
                       >
-                        {c}
+                        {c.name}
                       </button>
                     ))}
                   </div>

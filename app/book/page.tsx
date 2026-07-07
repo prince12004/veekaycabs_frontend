@@ -28,6 +28,7 @@ import {
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
 import { CARS as LOCAL_CARS } from "@/lib/cars-data";
 import { carsAPI } from "@/lib/api";
+import { useActiveCities } from "@/lib/useActiveCities";
 
 // Map API car → local display format so CarGridCard component needs no changes
 const mapApiCar = (c: any) => {
@@ -234,6 +235,7 @@ function CarListingInner() {
   const highlightCar = searchParams.get("car") || "";
 
   const [city, setCity] = useState(initCity);
+  const activeCities = useActiveCities();
   const [pickupDT, setPickupDT] = useState(initStart);
   const [dropDT, setDropDT] = useState(initEnd);
   const [modifyOpen, setModifyOpen] = useState(false);
@@ -546,15 +548,9 @@ function CarListingInner() {
                       onChange={(e) => setCity(e.target.value)}
                       className="flex-1 bg-transparent text-white font-medium appearance-none cursor-pointer focus:outline-none"
                     >
-                      {[
-                        "Delhi",
-                        "Noida",
-                        "Gurgaon",
-                        "Ghaziabad",
-                        "Greater Noida",
-                      ].map((c) => (
-                        <option key={c} value={c} className="text-[#0F0F1A]">
-                          {c}
+                      {activeCities.map((c) => (
+                        <option key={c.slug} value={c.name} className="text-[#0F0F1A]">
+                          {c.name}
                         </option>
                       ))}
                     </select>

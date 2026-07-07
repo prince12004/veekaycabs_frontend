@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -9,6 +11,7 @@ import {
   Twitter,
   Linkedin,
 } from "lucide-react";
+import { useActiveCities } from "@/lib/useActiveCities";
 
 const quickLinks = [
   { href: "/book", label: "Self Drive Rental" },
@@ -19,8 +22,6 @@ const quickLinks = [
   { href: "/sitemap", label: "Sitemap" },
 ];
 
-const cities = ["Delhi", "Ghaziabad", "Noida", "Greater Noida", "Gurgaon"];
-
 const socialLinks = [
   { icon: Facebook, href: "#", label: "Facebook" },
   { icon: Instagram, href: "#", label: "Instagram" },
@@ -29,6 +30,8 @@ const socialLinks = [
 ];
 
 export default function Footer() {
+  const cities = useActiveCities();
+
   return (
     <footer className="bg-gradient-to-b from-[#0F0F1A] to-[#080810]">
       <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-16 pb-8">
@@ -91,12 +94,12 @@ export default function Footer() {
             </h4>
             <ul className="space-y-3">
               {cities.map((city) => (
-                <li key={city}>
+                <li key={city.slug}>
                   <Link
-                    href={`/book?city=${city.toLowerCase().replace(" ", "-")}`}
+                    href={`/book?city=${city.slug}`}
                     className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
                   >
-                    {city}
+                    {city.name}
                   </Link>
                 </li>
               ))}
