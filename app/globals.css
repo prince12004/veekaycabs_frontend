@@ -140,5 +140,8 @@ input:focus, select:focus, textarea:focus {
   }
   .main_headingss{
     font-size: 45px !important;
-  }  
+  }
+  .paragraphs{
+    font-size: 10px !important;
+  }
 }

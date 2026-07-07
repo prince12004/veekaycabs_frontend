@@ -582,7 +582,7 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.35, duration: 0.6 }}
-                className="textmain text-white/55 text-base md:text-lg leading-relaxed mb-8 max-w-lg"
+                className="textmain paragraphs text-white/55 text-base md:text-lg leading-relaxed mb-8 max-w-lg"
               >
                 101+ verified self-drive cars. Transparent pricing from{" "}
                 <span className="text-[#E8540A] font-semibold">Rs. 89/hr</span>
