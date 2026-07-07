@@ -31,6 +31,14 @@ interface RelatedRow {
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
+const HTML_ENTITIES: Record<string, string> = {
+  nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'",
+};
+const decodeHtmlEntities = (str: string) =>
+  str
+    .replace(/&(nbsp|amp|lt|gt|quot|#39|apos);/g, (_m, name) => HTML_ENTITIES[name])
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)));
+
 export default function BlogDetailPage() {
   const params = useParams();
   const slug = String(params.slug);
@@ -50,7 +58,7 @@ export default function BlogDetailPage() {
     const items: { id: string; title: string }[] = [];
     const html = blog.content.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (_match, attrs, inner) => {
       const id = `section-${i++}`;
-      const title = inner.replace(/<[^>]+>/g, "").trim();
+      const title = decodeHtmlEntities(inner.replace(/<[^>]+>/g, "")).trim();
       if (title) items.push({ id, title });
       const cleanAttrs = String(attrs).replace(/\sid="[^"]*"/i, "");
       return `<h2${cleanAttrs} id="${id}">${inner}</h2>`;
