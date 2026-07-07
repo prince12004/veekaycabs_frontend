@@ -569,7 +569,7 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.7 }}
-                className="text-5xl md:text-6xl lg:text-[62px] font-black font-syne text-white leading-[1.06] mb-5"
+                className="main_headingss text-4xl sm:text-5xl md:text-6xl lg:text-[62px] font-black font-syne text-white leading-[1.06] mb-5"
               >
                 Self Drive Car
                 <br />
