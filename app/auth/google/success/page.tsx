@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { usersAPI } from "@/lib/api";
 
-export default function GoogleSuccessPage() {
+function GoogleSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState(false);
@@ -55,5 +55,19 @@ export default function GoogleSuccessPage() {
         Signing you in...
       </div>
     </div>
+  );
+}
+
+export default function GoogleSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 size={20} className="animate-spin text-[#E8540A]" />
+        </div>
+      }
+    >
+      <GoogleSuccessContent />
+    </Suspense>
   );
 }
