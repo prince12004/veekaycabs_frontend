@@ -688,7 +688,7 @@ export default function HomePage() {
                   </div>
                   <button
                     onClick={handleSearch}
-                    className="shrink-0 btn-gradient px-6 py-2.5 rounded-xl text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity"
+                    className="search_button shrink-0 btn-gradient px-6 py-2.5 rounded-xl text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity"
                   >
                     <Search size={15} />
                     Search
