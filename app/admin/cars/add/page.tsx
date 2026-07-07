@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Upload, Save, ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
+import { Upload, Save, ArrowLeft, AlertTriangle, Loader2, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { adminCarsApi } from "@/lib/api";
@@ -38,6 +38,20 @@ function ExpiryField({ label, value, onChange }: { label: string; value: string;
   );
 }
 
+function KmDueField({ label, odometer, lastKm, intervalKm }: { label: string; odometer: number; lastKm: number; intervalKm: number }) {
+  const dueAtKm = lastKm + intervalKm;
+  const kmLeft = dueAtKm - odometer;
+  const isOverdue = kmLeft < 0;
+  const isCritical = kmLeft >= 0 && kmLeft <= 200;
+  const isWarning = kmLeft > 200 && kmLeft <= 500;
+  return (
+    <p className={`text-xs mt-1 font-semibold flex items-center gap-1 ${isOverdue || isCritical ? "text-[#EF4444]" : isWarning ? "text-[#F59E0B]" : "text-[#10B981]"}`}>
+      {(isOverdue || isCritical) && <AlertTriangle size={11} />}
+      {label}: due at {dueAtKm.toLocaleString("en-IN")} km — {isOverdue ? `overdue by ${Math.abs(kmLeft).toLocaleString("en-IN")} km` : `${kmLeft.toLocaleString("en-IN")} km left`}
+    </p>
+  );
+}
+
 const inputCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
 const selectCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
 
@@ -53,7 +67,8 @@ export default function AddCarPage() {
     fuel: "Petrol", transmission: "Automatic", seats: "5",
     cityId: "", gpsDeviceId: "",
     regularPrice: "", weekendPrice: "", securityDeposit: "10000", doorstepDeliveryCharge: "500", kmPackage: "250 km/day",
-    insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "",
+    insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "", permitExpiry: "",
+    odometer: "0", serviceIntervalKm: "5000", lastServiceKm: "0", alignmentIntervalKm: "10000", lastAlignmentKm: "0",
     isActive: true,
   });
 
@@ -100,6 +115,14 @@ export default function AddCarPage() {
         fitness:   { expiry: form.fitnessExpiry   || null },
         roadTax:   { expiry: form.roadTaxExpiry   || null },
         rc:        { expiry: form.rcExpiry        || null },
+        permit:    { expiry: form.permitExpiry    || null },
+      }));
+      fd.append("odometer", form.odometer);
+      fd.append("maintenance", JSON.stringify({
+        serviceIntervalKm: Number(form.serviceIntervalKm) || 0,
+        lastServiceKm: Number(form.lastServiceKm) || 0,
+        alignmentIntervalKm: Number(form.alignmentIntervalKm) || 0,
+        lastAlignmentKm: Number(form.lastAlignmentKm) || 0,
       }));
       images.forEach(img => fd.append("images", img));
 
@@ -119,6 +142,7 @@ export default function AddCarPage() {
     { key: "fitnessExpiry"   as const, label: "Fitness Certificate Expiry" },
     { key: "roadTaxExpiry"   as const, label: "Road Tax Expiry" },
     { key: "rcExpiry"        as const, label: "RC Expiry" },
+    { key: "permitExpiry"    as const, label: "Permit Expiry" },
   ];
 
   return (
@@ -245,6 +269,42 @@ export default function AddCarPage() {
             {docFields.map(({ key, label }) => (
               <ExpiryField key={key} label={label} value={form[key]} onChange={v => setForm(f => ({ ...f, [key]: v }))} />
             ))}
+          </div>
+        </div>
+
+        {/* Maintenance */}
+        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
+          <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF] flex items-center gap-2">
+            <Wrench size={16} className="text-[#E8540A]" /> Service & Alignment
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-4">
+            <FieldGroup label="Current Odometer (km)">
+              <input type="number" value={form.odometer} onChange={update("odometer")} min="0" className={inputCls} />
+            </FieldGroup>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <FieldGroup label="Service Interval (km)">
+                  <input type="number" value={form.serviceIntervalKm} onChange={update("serviceIntervalKm")} min="0" className={inputCls} />
+                </FieldGroup>
+                <FieldGroup label="Last Service Odometer (km)">
+                  <input type="number" value={form.lastServiceKm} onChange={update("lastServiceKm")} min="0" className={inputCls} />
+                </FieldGroup>
+              </div>
+              <KmDueField label="Service" odometer={Number(form.odometer) || 0} lastKm={Number(form.lastServiceKm) || 0} intervalKm={Number(form.serviceIntervalKm) || 0} />
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <FieldGroup label="Alignment Interval (km)">
+                  <input type="number" value={form.alignmentIntervalKm} onChange={update("alignmentIntervalKm")} min="0" className={inputCls} />
+                </FieldGroup>
+                <FieldGroup label="Last Alignment Odometer (km)">
+                  <input type="number" value={form.lastAlignmentKm} onChange={update("lastAlignmentKm")} min="0" className={inputCls} />
+                </FieldGroup>
+              </div>
+              <KmDueField label="Alignment" odometer={Number(form.odometer) || 0} lastKm={Number(form.lastAlignmentKm) || 0} intervalKm={Number(form.alignmentIntervalKm) || 0} />
+            </div>
           </div>
         </div>
 

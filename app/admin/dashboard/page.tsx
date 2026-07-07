@@ -18,7 +18,7 @@ import { adminDashboardAPI } from "@/lib/api";
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 type RecentBooking = { id: string; bookingId: string; customer: string; car: string; city: string; amount: number; status: string; createdAt: string; };
-type ExpiryAlert = { carId: string; car: string; plate: string; doc: string; expiry: string; daysLeft: number; level: string; };
+type ExpiryAlert = { carId: string; car: string; plate: string; doc: string; expiry: string; daysLeft: number; level: string; unit?: "days" | "km"; };
 type DayRevenue = { day: string; date: string; revenue: number; bookings: number };
 
 type DashboardStats = {
@@ -416,7 +416,7 @@ export default function AdminDashboard() {
                       className="text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap shrink-0"
                       style={{ backgroundColor: lc.badge, color: lc.badgeText }}
                     >
-                      {alert.daysLeft}d
+                      {alert.unit === "km" ? `${alert.daysLeft.toLocaleString("en-IN")} km` : `${alert.daysLeft}d`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -424,7 +424,7 @@ export default function AdminDashboard() {
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${Math.min(100, (60 - alert.daysLeft) / 60 * 100)}%`,
+                          width: `${Math.min(100, ((alert.unit === "km" ? 1000 : 60) - alert.daysLeft) / (alert.unit === "km" ? 1000 : 60) * 100)}%`,
                           backgroundColor: lc.bar,
                         }}
                       />
