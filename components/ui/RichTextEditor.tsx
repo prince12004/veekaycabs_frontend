@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useMemo } from "react";
+import "react-quill-new/dist/quill.snow.css";
 
 // Quill must not render server-side (uses browser globals)
 const QuillEditor = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => (

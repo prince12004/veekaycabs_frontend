@@ -228,7 +228,7 @@ export default function BlogsPage() {
                     </button>
                   </div>
                 ) : (
-                  <label className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-5 cursor-pointer hover:border-[#E8540A]/60 hover:bg-[#FFF3ED] transition-all">
+                  <label className="relative flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-5 cursor-pointer hover:border-[#E8540A]/60 hover:bg-[#FFF3ED] transition-all">
                     <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={handleImage} />
                     <div className="w-12 h-12 rounded-xl bg-[#FFF3ED] flex items-center justify-center">
                       <ImageIcon size={22} className="text-[#E8540A]" />
