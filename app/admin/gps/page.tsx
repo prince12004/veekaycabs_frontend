@@ -68,7 +68,16 @@ export default function GPSTrackingPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const filtered = cars.filter(c => statusFilter === "All" || c.status === statusFilter.toLowerCase());
+  const STATUS_ORDER: Record<string, number> = { online: 0, idle: 1, offline: 2 };
+  const filtered = cars
+    .filter(c => statusFilter === "All" || c.status === statusFilter.toLowerCase())
+    .sort((a, b) => {
+      const statusDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      if (statusDiff !== 0) return statusDiff;
+      const aTime = a.lastUpdate ? new Date(a.lastUpdate).getTime() : 0;
+      const bTime = b.lastUpdate ? new Date(b.lastUpdate).getTime() : 0;
+      return bTime - aTime;
+    });
 
   return (
     <div className="p-6 space-y-5">
