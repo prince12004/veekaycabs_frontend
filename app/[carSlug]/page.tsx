@@ -194,7 +194,8 @@ export default function CarSlugPage() {
     const token = typeof window !== "undefined" ? localStorage.getItem("vk_token") : null;
     if (!token) {
       toast.error("Please login to continue booking");
-      router.push(`/login?redirect=/${carSlug}?city=${city}&start=${startSlot}&end=${endSlot}`);
+      const redirectTarget = `/${carSlug}?city=${city}&carId=${carId}&start=${startSlot}&end=${endSlot}`;
+      router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
       return;
     }
 
