@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { TrendingUp, Calendar, BarChart2, XCircle, ArrowUpRight } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { TrendingUp, Calendar, BarChart2, XCircle, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 import {
   AreaChart,
   Area,
@@ -13,34 +14,71 @@ import {
   BarChart,
   Bar,
 } from "recharts";
+import { adminReportsApi } from "@/lib/api";
 
-const MONTHLY_REVENUE = [
-  { month: "Jan", revenue: 42000, bookings: 14 },
-  { month: "Feb", revenue: 58000, bookings: 19 },
-  { month: "Mar", revenue: 76000, bookings: 25 },
-  { month: "Apr", revenue: 91000, bookings: 30 },
-  { month: "May", revenue: 110000, bookings: 37 },
-  { month: "Jun", revenue: 134000, bookings: 44 },
-];
+interface RevenuePoint { _id: string; totalRevenue: number; collectedRevenue: number; bookingCount: number; avgBookingValue: number }
+interface CityRow { cityName: string; totalRevenue: number; bookingCount: number }
+interface RevenueData {
+  summary: { totalRevenue: number; collectedRevenue: number; bookingCount: number; avgBookingValue: number };
+  revenueData: RevenuePoint[];
+  cityBreakdown: CityRow[];
+}
 
-const CITY_BREAKDOWN = [
-  { city: "Delhi", bookings: 89, revenue: 267000, percentage: 52 },
-  { city: "Noida", bookings: 45, revenue: 135000, percentage: 26 },
-  { city: "Gurgaon", bookings: 28, revenue: 84000, percentage: 16 },
-  { city: "Ghaziabad", bookings: 8, revenue: 24000, percentage: 5 },
-  { city: "Greater Noida", bookings: 3, revenue: 9000, percentage: 2 },
-];
+const monthLabel = (key: string) => {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-IN", { month: "short" });
+};
 
-const SUMMARY_CARDS = [
-  { label: "Total Revenue", value: "Rs. 5,11,000", change: "+18%", positive: true, icon: TrendingUp, color: "#E8540A", bg: "#FFF3ED" },
-  { label: "Total Bookings", value: "173", change: "+22%", positive: true, icon: Calendar, color: "#3B82F6", bg: "#DBEAFE" },
-  { label: "Avg Booking Value", value: "Rs. 2,953", change: "+5%", positive: true, icon: BarChart2, color: "#8B5CF6", bg: "#EDE9FE" },
-  { label: "Cancellation Rate", value: "4.6%", change: "-1.2%", positive: true, icon: XCircle, color: "#10B981", bg: "#D1FAE5" },
-];
+const defaultFrom = () => {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 5);
+  d.setDate(1);
+  return d.toISOString().slice(0, 10);
+};
 
 export default function AdminReportsPage() {
-  const [dateFrom, setDateFrom] = useState("2026-01-01");
-  const [dateTo, setDateTo] = useState("2026-06-30");
+  const [dateFrom, setDateFrom] = useState(defaultFrom());
+  const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
+  const [loading, setLoading] = useState(true);
+  const [revenue, setRevenue] = useState<RevenueData | null>(null);
+  const [cancellationRate, setCancellationRate] = useState(0);
+
+  const fetchReports = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      adminReportsApi.getRevenue({ from: dateFrom, to: dateTo, groupBy: "month" }),
+      adminReportsApi.getBookingStats({ from: dateFrom, to: dateTo }),
+    ])
+      .then(([revRes, bookingRes]) => {
+        setRevenue(revRes.data.data);
+        setCancellationRate(bookingRes.data.data.cancellationRate || 0);
+      })
+      .catch(() => toast.error("Failed to load reports"))
+      .finally(() => setLoading(false));
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => { fetchReports(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const chartData = (revenue?.revenueData || []).map((p) => ({
+    month: monthLabel(p._id),
+    revenue: p.totalRevenue,
+    bookings: p.bookingCount,
+  }));
+
+  const totalRevenue = revenue?.summary.totalRevenue || 0;
+  const cityRows = (revenue?.cityBreakdown || []).map((c) => ({
+    city: c.cityName || "Unknown",
+    bookings: c.bookingCount,
+    revenue: c.totalRevenue,
+    percentage: totalRevenue > 0 ? Math.round((c.totalRevenue / totalRevenue) * 100) : 0,
+  }));
+
+  const summaryCards = [
+    { label: "Total Revenue", value: `Rs. ${totalRevenue.toLocaleString("en-IN")}`, icon: TrendingUp, color: "#E8540A", bg: "#FFF3ED" },
+    { label: "Total Bookings", value: String(revenue?.summary.bookingCount || 0), icon: Calendar, color: "#3B82F6", bg: "#DBEAFE" },
+    { label: "Avg Booking Value", value: `Rs. ${Math.round(revenue?.summary.avgBookingValue || 0).toLocaleString("en-IN")}`, icon: BarChart2, color: "#8B5CF6", bg: "#EDE9FE" },
+    { label: "Cancellation Rate", value: `${cancellationRate}%`, icon: XCircle, color: "#10B981", bg: "#D1FAE5" },
+  ];
 
   return (
     <div className="p-6 space-y-6">
@@ -66,15 +104,15 @@ export default function AdminReportsPage() {
               className="text-sm text-[#0F0F1A] outline-none"
             />
           </div>
-          <button className="btn-gradient px-4 py-2 rounded-xl text-white text-sm font-semibold">
-            Apply
+          <button onClick={fetchReports} disabled={loading} className="btn-gradient px-4 py-2 rounded-xl text-white text-sm font-semibold disabled:opacity-60 flex items-center gap-2">
+            {loading && <Loader2 size={14} className="animate-spin" />} Apply
           </button>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {SUMMARY_CARDS.map((card) => {
+        {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
             <div key={card.label} className="bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm">
@@ -82,10 +120,6 @@ export default function AdminReportsPage() {
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: card.bg }}>
                   <Icon size={18} style={{ color: card.color }} />
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center gap-0.5 ${card.positive ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
-                  <ArrowUpRight size={11} />
-                  {card.change}
-                </span>
               </div>
               <p className="font-black font-syne text-2xl text-[#0F0F1A] leading-none mb-1">{card.value}</p>
               <p className="text-[#9090A8] text-xs font-semibold uppercase tracking-wider">{card.label}</p>
@@ -99,7 +133,7 @@ export default function AdminReportsPage() {
         <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">Monthly Revenue</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={MONTHLY_REVENUE} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <defs>
                 <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#E8540A" stopOpacity={0.15} />
@@ -129,7 +163,7 @@ export default function AdminReportsPage() {
         <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">Monthly Bookings</h3>
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={MONTHLY_REVENUE} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+            <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E4E5EF" />
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9090A8" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "#9090A8" }} axisLine={false} tickLine={false} />
@@ -158,7 +192,9 @@ export default function AdminReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {CITY_BREAKDOWN.map((row) => (
+              {cityRows.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-8 text-[#9090A8] text-sm">No bookings in this date range</td></tr>
+              ) : cityRows.map((row) => (
                 <tr key={row.city} className="border-b border-[#E4E5EF] last:border-0 hover:bg-[#F8F9FC] transition-colors">
                   <td className="px-4 py-3.5 font-semibold text-[#0F0F1A] text-sm">{row.city}</td>
                   <td className="px-4 py-3.5 text-[#4A4A6A] text-sm">{row.bookings}</td>

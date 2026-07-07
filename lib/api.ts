@@ -266,6 +266,13 @@ export const adminContactsAPI = {
   exportCsv: () => adminApi.get("/api/admin/contact-requests/export", { responseType: "blob" }),
 };
 
+export const adminReportsApi = {
+  getRevenue: (params: { from?: string; to?: string; groupBy?: string }) =>
+    adminApi.get("/api/admin/reports/revenue", { params }),
+  getBookingStats: (params: { from?: string; to?: string }) =>
+    adminApi.get("/api/admin/reports/bookings", { params }),
+};
+
 export const adminDashboardAPI = {
   getSidebarCounts: () => adminApi.get("/api/admin/dashboard/sidebar-counts"),
   getStats: () => adminApi.get("/api/admin/dashboard/stats"),
@@ -273,6 +280,15 @@ export const adminDashboardAPI = {
 
 export const citiesAPI = {
   getAll: () => api.get("/api/cities"),
+};
+
+export const adminCitiesApi = {
+  getAll: () => adminApi.get("/api/admin/cities"),
+  create: (data: { name: string; slug?: string; state?: string }) =>
+    adminApi.post("/api/admin/cities", data),
+  update: (id: string, data: Record<string, unknown>) =>
+    adminApi.put(`/api/admin/cities/${id}`, data),
+  remove: (id: string) => adminApi.delete(`/api/admin/cities/${id}`),
 };
 
 export const usersAPI = {
