@@ -28,7 +28,7 @@ import Footer from "@/components/layout/Footer";
 import DateTimePicker, { DateTimePickerHandle } from "@/components/ui/DateTimePicker";
 import { cn, addHoursToSlot, getEarliestPickup, getDefaultBookingWindow, isSlotBefore } from "@/lib/utils";
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
-import { carsAPI } from "@/lib/api";
+import { carsAPI, blogsAPI } from "@/lib/api";
 import { useActiveCities } from "@/lib/useActiveCities";
 
 // ─── Car Images (Unsplash) ────────────────────────────────────────────────────
@@ -50,52 +50,6 @@ const CAR_IMAGES: Record<string, string> = {
 };
 
 // ─── Sample Data ──────────────────────────────────────────────────────────────
-
-
-const SAMPLE_BLOGS = [
-  {
-    id: "1",
-    title: "Top 10 Road Trip Destinations from Delhi You Must Explore",
-    excerpt:
-      "Pack your bags and fuel your wanderlust — Delhi NCR is surrounded by incredible destinations within a day's drive. Here are our top picks for the perfect self-drive road trip.",
-    tag: "Road Trips",
-    tagColor: "#E8540A",
-    readTime: 6,
-    date: "Dec 15, 2025",
-    slug: "top-10-road-trips-from-delhi",
-    image:
-      "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=700&auto=format&fit=crop&q=80",
-    gradient: "from-[#E8540A]/20 to-[#FF6B35]/5",
-  },
-  {
-    id: "2",
-    title: "Self-Drive vs Chauffeur: Which is Right for You in 2025?",
-    excerpt:
-      "A complete guide to choosing between self-drive car rentals and chauffeur-driven cabs based on your trip type, budget, and convenience needs.",
-    tag: "Tips & Guides",
-    tagColor: "#10B981",
-    readTime: 5,
-    date: "Nov 28, 2025",
-    slug: "self-drive-vs-chauffeur-guide",
-    image:
-      "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=700&auto=format&fit=crop&q=80",
-    gradient: "from-[#10B981]/20 to-[#10B981]/5",
-  },
-  {
-    id: "3",
-    title: "Documents Required for Renting a Self-Drive Car in India",
-    excerpt:
-      "Planning your first self-drive rental? Here's a complete checklist of all documents you'll need — Aadhaar, driving licence, and more — to ensure a hassle-free booking.",
-    tag: "KYC & Documents",
-    tagColor: "#6366F1",
-    readTime: 4,
-    date: "Nov 10, 2025",
-    slug: "documents-for-self-drive-car-rental",
-    image:
-      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=700&auto=format&fit=crop&q=80",
-    gradient: "from-[#6366F1]/20 to-[#6366F1]/5",
-  },
-];
 
 const FEATURES = [
   {
@@ -284,6 +238,23 @@ interface HomeCar {
   isAvailable: boolean;
 }
 
+interface HomeBlog {
+  _id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  coverImage?: string;
+  tags?: string[];
+  readTime: number;
+  publishedAt: string;
+}
+
+const BLOG_TAG_STYLES = [
+  { tagColor: "#E8540A", gradient: "from-[#E8540A]/20 to-[#FF6B35]/5" },
+  { tagColor: "#10B981", gradient: "from-[#10B981]/20 to-[#10B981]/5" },
+  { tagColor: "#6366F1", gradient: "from-[#6366F1]/20 to-[#6366F1]/5" },
+];
+
 function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
   const soldOut = car.isAvailable === false;
   return (
@@ -445,9 +416,14 @@ export default function HomePage() {
   const [searchError, setSearchError] = useState("");
   const [reviewPage, setReviewPage] = useState(0);
   const [popularCars, setPopularCars] = useState<HomeCar[]>([]);
+  const [latestBlogs, setLatestBlogs] = useState<HomeBlog[]>([]);
 
   const statsRef = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: "-100px" });
+
+  useEffect(() => {
+    blogsAPI.getAll({ limit: "3" }).then(({ data }) => setLatestBlogs(data.data || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const startTime = pickupDateTime ? new Date(pickupDateTime.replace(" ", "T")).toISOString() : undefined;
@@ -1175,9 +1151,11 @@ export default function HomePage() {
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {SAMPLE_BLOGS.map((blog, idx) => (
+              {latestBlogs.map((blog, idx) => {
+                const style = BLOG_TAG_STYLES[idx % BLOG_TAG_STYLES.length];
+                return (
                 <motion.article
-                  key={blog.id}
+                  key={blog._id}
                   variants={fadeInUp}
                   custom={idx}
                   className="bg-white rounded-2xl overflow-hidden border border-[#E4E5EF] shadow-[0_4px_24px_rgba(0,0,0,0.06)] card-hover group"
@@ -1186,11 +1164,11 @@ export default function HomePage() {
                   <div
                     className={cn(
                       "h-52 bg-gradient-to-br relative overflow-hidden",
-                      blog.gradient
+                      style.gradient
                     )}
                   >
                     <img
-                      src={blog.image}
+                      src={blog.coverImage || ""}
                       alt={blog.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"
@@ -1199,12 +1177,14 @@ export default function HomePage() {
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                    <div
-                      className="absolute top-4 left-4 px-3 py-1 rounded-full text-white text-xs font-bold shadow-md"
-                      style={{ backgroundColor: blog.tagColor }}
-                    >
-                      {blog.tag}
-                    </div>
+                    {blog.tags?.[0] && (
+                      <div
+                        className="absolute top-4 left-4 px-3 py-1 rounded-full text-white text-xs font-bold shadow-md"
+                        style={{ backgroundColor: style.tagColor }}
+                      >
+                        {blog.tags[0]}
+                      </div>
+                    )}
                     <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-full">
                       <span className="text-white text-xs font-medium">
                         {blog.readTime} min read
@@ -1213,7 +1193,9 @@ export default function HomePage() {
                   </div>
 
                   <div className="p-6">
-                    <div className="text-[#9090A8] text-xs mb-3">{blog.date}</div>
+                    <div className="text-[#9090A8] text-xs mb-3">
+                      {new Date(blog.publishedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
+                    </div>
                     <h3 className="font-bold font-syne text-[#0F0F1A] text-lg leading-snug mb-3 group-hover:text-[#E8540A] transition-colors line-clamp-2">
                       {blog.title}
                     </h3>
@@ -1229,7 +1211,8 @@ export default function HomePage() {
                     </Link>
                   </div>
                 </motion.article>
-              ))}
+                );
+              })}
             </div>
           </SectionInView>
         </div>

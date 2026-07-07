@@ -52,7 +52,7 @@ export default function Footer() {
             </div>
             <p className="text-white/50 text-sm leading-relaxed mb-6">
               Delhi NCR&apos;s premier self-drive car rental platform. Drive
-              your adventure with us since 2019.
+              your adventure with us since 2003.
             </p>
             <div className="flex gap-3">
               {socialLinks.map(({ icon: Icon, href, label }) => (

@@ -54,7 +54,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center gap-2 bg-[#E8540A]/10 border border-[#E8540A]/25 text-[#E8540A] text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-6">
               ✦ Our Story
             </div>
-            <h1 className="text-5xl lg:text-7xl font-black text-white font-syne leading-tight mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white font-syne leading-tight mb-6">
               Delhi NCR&apos;s Most{" "}
               <span className="bg-gradient-to-r from-[#E8540A] to-[#FF9A3C] bg-clip-text text-transparent">
                 Trusted
