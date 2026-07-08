@@ -23,9 +23,9 @@ function FieldGroup({ label, required, children }: { label: string; required?: b
 
 function ExpiryField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const diff = value ? Math.ceil((new Date(value).getTime() - Date.now()) / 86400000) : null;
-  const isExpired  = diff !== null && diff < 0;
+  const isExpired = diff !== null && diff < 0;
   const isCritical = diff !== null && diff >= 0 && diff <= 10;
-  const isWarning  = diff !== null && diff > 10 && diff <= 30;
+  const isWarning = diff !== null && diff > 10 && diff <= 30;
   return (
     <div>
       <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">{label}</label>
@@ -78,7 +78,7 @@ export default function EditCarPage() {
     cityId: "", gpsDeviceId: "",
     regularPrice: "", weekendPrice: "", securityDeposit: "", doorstepDeliveryCharge: "500", kmPackage: "",
     insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "", permitExpiry: "",
-    odometer: "0", serviceIntervalKm: "5000", lastServiceKm: "0", alignmentIntervalKm: "10000", lastAlignmentKm: "0",
+    odometer: "0", serviceIntervalKm: "8000", lastServiceKm: "0", alignmentIntervalKm: "5000", lastAlignmentKm: "0",
     isActive: true,
   });
 
@@ -106,22 +106,22 @@ export default function EditCarPage() {
           doorstepDeliveryCharge: String(found.doorstepDeliveryCharge ?? 500),
           kmPackage: found.kmPackage || "",
           insuranceExpiry: toDateInput(found.documents?.insurance?.expiry),
-          pucExpiry:       toDateInput(found.documents?.puc?.expiry),
-          fitnessExpiry:   toDateInput(found.documents?.fitness?.expiry),
-          roadTaxExpiry:   toDateInput(found.documents?.roadTax?.expiry),
-          rcExpiry:        toDateInput(found.documents?.rc?.expiry),
-          permitExpiry:    toDateInput(found.documents?.permit?.expiry),
+          pucExpiry: toDateInput(found.documents?.puc?.expiry),
+          fitnessExpiry: toDateInput(found.documents?.fitness?.expiry),
+          roadTaxExpiry: toDateInput(found.documents?.roadTax?.expiry),
+          rcExpiry: toDateInput(found.documents?.rc?.expiry),
+          permitExpiry: toDateInput(found.documents?.permit?.expiry),
           odometer: String(found.odometer || 0),
-          serviceIntervalKm: String(found.maintenance?.serviceIntervalKm ?? 5000),
+          serviceIntervalKm: String(found.maintenance?.serviceIntervalKm ?? 8000),
           lastServiceKm: String(found.maintenance?.lastServiceKm ?? 0),
-          alignmentIntervalKm: String(found.maintenance?.alignmentIntervalKm ?? 10000),
+          alignmentIntervalKm: String(found.maintenance?.alignmentIntervalKm ?? 5000),
           lastAlignmentKm: String(found.maintenance?.lastAlignmentKm ?? 0),
           isActive: found.isActive ?? true,
         });
       }
       setCities(citiesRes.data || []);
     }).catch(() => toast.error("Failed to load car data"))
-    .finally(() => setLoading(false));
+      .finally(() => setLoading(false));
   }, [carId]);
 
   const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -155,11 +155,11 @@ export default function EditCarPage() {
       fd.append("isActive", String(form.isActive));
       fd.append("documents", JSON.stringify({
         insurance: { expiry: form.insuranceExpiry || null },
-        puc:       { expiry: form.pucExpiry       || null },
-        fitness:   { expiry: form.fitnessExpiry   || null },
-        roadTax:   { expiry: form.roadTaxExpiry   || null },
-        rc:        { expiry: form.rcExpiry        || null },
-        permit:    { expiry: form.permitExpiry    || null },
+        puc: { expiry: form.pucExpiry || null },
+        fitness: { expiry: form.fitnessExpiry || null },
+        roadTax: { expiry: form.roadTaxExpiry || null },
+        rc: { expiry: form.rcExpiry || null },
+        permit: { expiry: form.permitExpiry || null },
       }));
       fd.append("odometer", form.odometer);
       fd.append("maintenance", JSON.stringify({
@@ -183,11 +183,11 @@ export default function EditCarPage() {
 
   const docFields = [
     { key: "insuranceExpiry" as const, label: "Insurance Expiry" },
-    { key: "pucExpiry"       as const, label: "PUC Expiry" },
-    { key: "fitnessExpiry"   as const, label: "Fitness Certificate Expiry" },
-    { key: "roadTaxExpiry"   as const, label: "Road Tax Expiry" },
-    { key: "rcExpiry"        as const, label: "RC Expiry" },
-    { key: "permitExpiry"    as const, label: "Permit Expiry" },
+    { key: "pucExpiry" as const, label: "PUC Expiry" },
+    { key: "fitnessExpiry" as const, label: "Fitness Certificate Expiry" },
+    { key: "roadTaxExpiry" as const, label: "Road Tax Expiry" },
+    { key: "rcExpiry" as const, label: "RC Expiry" },
+    { key: "permitExpiry" as const, label: "Permit Expiry" },
   ];
 
   const expiringSoon = docFields.filter(({ key }) => {
@@ -291,11 +291,11 @@ export default function EditCarPage() {
           <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Pricing</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {([
-              ["regularPrice",          "Regular Price/hr",        false],
-              ["weekendPrice",          "Weekend Price/hr",         false],
-              ["securityDeposit",       "Security Deposit",         false],
-              ["doorstepDeliveryCharge","Doorstep Delivery Charge", false],
-              ["kmPackage",             "KM Package",               true],
+              ["regularPrice", "Regular Price/hr", false],
+              ["weekendPrice", "Weekend Price/hr", false],
+              ["securityDeposit", "Security Deposit", false],
+              ["doorstepDeliveryCharge", "Doorstep Delivery Charge", false],
+              ["kmPackage", "KM Package", true],
             ] as [keyof typeof form, string, boolean][]).map(([field, label, isText]) => (
               <FieldGroup key={field} label={label} required={!isText}>
                 <input type={isText ? "text" : "number"} value={form[field] as string} onChange={update(field)} className={inputCls} placeholder={isText ? "250 km/day" : "0"} required={!isText} />

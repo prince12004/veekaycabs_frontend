@@ -20,9 +20,9 @@ function FieldGroup({ label, required, children }: { label: string; required?: b
 
 function ExpiryField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const diff = value ? Math.ceil((new Date(value).getTime() - Date.now()) / 86400000) : null;
-  const isExpired  = diff !== null && diff < 0;
+  const isExpired = diff !== null && diff < 0;
   const isCritical = diff !== null && diff >= 0 && diff <= 10;
-  const isWarning  = diff !== null && diff > 10 && diff <= 30;
+  const isWarning = diff !== null && diff > 10 && diff <= 30;
   return (
     <div>
       <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">{label}</label>
@@ -68,7 +68,7 @@ export default function AddCarPage() {
     cityId: "", gpsDeviceId: "",
     regularPrice: "", weekendPrice: "", securityDeposit: "10000", doorstepDeliveryCharge: "500", kmPackage: "250 km/day",
     insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "", permitExpiry: "",
-    odometer: "0", serviceIntervalKm: "5000", lastServiceKm: "0", alignmentIntervalKm: "10000", lastAlignmentKm: "0",
+    odometer: "0", serviceIntervalKm: "8000", lastServiceKm: "0", alignmentIntervalKm: "5000", lastAlignmentKm: "0",
     isActive: true,
   });
 
@@ -79,7 +79,7 @@ export default function AddCarPage() {
         setCities(d.data || []);
         if (d.data?.length > 0) setForm(f => ({ ...f, cityId: d.data[0]._id }));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const update = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -111,11 +111,11 @@ export default function AddCarPage() {
       fd.append("isActive", String(form.isActive));
       fd.append("documents", JSON.stringify({
         insurance: { expiry: form.insuranceExpiry || null },
-        puc:       { expiry: form.pucExpiry       || null },
-        fitness:   { expiry: form.fitnessExpiry   || null },
-        roadTax:   { expiry: form.roadTaxExpiry   || null },
-        rc:        { expiry: form.rcExpiry        || null },
-        permit:    { expiry: form.permitExpiry    || null },
+        puc: { expiry: form.pucExpiry || null },
+        fitness: { expiry: form.fitnessExpiry || null },
+        roadTax: { expiry: form.roadTaxExpiry || null },
+        rc: { expiry: form.rcExpiry || null },
+        permit: { expiry: form.permitExpiry || null },
       }));
       fd.append("odometer", form.odometer);
       fd.append("maintenance", JSON.stringify({
@@ -138,11 +138,11 @@ export default function AddCarPage() {
 
   const docFields = [
     { key: "insuranceExpiry" as const, label: "Insurance Expiry" },
-    { key: "pucExpiry"       as const, label: "PUC Expiry" },
-    { key: "fitnessExpiry"   as const, label: "Fitness Certificate Expiry" },
-    { key: "roadTaxExpiry"   as const, label: "Road Tax Expiry" },
-    { key: "rcExpiry"        as const, label: "RC Expiry" },
-    { key: "permitExpiry"    as const, label: "Permit Expiry" },
+    { key: "pucExpiry" as const, label: "PUC Expiry" },
+    { key: "fitnessExpiry" as const, label: "Fitness Certificate Expiry" },
+    { key: "roadTaxExpiry" as const, label: "Road Tax Expiry" },
+    { key: "rcExpiry" as const, label: "RC Expiry" },
+    { key: "permitExpiry" as const, label: "Permit Expiry" },
   ];
 
   return (
@@ -214,11 +214,11 @@ export default function AddCarPage() {
           <h3 className="font-bold font-syne text-[#0F0F1A] text-base mb-5 pb-3 border-b border-[#E4E5EF]">Pricing</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             {([
-              ["regularPrice",          "Regular Price/hr",        false],
-              ["weekendPrice",          "Weekend Price/hr",         false],
-              ["securityDeposit",       "Security Deposit",         false],
-              ["doorstepDeliveryCharge","Doorstep Delivery Charge", false],
-              ["kmPackage",             "KM Package",               true],
+              ["regularPrice", "Regular Price/hr", false],
+              ["weekendPrice", "Weekend Price/hr", false],
+              ["securityDeposit", "Security Deposit", false],
+              ["doorstepDeliveryCharge", "Doorstep Delivery Charge", false],
+              ["kmPackage", "KM Package", true],
             ] as [keyof typeof form, string, boolean][]).map(([field, label, isText]) => (
               <FieldGroup key={field} label={label} required={!isText}>
                 <input
