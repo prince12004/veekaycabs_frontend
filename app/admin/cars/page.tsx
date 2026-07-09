@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench } from "lucide-react";
+import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench, ChevronLeft, ChevronRight } from "lucide-react";
 import { adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
+
+const PAGE_SIZE = 20;
 
 export default function AdminCarsPage() {
   const [cars, setCars] = useState<any[]>([]);
@@ -13,13 +15,66 @@ export default function AdminCarsPage() {
   const [cityFilter, setCityFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
   const [toggling, setToggling] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [criticalExpiry, setCriticalExpiry] = useState(0);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+
+  // Cities & the expiry alert count need to see the whole fleet, not just
+  // the current page — fetched once, separately from the paginated list.
+  useEffect(() => {
+    adminCarsApi.getAll({ limit: 1000 })
+      .then(({ data }) => {
+        const all = data.data || [];
+        const byId = new Map<string, string>();
+        all.forEach((c: any) => {
+          if (c.cityId?._id && c.cityId?.name) byId.set(c.cityId._id, c.cityId.name);
+        });
+        setCities(Array.from(byId, ([id, name]) => ({ id, name })));
+      })
+      .catch(() => {});
+    adminCarsApi.getExpiryAlerts()
+      .then(({ data }) => {
+        const alerts = data.data || [];
+        const criticalCarIds = new Set(
+          alerts
+            .filter((a: any) => a.docType === "insurance" || a.docType === "puc")
+            .filter((a: any) => a.status === "expired" || (a.daysLeft !== undefined && a.daysLeft <= 14))
+            .map((a: any) => a.carId)
+        );
+        setCriticalExpiry(criticalCarIds.size);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Reset to page 1 whenever a filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [search, cityFilter, typeFilter]);
 
   useEffect(() => {
-    adminCarsApi.getAll()
-      .then(({ data }) => setCars(data.data || []))
-      .catch(() => toast.error("Failed to load cars"))
-      .finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    const timer = setTimeout(() => {
+      const params: Record<string, string | number> = { page, limit: PAGE_SIZE };
+      if (search) params.search = search;
+      if (cityFilter !== "All") params.city = cityFilter;
+      if (typeFilter !== "All") params.type = typeFilter;
+
+      adminCarsApi.getAll(params)
+        .then(({ data }) => {
+          setCars(data.data || []);
+          setPages(data.pages || 1);
+          setTotal(data.total || 0);
+          setActiveCount(data.activeCount || 0);
+        })
+        .catch(() => toast.error("Failed to load cars"))
+        .finally(() => setLoading(false));
+    }, search ? 300 : 0);
+
+    return () => clearTimeout(timer);
+  }, [page, search, cityFilter, typeFilter]);
 
   const getDaysLeft = (expiry?: string | Date | null) => {
     if (!expiry) return null;
@@ -46,28 +101,12 @@ export default function AdminCarsPage() {
     }
   };
 
-  const filtered = cars.filter(c => {
-    const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.registrationNo?.toLowerCase().includes(search.toLowerCase());
-    const matchCity = cityFilter === "All" || c.cityId?.name === cityFilter;
-    const matchType = typeFilter === "All" || c.type === typeFilter;
-    return matchSearch && matchCity && matchType;
-  });
-
-  const active = cars.filter(c => c.isActive).length;
-  const criticalExpiry = cars.filter(c => {
-    const insDays = getDaysLeft(c.documents?.insurance?.expiry);
-    const pucDays = getDaysLeft(c.documents?.puc?.expiry);
-    return (insDays !== null && insDays <= 14) || (pucDays !== null && pucDays <= 14);
-  }).length;
-
-  const cities = ["All", ...Array.from(new Set(cars.map(c => c.cityId?.name).filter(Boolean)))];
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-[#0F0F1A] font-syne">Car Fleet</h1>
-          <p className="text-[#9090A8] text-sm">{cars.length} total cars · {active} active</p>
+          <p className="text-[#9090A8] text-sm">{total} total cars · {activeCount} active</p>
         </div>
         <Link href="/admin/cars/add" className="btn-gradient px-5 py-2.5 rounded-xl text-white font-semibold text-sm flex items-center gap-2">
           <Plus size={16} /> Add Car
@@ -77,9 +116,9 @@ export default function AdminCarsPage() {
       {/* Summary Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Fleet",    value: cars.length,              color: "#E8540A", bg: "#FFF3ED",  icon: Car },
-          { label: "Active",         value: active,                   color: "#10B981", bg: "#D1FAE5",  icon: ToggleRight },
-          { label: "Inactive",       value: cars.length - active,     color: "#9090A8", bg: "#F1F2F7",  icon: ToggleLeft },
+          { label: "Total Fleet",    value: total,                    color: "#E8540A", bg: "#FFF3ED",  icon: Car },
+          { label: "Active",         value: activeCount,              color: "#10B981", bg: "#D1FAE5",  icon: ToggleRight },
+          { label: "Inactive",       value: total - activeCount,      color: "#9090A8", bg: "#F1F2F7",  icon: ToggleLeft },
           { label: "Expiry Alert",   value: criticalExpiry,           color: "#EF4444", bg: "#FEE2E2",  icon: AlertTriangle },
         ].map(({ label, value, color, bg, icon: Icon }) => (
           <div key={label} className="bg-white rounded-2xl border border-[#E4E5EF] p-4 flex items-center gap-3">
@@ -107,7 +146,8 @@ export default function AdminCarsPage() {
           />
         </div>
         <select value={cityFilter} onChange={e => setCityFilter(e.target.value)} className="border-[1.5px] border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:border-[#E8540A] outline-none bg-white">
-          {cities.map(c => <option key={c}>{c}</option>)}
+          <option value="All">All</option>
+          {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="border-[1.5px] border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:border-[#E8540A] outline-none bg-white">
           {["All", "SUV", "Hatchback", "Sedan", "MUV", "Luxury"].map(t => <option key={t}>{t}</option>)}
@@ -120,7 +160,7 @@ export default function AdminCarsPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 size={32} className="animate-spin text-[#E8540A]" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : cars.length === 0 ? (
           <div className="text-center py-20 text-[#9090A8]">
             <Car size={40} className="mx-auto mb-3 opacity-30" />
             <p className="font-semibold">No cars found</p>
@@ -136,7 +176,7 @@ export default function AdminCarsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((car, i) => {
+                {cars.map((car, i) => {
                   const insDays  = getDaysLeft(car.documents?.insurance?.expiry);
                   const pucDays  = getDaysLeft(car.documents?.puc?.expiry);
                   const insColor = getExpiryColor(insDays);
@@ -219,6 +259,34 @@ export default function AdminCarsPage() {
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {!loading && total > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <p className="text-[#9090A8] text-xs">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="w-8 h-8 rounded-lg border-[1.5px] border-[#E4E5EF] flex items-center justify-center disabled:opacity-40 hover:border-[#E8540A] transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-semibold text-[#4A4A6A] px-2">
+              Page {page} of {pages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(pages, p + 1))}
+              disabled={page === pages}
+              className="w-8 h-8 rounded-lg border-[1.5px] border-[#E4E5EF] flex items-center justify-center disabled:opacity-40 hover:border-[#E8540A] transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
