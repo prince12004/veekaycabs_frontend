@@ -151,6 +151,15 @@ export const adminCarsApi = {
     }),
 };
 
+export const adminMaintenanceApi = {
+  getAll: (params?: Record<string, string | number>) =>
+    adminApi.get("/api/admin/maintenance", { params }),
+  getTotalsByCar: (params?: Record<string, string>) => adminApi.get("/api/admin/maintenance/by-car", { params }),
+  create: (data: Record<string, unknown>) => adminApi.post("/api/admin/maintenance", data),
+  update: (id: string, data: Record<string, unknown>) => adminApi.put(`/api/admin/maintenance/${id}`, data),
+  remove: (id: string) => adminApi.delete(`/api/admin/maintenance/${id}`),
+};
+
 // RC verification / Challan check for ANY registration number — fleet car or
 // not. Results are cached server-side by registration number; pass force to
 // bypass the cache and re-run.

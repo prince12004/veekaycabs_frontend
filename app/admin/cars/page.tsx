@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench } from "lucide-react";
 import { adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -205,6 +205,9 @@ export default function AdminCarsPage() {
                           </Link>
                           <Link href={`/admin/cars/${car._id}/edit`} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center">
                             <Edit size={14} />
+                          </Link>
+                          <Link href={`/admin/cars/${car._id}/maintenance`} className="w-8 h-8 rounded-lg bg-[#EDE9FE] text-[#6D28D9] hover:bg-[#6D28D9] hover:text-white transition-colors flex items-center justify-center" title="Maintenance">
+                            <Wrench size={14} />
                           </Link>
                         </div>
                       </td>
