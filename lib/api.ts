@@ -133,6 +133,7 @@ export const carsAPI = {
 export const adminCarsApi = {
   getAll: (params?: Record<string, string | number>) =>
     adminApi.get("/api/admin/cars", { params }),
+  getStats: () => adminApi.get("/api/admin/cars/stats"),
   create: (data: FormData) =>
     adminApi.post("/api/admin/cars", data, {
       headers: { "Content-Type": "multipart/form-data" },

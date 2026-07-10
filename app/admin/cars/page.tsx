@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench, ChevronLeft, ChevronRight } from "lucide-react";
 import { adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
+import CarMaintenanceModal from "@/components/admin/CarMaintenanceModal";
 
 const PAGE_SIZE = 20;
+
+type StatusTab = "all" | "active" | "inactive" | "expiry";
 
 export default function AdminCarsPage() {
   const [cars, setCars] = useState<any[]>([]);
@@ -14,67 +17,62 @@ export default function AdminCarsPage() {
   const [search, setSearch] = useState("");
   const [cityFilter, setCityFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
+  const [statusTab, setStatusTab] = useState<StatusTab>("all");
   const [toggling, setToggling] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [activeCount, setActiveCount] = useState(0);
-  const [criticalExpiry, setCriticalExpiry] = useState(0);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [maintenanceCarId, setMaintenanceCarId] = useState<string | null>(null);
 
-  // Cities & the expiry alert count need to see the whole fleet, not just
-  // the current page — fetched once, separately from the paginated list.
-  useEffect(() => {
-    adminCarsApi.getAll({ limit: 1000 })
+  // Overall fleet stats (unaffected by the current filter/tab) — fetched
+  // once so the summary tiles always show the true totals.
+  const [overallTotal, setOverallTotal] = useState(0);
+  const [overallActive, setOverallActive] = useState(0);
+  const [criticalExpiry, setCriticalExpiry] = useState(0);
+
+  const loadOverallStats = useCallback(() => {
+    adminCarsApi.getStats()
       .then(({ data }) => {
-        const all = data.data || [];
-        const byId = new Map<string, string>();
-        all.forEach((c: any) => {
-          if (c.cityId?._id && c.cityId?.name) byId.set(c.cityId._id, c.cityId.name);
-        });
-        setCities(Array.from(byId, ([id, name]) => ({ id, name })));
-      })
-      .catch(() => {});
-    adminCarsApi.getExpiryAlerts()
-      .then(({ data }) => {
-        const alerts = data.data || [];
-        const criticalCarIds = new Set(
-          alerts
-            .filter((a: any) => a.docType === "insurance" || a.docType === "puc")
-            .filter((a: any) => a.status === "expired" || (a.daysLeft !== undefined && a.daysLeft <= 14))
-            .map((a: any) => a.carId)
-        );
-        setCriticalExpiry(criticalCarIds.size);
+        setCities(data.cities || []);
+        setOverallTotal(data.total || 0);
+        setOverallActive(data.activeCount || 0);
+        setCriticalExpiry(data.criticalExpiry || 0);
       })
       .catch(() => {});
   }, []);
 
+  useEffect(() => { loadOverallStats(); }, [loadOverallStats]);
+
   // Reset to page 1 whenever a filter changes.
   useEffect(() => {
     setPage(1);
-  }, [search, cityFilter, typeFilter]);
+  }, [search, cityFilter, typeFilter, statusTab]);
+
+  const loadCars = useCallback(() => {
+    setLoading(true);
+    const params: Record<string, string | number> = { page, limit: PAGE_SIZE };
+    if (search) params.search = search;
+    if (cityFilter !== "All") params.city = cityFilter;
+    if (typeFilter !== "All") params.type = typeFilter;
+    if (statusTab === "active") params.isActive = "true";
+    if (statusTab === "inactive") params.isActive = "false";
+    if (statusTab === "expiry") params.expiryAlert = "true";
+
+    return adminCarsApi.getAll(params)
+      .then(({ data }) => {
+        setCars(data.data || []);
+        setPages(data.pages || 1);
+        setTotal(data.total || 0);
+      })
+      .catch(() => toast.error("Failed to load cars"))
+      .finally(() => setLoading(false));
+  }, [page, search, cityFilter, typeFilter, statusTab]);
 
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      const params: Record<string, string | number> = { page, limit: PAGE_SIZE };
-      if (search) params.search = search;
-      if (cityFilter !== "All") params.city = cityFilter;
-      if (typeFilter !== "All") params.type = typeFilter;
-
-      adminCarsApi.getAll(params)
-        .then(({ data }) => {
-          setCars(data.data || []);
-          setPages(data.pages || 1);
-          setTotal(data.total || 0);
-          setActiveCount(data.activeCount || 0);
-        })
-        .catch(() => toast.error("Failed to load cars"))
-        .finally(() => setLoading(false));
-    }, search ? 300 : 0);
-
+    const timer = setTimeout(loadCars, search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [page, search, cityFilter, typeFilter]);
+  }, [loadCars]);
 
   const getDaysLeft = (expiry?: string | Date | null) => {
     if (!expiry) return null;
@@ -89,11 +87,12 @@ export default function AdminCarsPage() {
     return { text: "#10B981", bg: "#D1FAE5" };
   };
 
-  const toggleCar = async (carId: string, current: boolean) => {
+  const toggleCar = async (carId: string) => {
     setToggling(carId);
     try {
       await adminCarsApi.toggleStatus(carId);
-      setCars(prev => prev.map(c => c._id === carId ? { ...c, isActive: !current } : c));
+      loadCars();
+      loadOverallStats();
     } catch {
       toast.error("Failed to update status");
     } finally {
@@ -106,22 +105,26 @@ export default function AdminCarsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-[#0F0F1A] font-syne">Car Fleet</h1>
-          <p className="text-[#9090A8] text-sm">{total} total cars · {activeCount} active</p>
+          <p className="text-[#9090A8] text-sm">{overallTotal} total cars · {overallActive} active</p>
         </div>
         <Link href="/admin/cars/add" className="btn-gradient px-5 py-2.5 rounded-xl text-white font-semibold text-sm flex items-center gap-2">
           <Plus size={16} /> Add Car
         </Link>
       </div>
 
-      {/* Summary Strip */}
+      {/* Summary Strip — click a tile to filter the table below */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total Fleet",    value: total,                    color: "#E8540A", bg: "#FFF3ED",  icon: Car },
-          { label: "Active",         value: activeCount,              color: "#10B981", bg: "#D1FAE5",  icon: ToggleRight },
-          { label: "Inactive",       value: total - activeCount,      color: "#9090A8", bg: "#F1F2F7",  icon: ToggleLeft },
-          { label: "Expiry Alert",   value: criticalExpiry,           color: "#EF4444", bg: "#FEE2E2",  icon: AlertTriangle },
-        ].map(({ label, value, color, bg, icon: Icon }) => (
-          <div key={label} className="bg-white rounded-2xl border border-[#E4E5EF] p-4 flex items-center gap-3">
+        {([
+          { key: "all",      label: "Total Fleet",    value: overallTotal,                    color: "#E8540A", bg: "#FFF3ED",  icon: Car },
+          { key: "active",   label: "Active",         value: overallActive,                    color: "#10B981", bg: "#D1FAE5",  icon: ToggleRight },
+          { key: "inactive", label: "Inactive",       value: overallTotal - overallActive,      color: "#9090A8", bg: "#F1F2F7",  icon: ToggleLeft },
+          { key: "expiry",   label: "Expiry Alert",   value: criticalExpiry,                    color: "#EF4444", bg: "#FEE2E2",  icon: AlertTriangle },
+        ] as const).map(({ key, label, value, color, bg, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setStatusTab(key)}
+            className={`text-left bg-white rounded-2xl border p-4 flex items-center gap-3 transition-colors ${statusTab === key ? "border-[#0F0F1A] ring-1 ring-[#0F0F1A]" : "border-[#E4E5EF] hover:border-[#0F0F1A]/30"}`}
+          >
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
               <Icon size={18} style={{ color }} />
             </div>
@@ -129,7 +132,7 @@ export default function AdminCarsPage() {
               <p className="text-2xl font-black text-[#0F0F1A] font-syne leading-none">{value}</p>
               <p className="text-[#9090A8] text-[10px] font-semibold uppercase tracking-wider mt-0.5">{label}</p>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -226,7 +229,7 @@ export default function AdminCarsPage() {
                       </td>
                       <td className="px-5 py-4">
                         <button
-                          onClick={() => toggleCar(car._id, car.isActive)}
+                          onClick={() => toggleCar(car._id)}
                           disabled={toggling === car._id}
                           className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 ${car.isActive ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}
                         >
@@ -246,9 +249,9 @@ export default function AdminCarsPage() {
                           <Link href={`/admin/cars/${car._id}/edit`} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center">
                             <Edit size={14} />
                           </Link>
-                          <Link href={`/admin/cars/${car._id}/maintenance`} className="w-8 h-8 rounded-lg bg-[#EDE9FE] text-[#6D28D9] hover:bg-[#6D28D9] hover:text-white transition-colors flex items-center justify-center" title="Maintenance">
+                          <button onClick={() => setMaintenanceCarId(car._id)} className="w-8 h-8 rounded-lg bg-[#EDE9FE] text-[#6D28D9] hover:bg-[#6D28D9] hover:text-white transition-colors flex items-center justify-center" title="Maintenance">
                             <Wrench size={14} />
-                          </Link>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -286,6 +289,14 @@ export default function AdminCarsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {maintenanceCarId && (
+        <CarMaintenanceModal
+          carId={maintenanceCarId}
+          onClose={() => setMaintenanceCarId(null)}
+          onChanged={loadCars}
+        />
       )}
     </div>
   );
