@@ -277,6 +277,11 @@ export const adminBlogsApi = {
   togglePublish: (id: string) => adminApi.patch(`/api/admin/blogs/${id}/publish`),
 };
 
+export const carSeoPagesAPI = {
+  getAll: () => api.get("/api/public/car-seo-pages"),
+  getBySlug: (slug: string) => api.get(`/api/public/car-seo-pages/${slug}`),
+};
+
 export const contactAPI = {
   submit: (data: Record<string, unknown>) => api.post("/api/contact", data),
 };

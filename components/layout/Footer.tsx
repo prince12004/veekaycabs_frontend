@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -10,8 +11,11 @@ import {
   Instagram,
   Twitter,
   Linkedin,
+  X,
+  Search,
 } from "lucide-react";
 import { useActiveCities } from "@/lib/useActiveCities";
+import { carSeoPagesAPI } from "@/lib/api";
 
 const quickLinks = [
   { href: "/book", label: "Self Drive Rental" },
@@ -31,6 +35,17 @@ const socialLinks = [
 
 export default function Footer() {
   const cities = useActiveCities();
+  const [seoPages, setSeoPages] = useState<{ pageName: string; pageSlug: string }[]>([]);
+  const [showSeoModal, setShowSeoModal] = useState(false);
+
+  // Fetched unconditionally (not gated behind the click) so the links exist
+  // in the page as soon as it loads — this list exists for internal-linking
+  // SEO value, which only counts if the links are actually in the DOM.
+  useEffect(() => {
+    carSeoPagesAPI.getAll()
+      .then(({ data }) => setSeoPages(data?.data || []))
+      .catch(() => {});
+  }, []);
 
   return (
     <footer className="bg-gradient-to-b from-[#0F0F1A] to-[#080810]">
@@ -84,6 +99,17 @@ export default function Footer() {
                   </Link>
                 </li>
               ))}
+              {seoPages.length > 0 && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setShowSeoModal(true)}
+                    className="flex items-center gap-1.5 text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200"
+                  >
+                    <Search size={13} /> Popular Searches
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -184,6 +210,43 @@ export default function Footer() {
           Self-Drive Car Rental Platform
         </p>
       </div>
+
+      {/* Popular Searches — rendered whenever there's data (not just when
+          open) so these internal links are always present in the page's
+          HTML for crawlers; only the visibility is toggled for humans. */}
+      {seoPages.length > 0 && (
+        <div
+          className={`fixed inset-0 z-[200] items-center justify-center p-4 bg-black/60 ${showSeoModal ? "flex" : "hidden"}`}
+          onClick={() => setShowSeoModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-[#E4E5EF] flex items-center justify-between shrink-0">
+              <h2 className="font-bold text-[#0F0F1A] text-base flex items-center gap-2">
+                <Search size={16} className="text-[#E8540A]" /> Popular Searches
+              </h2>
+              <button onClick={() => setShowSeoModal(false)} className="text-[#9090A8] hover:text-[#EF4444]">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                {seoPages.map((p) => (
+                  <Link
+                    key={p.pageSlug}
+                    href={`/seo/${p.pageSlug}`}
+                    className="text-[#4A4A6A] text-sm hover:text-[#E8540A] py-1.5 truncate"
+                  >
+                    {p.pageName}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </footer>
   );
 }

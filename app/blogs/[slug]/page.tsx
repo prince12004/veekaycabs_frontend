@@ -190,92 +190,83 @@ export default function BlogDetailPage() {
 
       {/* Content */}
       <section className="py-16 bg-[#F8F9FC]">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="lg:grid lg:grid-cols-4 lg:gap-10">
-            {/* TOC + Share sidebar */}
-            <div className="hidden lg:block">
-              <div className="sticky top-28">
-                {toc.length > 0 && (
-                  <>
-                    <p className="text-xs font-bold uppercase tracking-widest text-[#9090A8] mb-4">Contents</p>
-                    <nav className="space-y-1 mb-8">
-                      {toc.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            setActiveSection(item.id);
-                            document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                          }}
-                          className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-all ${activeSection === item.id ? "bg-[#FFF3ED] text-[#E8540A] font-semibold" : "text-[#4A4A6A] hover:text-[#E8540A]"}`}
-                        >
-                          {item.title}
-                        </button>
-                      ))}
-                    </nav>
-                  </>
-                )}
-                <p className="text-xs font-bold uppercase tracking-widest text-[#9090A8] mb-3">Share</p>
-                <div className="flex gap-2">
-                  <button onClick={copyLink} className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-[#E8540A] hover:text-[#E8540A] transition-all text-[#4A4A6A]">
-                    <Copy size={14} />
+        <div className="max-w-4xl mx-auto px-6">
+          {/* Contents chips + Share row */}
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+            {toc.length > 0 ? (
+              <nav className="flex flex-wrap gap-2">
+                {toc.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${activeSection === item.id ? "bg-[#FFF3ED] border-[#E8540A]/30 text-[#E8540A]" : "border-[#E4E5EF] text-[#4A4A6A] hover:border-[#E8540A]/30 hover:text-[#E8540A]"}`}
+                  >
+                    {item.title}
                   </button>
-                  <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}&text=${encodeURIComponent(blog.title)}`} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-blue-400 hover:text-blue-400 transition-all text-[#4A4A6A]">
-                    <Twitter size={14} />
-                  </a>
-                  <a href={`https://wa.me/?text=${encodeURIComponent(blog.title + " " + (typeof window !== "undefined" ? window.location.href : ""))}`} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-green-500 hover:text-green-500 transition-all text-[#4A4A6A]">
-                    <MessageCircle size={14} />
-                  </a>
-                </div>
+                ))}
+              </nav>
+            ) : <div />}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#9090A8] mr-1">Share</span>
+              <button onClick={copyLink} className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-[#E8540A] hover:text-[#E8540A] transition-all text-[#4A4A6A]">
+                <Copy size={14} />
+              </button>
+              <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}&text=${encodeURIComponent(blog.title)}`} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-blue-400 hover:text-blue-400 transition-all text-[#4A4A6A]">
+                <Twitter size={14} />
+              </a>
+              <a href={`https://wa.me/?text=${encodeURIComponent(blog.title + " " + (typeof window !== "undefined" ? window.location.href : ""))}`} target="_blank" rel="noreferrer" className="w-9 h-9 rounded-full border border-[#E4E5EF] flex items-center justify-center hover:border-green-500 hover:text-green-500 transition-all text-[#4A4A6A]">
+                <MessageCircle size={14} />
+              </a>
+            </div>
+          </div>
+
+          {/* Article */}
+          <div className="bg-white rounded-2xl border border-[#E4E5EF] p-8 lg:p-12 shadow-[0_2px_20px_rgba(0,0,0,0.06)]">
+            <div
+              className="blog-content text-[#4A4A6A] leading-relaxed [&_h2]:text-2xl [&_h2]:font-black [&_h2]:font-syne [&_h2]:text-[#0F0F1A] [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-[#0F0F1A] [&_h3]:mt-6 [&_h3]:mb-3 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_li]:mb-1.5 [&_strong]:text-[#0F0F1A] [&_strong]:font-bold [&_a]:text-[#E8540A] [&_a]:underline [&_img]:rounded-xl [&_img]:my-4"
+              dangerouslySetInnerHTML={{ __html: contentHtml }}
+            />
+
+            {/* Author */}
+            <div className="mt-12 pt-8 border-t border-[#E4E5EF] flex items-center gap-5">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#E8540A] to-[#FF6B35] flex items-center justify-center text-white font-black text-lg font-syne shrink-0">
+                VK
+              </div>
+              <div>
+                <p className="font-bold text-[#0F0F1A]">{blog.author}</p>
+                <p className="text-[#9090A8] text-sm">Delhi NCR&apos;s #1 Self-Drive Car Rental Platform since 2003</p>
               </div>
             </div>
+          </div>
 
-            {/* Article */}
-            <div className="lg:col-span-3">
-              <div className="bg-white rounded-2xl border border-[#E4E5EF] p-8 lg:p-12 shadow-[0_2px_20px_rgba(0,0,0,0.06)]">
-                <div
-                  className="blog-content text-[#4A4A6A] leading-relaxed [&_h2]:text-2xl [&_h2]:font-black [&_h2]:font-syne [&_h2]:text-[#0F0F1A] [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-[#0F0F1A] [&_h3]:mt-6 [&_h3]:mb-3 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_li]:mb-1.5 [&_strong]:text-[#0F0F1A] [&_strong]:font-bold [&_a]:text-[#E8540A] [&_a]:underline [&_img]:rounded-xl [&_img]:my-4"
-                  dangerouslySetInnerHTML={{ __html: contentHtml }}
-                />
-
-                {/* Author */}
-                <div className="mt-12 pt-8 border-t border-[#E4E5EF] flex items-center gap-5">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#E8540A] to-[#FF6B35] flex items-center justify-center text-white font-black text-lg font-syne shrink-0">
-                    VK
-                  </div>
-                  <div>
-                    <p className="font-bold text-[#0F0F1A]">{blog.author}</p>
-                    <p className="text-[#9090A8] text-sm">Delhi NCR&apos;s #1 Self-Drive Car Rental Platform since 2003</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Related Posts */}
-              {related.length > 0 && (
-                <div className="mt-10">
-                  <h3 className="text-xl font-bold text-[#0F0F1A] font-syne mb-6">Related Articles</h3>
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    {related.map(post => (
-                      <Link key={post._id} href={`/blogs/${post.slug}`}>
-                        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 hover:border-[#E8540A]/30 hover:-translate-y-1 hover:shadow-lg transition-all duration-200 group">
-                          <BookOpen size={28} className="text-[#E8540A]/40 mb-3" />
-                          <h4 className="font-bold text-[#0F0F1A] text-sm mb-2 group-hover:text-[#E8540A] transition-colors line-clamp-3 leading-snug">{post.title}</h4>
-                          <span className="text-[#9090A8] text-xs flex items-center gap-1"><Clock size={11} /> {post.readTime} min read</span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* CTA */}
-              <div className="mt-8 bg-gradient-to-r from-[#E8540A] to-[#FF6B35] rounded-2xl p-8 text-center">
-                <h3 className="text-2xl font-black text-white font-syne mb-2">Ready to Hit the Road?</h3>
-                <p className="text-white/80 mb-6">Book a self-drive car in Delhi NCR. 60-second booking, 101+ verified cars.</p>
-                <Link href="/book" className="bg-white text-[#E8540A] font-bold px-8 py-3 rounded-xl hover:bg-[#FFF3ED] transition-colors inline-flex items-center gap-2">
-                  Book Now <ChevronRight size={16} />
-                </Link>
+          {/* Related Posts */}
+          {related.length > 0 && (
+            <div className="mt-10">
+              <h3 className="text-xl font-bold text-[#0F0F1A] font-syne mb-6">Related Articles</h3>
+              <div className="grid sm:grid-cols-3 gap-4">
+                {related.map(post => (
+                  <Link key={post._id} href={`/blogs/${post.slug}`}>
+                    <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 hover:border-[#E8540A]/30 hover:-translate-y-1 hover:shadow-lg transition-all duration-200 group">
+                      <BookOpen size={28} className="text-[#E8540A]/40 mb-3" />
+                      <h4 className="font-bold text-[#0F0F1A] text-sm mb-2 group-hover:text-[#E8540A] transition-colors line-clamp-3 leading-snug">{post.title}</h4>
+                      <span className="text-[#9090A8] text-xs flex items-center gap-1"><Clock size={11} /> {post.readTime} min read</span>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
+          )}
+
+          {/* CTA */}
+          <div className="mt-8 bg-gradient-to-r from-[#E8540A] to-[#FF6B35] rounded-2xl p-8 text-center">
+            <h3 className="text-2xl font-black text-white font-syne mb-2">Ready to Hit the Road?</h3>
+            <p className="text-white/80 mb-6">Book a self-drive car in Delhi NCR. 60-second booking, 101+ verified cars.</p>
+            <Link href="/book" className="bg-white text-[#E8540A] font-bold px-8 py-3 rounded-xl hover:bg-[#FFF3ED] transition-colors inline-flex items-center gap-2">
+              Book Now <ChevronRight size={16} />
+            </Link>
           </div>
         </div>
       </section>
