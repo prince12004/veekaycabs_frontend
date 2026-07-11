@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Navigation, Car, MapPin, Wifi, WifiOff, Battery, Gauge, Clock, RefreshCw, Loader2 } from "lucide-react";
+import { Car, MapPin, Wifi, WifiOff, Battery, Gauge, Clock, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminGpsApi } from "@/lib/api";
+import { FleetMap } from "@/components/admin/FleetMap";
+import { FLEET_STATUS, type FleetStatus } from "@/lib/fleetStatus";
 
 type GpsCar = {
   carId: string;
   name: string;
   regNo: string;
   deviceId: string;
-  status: "online" | "idle" | "offline";
+  status: FleetStatus;
   speed: number;
   battery: number | null;
   ignition?: boolean | null;
@@ -20,12 +22,6 @@ type GpsCar = {
   address: string | null;
   customer: string;
   bookingEnd: string | null;
-};
-
-const STATUS_CFG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  online: { label: "Online", bg: "#D1FAE5", text: "#065F46", dot: "#10B981" },
-  idle: { label: "Idle", bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
-  offline: { label: "Offline", bg: "#FEE2E2", text: "#991B1B", dot: "#EF4444" },
 };
 
 function timeAgo(iso: string | null) {
@@ -107,11 +103,12 @@ export default function GPSTrackingPage() {
         <>
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Online", count: cars.filter(c => c.status === "online").length, color: "#10B981", bg: "#D1FAE5" },
-              { label: "Idle", count: cars.filter(c => c.status === "idle").length, color: "#F59E0B", bg: "#FEF3C7" },
-              { label: "Offline", count: cars.filter(c => c.status === "offline").length, color: "#EF4444", bg: "#FEE2E2" },
-            ].map(s => (
+            {(["online", "idle", "offline"] as const).map(key => ({
+              label: FLEET_STATUS[key].label,
+              count: cars.filter(c => c.status === key).length,
+              color: FLEET_STATUS[key].solid,
+              bg: FLEET_STATUS[key].bg,
+            })).map(s => (
               <div key={s.label} className="bg-white rounded-2xl border border-[#E4E5EF] p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: s.bg }}>
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
@@ -137,7 +134,7 @@ export default function GPSTrackingPage() {
               </div>
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {filtered.map(car => {
-                  const sc = STATUS_CFG[car.status];
+                  const sc = FLEET_STATUS[car.status];
                   return (
                     <button key={car.carId} onClick={() => setSelected(car)}
                       className={cn("w-full text-left bg-white rounded-xl border p-4 transition-all", selected?.carId === car.carId ? "border-[#E8540A] shadow-[0_0_0_3px_rgba(232,84,10,0.1)]" : "border-[#E4E5EF] hover:border-[#E8540A]/40")}>
@@ -147,7 +144,7 @@ export default function GPSTrackingPage() {
                             <div className="w-10 h-10 rounded-xl bg-[#FFF3ED] flex items-center justify-center">
                               <Car size={18} className="text-[#E8540A]" />
                             </div>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: sc.dot }} />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: sc.solid }} />
                           </div>
                           <div>
                             <p className="font-bold text-sm text-[#0F0F1A]">{car.name}</p>
@@ -172,64 +169,27 @@ export default function GPSTrackingPage() {
 
             {/* Map + Detail */}
             <div className="lg:col-span-3 space-y-4">
-              {/* Map Placeholder */}
-              <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden" style={{ height: 320 }}>
-                <div className="relative w-full h-full bg-gradient-to-br from-[#E8F5E8] to-[#D1FAE5] flex items-center justify-center">
-                  <div className="absolute inset-0 opacity-20">
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="absolute border-[#10B981] border" style={{ left: `${i * 14}%`, top: 0, bottom: 0, width: 1 }} />
-                    ))}
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="absolute border-[#10B981] border" style={{ top: `${i * 18}%`, left: 0, right: 0, height: 1 }} />
-                    ))}
-                  </div>
-                  {filtered.filter(c => c.status !== "offline" && c.lat != null).map((car, i) => {
-                    const sc = STATUS_CFG[car.status];
-                    const x = 15 + (i * 18) % 70;
-                    const y = 20 + (i * 22) % 60;
-                    return (
-                      <button key={car.carId} onClick={() => setSelected(car)}
-                        className="absolute" style={{ left: `${x}%`, top: `${y}%`, transform: "translate(-50%, -50%)" }}>
-                        <div className={cn("w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center transition-all", selected?.carId === car.carId ? "w-10 h-10" : "")} style={{ backgroundColor: sc.dot }}>
-                          <Car size={selected?.carId === car.carId ? 16 : 13} className="text-white" />
-                        </div>
-                        {selected?.carId === car.carId && (
-                          <div className="absolute left-1/2 -translate-x-1/2 mt-1 bg-[#0F0F1A] text-white text-[10px] font-bold px-2 py-1 rounded-lg whitespace-nowrap">
-                            {car.regNo}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                  {selected?.lat != null ? (
-                    <a
-                      href={`https://www.google.com/maps?q=${selected.lat},${selected.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-xs text-[#4A4A6A] hover:bg-white transition-colors"
-                    >
-                      <p className="font-bold text-[#0F0F1A]">Live Map</p>
-                      <p className="text-[#E8540A] font-semibold">Open in Maps for exact location →</p>
-                    </a>
-                  ) : (
-                    <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-xs text-[#4A4A6A]">
-                      <p className="font-bold text-[#0F0F1A]">Live Map</p>
-                      <p>Relative positions — select a car with a fix to open Maps</p>
-                    </div>
+              {/* Live satellite map */}
+              <div className="relative bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden" style={{ height: 320 }}>
+                <FleetMap
+                  cars={cars}
+                  selectedId={selected?.carId ?? null}
+                  onSelect={(carId) => setSelected(cars.find((c) => c.carId === carId) ?? null)}
+                  height={320}
+                />
+                <a
+                  href={selected?.lat != null ? `https://www.google.com/maps?q=${selected.lat},${selected.lng}` : undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={selected?.lat == null}
+                  className={cn(
+                    "absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-xs text-[#4A4A6A] transition-colors",
+                    selected?.lat != null ? "hover:bg-white cursor-pointer" : "opacity-40 pointer-events-none"
                   )}
-                  <a
-                    href={selected?.lat != null ? `https://www.google.com/maps?q=${selected.lat},${selected.lng}` : undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-disabled={selected?.lat == null}
-                    className={cn(
-                      "absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 transition-colors",
-                      selected?.lat != null ? "hover:bg-white cursor-pointer" : "opacity-40 pointer-events-none"
-                    )}
-                  >
-                    <Navigation size={14} className="text-[#E8540A]" />
-                  </a>
-                </div>
+                >
+                  <p className="font-bold text-[#0F0F1A]">{selected ? selected.name : "Live Map"}</p>
+                  <p className="text-[#E8540A] font-semibold">Open in Google Maps →</p>
+                </a>
               </div>
 
               {/* Selected Car Details */}
@@ -245,9 +205,9 @@ export default function GPSTrackingPage() {
                         <p className="text-xs text-[#9090A8] font-mono">{selected.regNo}</p>
                       </div>
                     </div>
-                    <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: STATUS_CFG[selected.status].bg, color: STATUS_CFG[selected.status].text }}>
+                    <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: FLEET_STATUS[selected.status].bg, color: FLEET_STATUS[selected.status].text }}>
                       {selected.status === "online" ? <Wifi size={11} /> : <WifiOff size={11} />}
-                      {STATUS_CFG[selected.status].label}
+                      {FLEET_STATUS[selected.status].label}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

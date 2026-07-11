@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
+import NumberInputScrollGuard from "@/components/providers/NumberInputScrollGuard";
 
 export const metadata: Metadata = {
   title: "Veekay Cabs - Self Drive Car Rental in Delhi NCR",
@@ -28,6 +29,7 @@ export default function RootLayout({
       <head />
       <body className="antialiased">
         <QueryProvider>
+          <NumberInputScrollGuard />
           {children}
           <Toaster
             position="top-right"

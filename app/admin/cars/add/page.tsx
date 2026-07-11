@@ -66,7 +66,7 @@ export default function AddCarPage() {
     name: "", registrationNo: "", modelYear: "", type: "SUV",
     fuel: "Petrol", transmission: "Automatic", seats: "5",
     cityId: "", gpsDeviceId: "",
-    regularPrice: "", weekendPrice: "", securityDeposit: "10000", doorstepDeliveryCharge: "500", kmPackage: "250 km/day",
+    regularPrice: "", weekendPrice: "", securityDeposit: "10000", doorstepDeliveryCharge: "500", kmPackage: "250 km/day", extraKmRate: "6",
     insuranceExpiry: "", pucExpiry: "", fitnessExpiry: "", roadTaxExpiry: "", rcExpiry: "", permitExpiry: "",
     odometer: "0", serviceIntervalKm: "8000", lastServiceKm: "0", alignmentIntervalKm: "5000", lastAlignmentKm: "0",
     isActive: true,
@@ -108,6 +108,7 @@ export default function AddCarPage() {
       fd.append("securityDeposit", form.securityDeposit);
       fd.append("doorstepDeliveryCharge", form.doorstepDeliveryCharge);
       fd.append("kmPackage", form.kmPackage);
+      fd.append("extraKmRate", form.extraKmRate || "0");
       fd.append("isActive", String(form.isActive));
       fd.append("documents", JSON.stringify({
         insurance: { expiry: form.insuranceExpiry || null },
@@ -231,6 +232,16 @@ export default function AddCarPage() {
                 />
               </FieldGroup>
             ))}
+            <FieldGroup label="Extra KM Rate (Rs./km)">
+              <input
+                type="number"
+                min="0"
+                value={form.extraKmRate}
+                onChange={update("extraKmRate")}
+                className={inputCls}
+                placeholder="e.g. 6"
+              />
+            </FieldGroup>
           </div>
         </div>
 

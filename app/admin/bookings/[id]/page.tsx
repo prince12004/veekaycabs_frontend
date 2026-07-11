@@ -6,6 +6,8 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { bookingsApi, settingsApi } from "@/lib/api";
 import { downloadInvoicePdf, generateInvoiceBlob } from "@/lib/invoicePdf";
+import { downloadClosingBillPdf, generateClosingBillBlob } from "@/lib/closingBillPdf";
+import type { ClosingBillData } from "@/components/admin/ClosingBillDocument";
 import {
   ArrowLeft, Phone, FileText, Car, User, Calendar, IndianRupee,
   Video, Upload, CheckCircle, XCircle, Clock,
@@ -100,7 +102,19 @@ export default function BookingDetailPage() {
   const [savingVerification, setSavingVerification] = useState(false);
   const [showPickupChecklist, setShowPickupChecklist] = useState(false);
   const [showReturnChecklist, setShowReturnChecklist] = useState(false);
-  const [refundInitiated, setRefundInitiated] = useState(false);
+
+  // Close booking / final settlement bill
+  const [closeBillModalOpen, setCloseBillModalOpen] = useState(false);
+  const [closingForm, setClosingForm] = useState({
+    startingMeter: "", closingMeter: "", kmsLimit: "", extraKmRate: "",
+    actualReturnTime: "", lateHourRate: "",
+    pickupCharges: "", dropCharges: "", fastagStateTax: "", allStateChallan: "",
+    overspeedingFine: "", fuelCharges: "", damageCharges: "", washingCharges: "", notes: "",
+  });
+  const [closingSaving, setClosingSaving] = useState(false);
+  const [downloadingClosingBill, setDownloadingClosingBill] = useState(false);
+  const [sendingClosingBillWhatsApp, setSendingClosingBillWhatsApp] = useState(false);
+  const [markingRefundPaid, setMarkingRefundPaid] = useState(false);
 
   // Media upload
   const pickupInputRef = useRef<HTMLInputElement>(null);
@@ -434,7 +448,11 @@ export default function BookingDetailPage() {
       securityDeposit: rawBooking.securityDeposit ?? 0,
       totalAmount: rawBooking.totalAmount ?? 0,
       amountPaid: rawBooking.amountPaid ?? 0,
-      balanceDue: rawBooking.balanceDue ?? (rawBooking.totalAmount ?? 0) - (rawBooking.amountPaid ?? 0),
+      // Always derive from the totalAmount/amountPaid shown on this same
+      // invoice — never trust the separately-stored balanceDue field, which
+      // can go stale relative to them (e.g. after a later edit) and produce
+      // an invoice whose own numbers don't add up.
+      balanceDue: (rawBooking.totalAmount ?? 0) - (rawBooking.amountPaid ?? 0),
       mode: booking.payment.mode,
       status: booking.payment.status,
     },
@@ -476,6 +494,168 @@ export default function BookingDetailPage() {
     }
   };
 
+  // ── Close Booking / Final Settlement Bill ───────────────────────────────────
+  const closingBill = rawBooking.closingBill;
+  const isClosed = !!closingBill?.closedAt;
+
+  const openCloseBillModal = () => {
+    const carKmPackage = rawBooking.carId?.kmPackage as string | undefined;
+    const perDayKm = carKmPackage ? parseInt(carKmPackage, 10) || 0 : 0;
+    const defaultLimit = perDayKm ? perDayKm * Math.max(nights, 1) : "";
+    const defaultClosingMeter = returnCondition.odometer || rawBooking.odometerEnd || "";
+    // Pulled from the car's own profile (set when adding/editing the car) —
+    // admin can still override per-closure below.
+    const carExtraKmRate = rawBooking.carId?.extraKmRate;
+    // Actual return time defaults to when "Mark Car Returned" was recorded,
+    // falling back to now — admin can correct it if the car physically came
+    // back at a different time than when this was processed in the system.
+    const toLocal = (d: Date) => {
+      const copy = new Date(d);
+      copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset());
+      return copy.toISOString().slice(0, 16);
+    };
+    const defaultReturnTime = rawBooking.returnCondition?.recordedAt
+      ? toLocal(new Date(rawBooking.returnCondition.recordedAt))
+      : toLocal(new Date());
+    // Hourly rental rate for this car doubles as the default late-hour rate.
+    const carHourlyRate = rawBooking.carId?.regularPrice;
+    setClosingForm({
+      startingMeter: rawBooking.odometerStart != null ? String(rawBooking.odometerStart) : "",
+      closingMeter: String(defaultClosingMeter),
+      kmsLimit: defaultLimit ? String(defaultLimit) : "",
+      extraKmRate: carExtraKmRate ? String(carExtraKmRate) : "",
+      actualReturnTime: defaultReturnTime,
+      lateHourRate: carHourlyRate ? String(carHourlyRate) : "",
+      pickupCharges: "", dropCharges: "", fastagStateTax: "", allStateChallan: "",
+      overspeedingFine: "", fuelCharges: "", damageCharges: "", washingCharges: "", notes: "",
+    });
+    setCloseBillModalOpen(true);
+  };
+
+  const handleCloseBooking = async () => {
+    if (!rawBooking) return;
+    if (rawBooking.odometerStart == null && !closingForm.startingMeter) {
+      toast.error("Enter the starting (pickup) meter reading — it was never recorded for this booking");
+      return;
+    }
+    if (!closingForm.closingMeter) {
+      toast.error("Enter the closing meter reading");
+      return;
+    }
+    setClosingSaving(true);
+    try {
+      const { data } = await bookingsApi.closeBooking(rawBooking._id, closingForm);
+      setRawBooking(data.data);
+      setCloseBillModalOpen(false);
+      const settlement = data.data?.closingBill?.settlementAmount ?? 0;
+      toast.success(
+        settlement > 0 ? `Booking closed — Rs. ${settlement.toLocaleString("en-IN")} due from customer`
+          : settlement < 0 ? `Booking closed — Rs. ${Math.abs(settlement).toLocaleString("en-IN")} refund due`
+            : "Booking closed — fully settled"
+      );
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to close booking");
+    } finally {
+      setClosingSaving(false);
+    }
+  };
+
+  const buildClosingBillData = (): ClosingBillData => ({
+    bookingId: booking.id,
+    billNo: `BILL-${String(booking.id).replace(/\W/g, "").slice(-8).toUpperCase()}`,
+    billDate: closingBill?.closedAt || new Date().toISOString(),
+    customer: booking.customer,
+    car: booking.car,
+    start: booking.start,
+    end: booking.end,
+    nights,
+    meter: {
+      startingMeter: rawBooking.odometerStart || 0,
+      closingMeter: rawBooking.odometerEnd || 0,
+      totalKms: closingBill?.totalKms || 0,
+      kmsLimit: closingBill?.kmsLimit || 0,
+      extraKms: closingBill?.extraKms || 0,
+      extraKmRate: closingBill?.extraKmRate || 0,
+      extraKmCharge: rawBooking.extraKmCharge || 0,
+    },
+    lateReturn: {
+      actualReturnTime: closingBill?.actualReturnTime || "",
+      lateHours: closingBill?.lateHours || 0,
+      lateHourRate: closingBill?.lateHourRate || 0,
+      lateCharges: closingBill?.lateCharges || 0,
+    },
+    charges: {
+      bookingFare: rawBooking.bookingFare ?? 0,
+      gst: rawBooking.gst ?? 0,
+      discount: rawBooking.discount ?? 0,
+      doorstepCharge: rawBooking.doorstepCharge ?? 0,
+      pickupCharges: closingBill?.pickupCharges || 0,
+      dropCharges: closingBill?.dropCharges || 0,
+      fastagStateTax: closingBill?.fastagStateTax || 0,
+      allStateChallan: closingBill?.allStateChallan || 0,
+      overspeedingFine: closingBill?.overspeedingFine || 0,
+      fuelCharges: closingBill?.fuelCharges || 0,
+      damageCharges: closingBill?.damageCharges || 0,
+      washingCharges: closingBill?.washingCharges || 0,
+      totalCharges: closingBill?.totalCharges || 0,
+    },
+    settlement: {
+      advancePaid: closingBill?.advancePaid || 0,
+      settlementAmount: closingBill?.settlementAmount || 0,
+    },
+    notes: closingBill?.notes || "",
+    company: {
+      companyName: companySettings?.companyName || "Veekay Cabs",
+      tagline: companySettings?.tagline,
+      gstNumber: companySettings?.gstNumber,
+      phone1: companySettings?.phone1 || "+91 99999 26867",
+      phone2: companySettings?.phone2,
+      email: companySettings?.email || "sales@veekaycabs.com",
+      website: companySettings?.website || "https://veekaycabs.com",
+      addressDelhi: companySettings?.addressDelhi || "A 13, 1st Floor, Ganesh Nagar, New Delhi 110092",
+    },
+  });
+
+  const handleDownloadClosingBill = async () => {
+    setDownloadingClosingBill(true);
+    try {
+      await downloadClosingBillPdf(buildClosingBillData());
+      toast.success("Final bill PDF downloaded");
+    } catch {
+      toast.error("Failed to generate final bill PDF");
+    } finally {
+      setDownloadingClosingBill(false);
+    }
+  };
+
+  const handleSendClosingBillWhatsApp = async () => {
+    if (!rawBooking) return;
+    setSendingClosingBillWhatsApp(true);
+    try {
+      const blob = await generateClosingBillBlob(buildClosingBillData());
+      await bookingsApi.sendClosingBillWhatsApp(rawBooking._id, blob);
+      toast.success("Final bill sent to customer via WhatsApp!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to send final bill via WhatsApp");
+    } finally {
+      setSendingClosingBillWhatsApp(false);
+    }
+  };
+
+  const handleMarkRefundPaid = async () => {
+    if (!rawBooking) return;
+    setMarkingRefundPaid(true);
+    try {
+      const { data } = await bookingsApi.markRefundPaid(rawBooking._id);
+      setRawBooking(data.data);
+      toast.success("Refund marked as paid");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to update refund status");
+    } finally {
+      setMarkingRefundPaid(false);
+    }
+  };
+
   // Car documents list (dynamic from car data)
   const carDocsList = [
     { key: "rc",        label: "RC (Registration Certificate)", url: booking.car.documents?.rc?.url,        expiry: booking.car.documents?.rc?.expiry },
@@ -511,13 +691,18 @@ export default function BookingDetailPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleSendInvoiceWhatsApp} disabled={sendingInvoiceWhatsApp}
+          <button
+            onClick={isClosed ? handleSendClosingBillWhatsApp : handleSendInvoiceWhatsApp}
+            disabled={isClosed ? sendingClosingBillWhatsApp : sendingInvoiceWhatsApp}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#128C7E] text-white font-semibold text-sm disabled:opacity-60">
-            {sendingInvoiceWhatsApp ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send Invoice via WhatsApp
+            {(isClosed ? sendingClosingBillWhatsApp : sendingInvoiceWhatsApp) ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            {isClosed ? "Send Final Bill via WhatsApp" : "Send Invoice via WhatsApp"}
           </button>
-          <button onClick={handleDownloadInvoice} disabled={generatingInvoice}
+          <button
+            onClick={isClosed ? handleDownloadClosingBill : handleDownloadInvoice}
+            disabled={isClosed ? downloadingClosingBill : generatingInvoice}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm disabled:opacity-60">
-            {generatingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Print
+            {(isClosed ? downloadingClosingBill : generatingInvoice) ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Print
           </button>
           <button onClick={openEditModal}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors">
@@ -556,6 +741,15 @@ export default function BookingDetailPage() {
           <div className="bg-white/15 rounded-xl px-4 py-2">
             <p className="text-white/70 text-xs">Type</p>
             <p className="font-bold">{booking.doorstep ? "Doorstep" : "Office Pickup"}</p>
+          </div>
+          <div className="bg-white/15 rounded-xl px-4 py-2">
+            <p className="text-white/70 text-xs">Payment</p>
+            <p className="font-bold">Rs. {booking.payment.received.toLocaleString("en-IN")} paid</p>
+            {balance > 0 ? (
+              <p className="text-[11px] font-semibold" style={{ color: "#FEF3C7" }}>Rs. {balance.toLocaleString("en-IN")} pending</p>
+            ) : (
+              <p className="text-[11px] font-semibold" style={{ color: "#D1FAE5" }}>Fully paid</p>
+            )}
           </div>
         </div>
       </div>
@@ -1077,20 +1271,257 @@ export default function BookingDetailPage() {
                     className="flex items-center gap-2 btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm disabled:opacity-60">
                     {savingVerification ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Mark Car Returned
                   </button>
-                  {carReturned && !refundInitiated && (
-                    <button onClick={() => setRefundInitiated(true)}
+                  {carReturned && !isClosed && (
+                    <button onClick={openCloseBillModal}
                       className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#EDE9FE] text-[#7C3AED] font-bold text-sm hover:bg-[#7C3AED] hover:text-white transition-colors">
-                      <RefreshCw size={16} /> Initiate Deposit Refund
+                      <FileText size={16} /> Close Booking &amp; Generate Bill
                     </button>
                   )}
-                  {refundInitiated && (
-                    <span className="flex items-center gap-2 px-4 py-3 bg-[#D1FAE5] text-[#065F46] rounded-xl text-sm font-bold">
-                      <CheckCircle size={15} /> Refund Initiated
-                    </span>
-                  )}
                 </div>
+
+                {/* Final settlement summary, once closed */}
+                {isClosed && closingBill && (
+                  <div className="border-t border-[#E4E5EF] pt-5 space-y-3">
+                    <p className="text-sm font-bold text-[#0F0F1A] flex items-center gap-1.5"><FileText size={14} className="text-[#7C3AED]" /> Final Settlement</p>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-[#F8F9FC] rounded-xl p-4">
+                        <p className="text-[10px] font-bold text-[#9090A8] uppercase tracking-wider mb-2">Trip Details</p>
+                        {[
+                          ["Departure Date", fmtDT(booking.start)],
+                          ["Arrival Date", fmtDT(booking.end)],
+                          ["Cab No", booking.car.regNo],
+                          ["Day Rental", `Rs. ${(rawBooking.bookingFare || 0).toLocaleString("en-IN")}`],
+                          ["Advance Payment (Security Deposit)", `Rs. ${(closingBill.advancePaid || 0).toLocaleString("en-IN")}`],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex justify-between items-center py-1.5 text-xs">
+                            <span className="text-[#9090A8]">{label}</span>
+                            <span className="font-semibold text-[#0F0F1A]">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-[#F8F9FC] rounded-xl p-4">
+                        <p className="text-[10px] font-bold text-[#9090A8] uppercase tracking-wider mb-2">Meter &amp; KM</p>
+                        {[
+                          ["Starting Meter", `${(rawBooking.odometerStart || 0).toLocaleString("en-IN")} km`],
+                          ["Closing Meter", `${(rawBooking.odometerEnd || 0).toLocaleString("en-IN")} km`],
+                          ["Total KMs", `${(closingBill.totalKms || 0).toLocaleString("en-IN")} km`],
+                          ["KMs Limit", `${(closingBill.kmsLimit || 0).toLocaleString("en-IN")} km`],
+                          ["Extra KMs", `${(closingBill.extraKms || 0).toLocaleString("en-IN")} km @ Rs. ${closingBill.extraKmRate || 0}/km`],
+                          ["Extra KM Charge", `Rs. ${(rawBooking.extraKmCharge || 0).toLocaleString("en-IN")}`],
+                          ...(closingBill.actualReturnTime ? [["Actual Return", fmtDT(closingBill.actualReturnTime)]] : []),
+                          ...(closingBill.lateHours > 0 ? [["Late Return", `${closingBill.lateHours} hr${closingBill.lateHours !== 1 ? "s" : ""} @ Rs. ${closingBill.lateHourRate || 0}/hr`]] : []),
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex justify-between items-center py-1.5 text-xs">
+                            <span className="text-[#9090A8]">{label}</span>
+                            <span className="font-semibold text-[#0F0F1A]">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#F8F9FC] rounded-xl p-4">
+                      <p className="text-[10px] font-bold text-[#9090A8] uppercase tracking-wider mb-2">Return-Time Charges</p>
+                      {([
+                        ["Late Return Charge", closingBill.lateCharges],
+                        ["Pickup Charges", closingBill.pickupCharges],
+                        ["Drop Charges", closingBill.dropCharges],
+                        ["Fastag / State Tax", closingBill.fastagStateTax],
+                        ["All State Challan", closingBill.allStateChallan],
+                        ["Overspeeding Fine", closingBill.overspeedingFine],
+                        ["Fuel Charges", closingBill.fuelCharges],
+                        ["Damages", closingBill.damageCharges],
+                        ["Washing", closingBill.washingCharges],
+                      ] as Array<[string, number | undefined]>).map(([label, value]) => (
+                        <div key={label} className="flex justify-between items-center py-1.5 text-xs">
+                          <span className="text-[#9090A8]">{label}</span>
+                          <span className="font-semibold text-[#0F0F1A]">Rs. {(value || 0).toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center pt-2.5 mt-1.5 border-t border-[#E4E5EF] text-sm">
+                        <span className="font-bold text-[#0F0F1A]">Total Charges</span>
+                        <span className="font-black text-[#7C3AED]">Rs. {(closingBill.totalCharges || 0).toLocaleString("en-IN")}</span>
+                      </div>
+                    </div>
+
+                    <div className={cn("flex items-center justify-between p-4 rounded-xl",
+                      closingBill.settlementAmount === 0 ? "bg-[#D1FAE5]" : closingBill.settlementAmount < 0 ? "bg-[#D1FAE5]" : "bg-[#FFF3ED]"
+                    )}>
+                      <span className={cn("text-sm font-bold",
+                        closingBill.settlementAmount <= 0 ? "text-[#065F46]" : "text-[#E8540A]"
+                      )}>
+                        {closingBill.settlementAmount === 0 ? "Fully Settled" : closingBill.settlementAmount < 0 ? "Refund Due to Customer" : "Balance Due from Customer"}
+                      </span>
+                      <span className={cn("text-lg font-black",
+                        closingBill.settlementAmount <= 0 ? "text-[#065F46]" : "text-[#E8540A]"
+                      )}>
+                        Rs. {Math.abs(closingBill.settlementAmount).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="flex gap-3 flex-wrap">
+                      <button onClick={handleDownloadClosingBill} disabled={downloadingClosingBill}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0F0F1A] text-white font-semibold text-sm disabled:opacity-60">
+                        {downloadingClosingBill ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Download Bill PDF
+                      </button>
+                      <button onClick={handleSendClosingBillWhatsApp} disabled={sendingClosingBillWhatsApp}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#128C7E] text-white font-semibold text-sm disabled:opacity-60">
+                        {sendingClosingBillWhatsApp ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send Bill via WhatsApp
+                      </button>
+                      {closingBill.settlementAmount < 0 && !closingBill.refundPaid && (
+                        <button onClick={handleMarkRefundPaid} disabled={markingRefundPaid}
+                          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#EDE9FE] text-[#7C3AED] font-semibold text-sm hover:bg-[#7C3AED] hover:text-white transition-colors disabled:opacity-60">
+                          {markingRefundPaid ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} Mark Refund Paid
+                        </button>
+                      )}
+                      {closingBill.refundPaid && (
+                        <span className="flex items-center gap-2 px-4 py-2.5 bg-[#D1FAE5] text-[#065F46] rounded-xl text-sm font-bold">
+                          <CheckCircle size={15} /> Refund Paid
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {/* Close Booking Modal                                                    */}
+      {/* ══════════════════════════════════════════════════════════════════════ */}
+      {closeBillModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCloseBillModalOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-[#E4E5EF] flex items-center justify-between shrink-0">
+              <h2 className="font-bold text-[#0F0F1A] text-base flex items-center gap-2">
+                <FileText size={16} className="text-[#7C3AED]" /> Close Booking &amp; Generate Bill
+              </h2>
+              <button onClick={() => setCloseBillModalOpen(false)} className="text-[#9090A8] hover:text-[#EF4444]"><XIcon size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              {/* Read-only trip summary — reference while filling the form below */}
+              <div className="bg-[#F8F9FC] rounded-xl p-4 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                {[
+                  ["Guest Name", booking.customer.name],
+                  ["Mobile No.", booking.customer.mobile],
+                  ["Cab No.", booking.car.regNo],
+                  ["Departure Date", fmtDT(booking.start)],
+                  ["Arrival Date", fmtDT(booking.end)],
+                  ["Day Rental", `Rs. ${(rawBooking.bookingFare || 0).toLocaleString("en-IN")}`],
+                  ["Advance Payment (Security Deposit)", `Rs. ${(rawBooking.amountPaid || 0).toLocaleString("en-IN")}`],
+                  ...(rawBooking.odometerStart != null ? [["Starting Meter", `${rawBooking.odometerStart.toLocaleString("en-IN")} km`]] : []),
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <p className="text-[9px] font-bold text-[#9090A8] uppercase tracking-wider">{label}</p>
+                    <p className="text-xs font-semibold text-[#0F0F1A] mt-0.5">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {rawBooking.odometerStart == null && (
+                <div className="bg-[#FEF3C7] border border-[#F59E0B]/40 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-[#92400E] mb-2">
+                    ⚠ Pickup odometer was never recorded for this booking. Enter it below to proceed.
+                  </p>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Starting Meter (km)</label>
+                  <input type="number" min="0" value={closingForm.startingMeter}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, startingMeter: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="e.g. 99719" />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Closing Meter (km)</label>
+                  <input type="number" min="0" value={closingForm.closingMeter}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, closingMeter: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="e.g. 100707" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">KMs Limit</label>
+                  <input type="number" min="0" value={closingForm.kmsLimit}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, kmsLimit: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="e.g. 700" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">
+                    Extra KM Rate (Rs./km) {rawBooking.carId?.extraKmRate ? <span className="text-[#9090A8] font-normal">· from car profile</span> : null}
+                  </label>
+                  <input type="number" min="0" value={closingForm.extraKmRate}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, extraKmRate: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="e.g. 6" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Notes</label>
+                  <input value={closingForm.notes}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, notes: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="Optional" />
+                </div>
+              </div>
+
+              <p className="text-xs font-bold text-[#9090A8] uppercase tracking-wider pt-1">Late Return</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">
+                    Actual Return Date &amp; Time <span className="text-[#9090A8] font-normal">· scheduled {fmtDT(booking.end)}</span>
+                  </label>
+                  <input type="datetime-local" value={closingForm.actualReturnTime}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, actualReturnTime: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">
+                    Late Hour Rate (Rs./hr) {rawBooking.carId?.regularPrice ? <span className="text-[#9090A8] font-normal">· car's hourly rate</span> : null}
+                  </label>
+                  <input type="number" min="0" value={closingForm.lateHourRate}
+                    onChange={(e) => setClosingForm((f) => ({ ...f, lateHourRate: e.target.value }))}
+                    className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="e.g. 110" />
+                </div>
+              </div>
+              {(() => {
+                const scheduledEnd = new Date(booking.end);
+                const actualReturn = closingForm.actualReturnTime ? new Date(closingForm.actualReturnTime) : null;
+                const lateHours = actualReturn && !isNaN(actualReturn.getTime()) && actualReturn > scheduledEnd
+                  ? Math.ceil((actualReturn.getTime() - scheduledEnd.getTime()) / (60 * 60 * 1000)) : 0;
+                const lateCharges = lateHours * (Number(closingForm.lateHourRate) || 0);
+                if (lateHours <= 0) return null;
+                return (
+                  <p className="text-xs text-[#7C3AED] font-semibold -mt-2">
+                    {lateHours} hr{lateHours !== 1 ? "s" : ""} late → Rs. {lateCharges.toLocaleString("en-IN")} late return charge
+                  </p>
+                );
+              })()}
+
+              <p className="text-xs font-bold text-[#9090A8] uppercase tracking-wider pt-1">Return-Time Charges (Rs.)</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {([
+                  ["pickupCharges", "Pickup Charges"],
+                  ["dropCharges", "Drop Charges"],
+                  ["fastagStateTax", "Fastag / State Tax"],
+                  ["allStateChallan", "All State Challan"],
+                  ["overspeedingFine", "Overspeeding Fine"],
+                  ["fuelCharges", "Fuel"],
+                  ["damageCharges", "Damages"],
+                  ["washingCharges", "Washing"],
+                ] as const).map(([key, label]) => (
+                  <div key={key}>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">{label}</label>
+                    <input type="number" min="0" value={closingForm[key]}
+                      onChange={(e) => setClosingForm((f) => ({ ...f, [key]: e.target.value }))}
+                      className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="0" />
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={handleCloseBooking} disabled={closingSaving}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-bold hover:bg-[#6D28D9] transition-colors disabled:opacity-60">
+                {closingSaving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                {closingSaving ? "Closing..." : "Close Booking & Compute Bill"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1297,20 +1728,28 @@ export default function BookingDetailPage() {
           <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5">
             <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2 mb-4"><Shield size={16} className="text-[#E8540A]" /> Quick Actions</h3>
             <div className="space-y-3">
-              <button onClick={handleSendInvoiceWhatsApp} disabled={sendingInvoiceWhatsApp}
+              <button
+                onClick={isClosed ? handleSendClosingBillWhatsApp : handleSendInvoiceWhatsApp}
+                disabled={isClosed ? sendingClosingBillWhatsApp : sendingInvoiceWhatsApp}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F0FDF4] border border-[#10B981]/20 hover:bg-[#D1FAE5] transition-colors text-left disabled:opacity-60">
-                {sendingInvoiceWhatsApp ? <Loader2 size={18} className="text-[#10B981] animate-spin" /> : <Phone size={18} className="text-[#10B981]" />}
+                {(isClosed ? sendingClosingBillWhatsApp : sendingInvoiceWhatsApp) ? <Loader2 size={18} className="text-[#10B981] animate-spin" /> : <Phone size={18} className="text-[#10B981]" />}
                 <div>
-                  <p className="font-semibold text-sm text-[#0F0F1A]">{sendingInvoiceWhatsApp ? "Sending..." : "Send WhatsApp Bill"}</p>
-                  <p className="text-xs text-[#9090A8]">Send invoice PDF to customer via WhatsApp</p>
+                  <p className="font-semibold text-sm text-[#0F0F1A]">
+                    {(isClosed ? sendingClosingBillWhatsApp : sendingInvoiceWhatsApp) ? "Sending..." : isClosed ? "Send Final Bill" : "Send WhatsApp Bill"}
+                  </p>
+                  <p className="text-xs text-[#9090A8]">{isClosed ? "Send final settlement bill (with refund/due) to customer via WhatsApp" : "Send invoice PDF to customer via WhatsApp"}</p>
                 </div>
               </button>
-              <button onClick={handleDownloadInvoice} disabled={generatingInvoice}
+              <button
+                onClick={isClosed ? handleDownloadClosingBill : handleDownloadInvoice}
+                disabled={isClosed ? downloadingClosingBill : generatingInvoice}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors text-left disabled:opacity-60">
-                {generatingInvoice ? <Loader2 size={18} className="text-[#4A4A6A] animate-spin" /> : <Printer size={18} className="text-[#4A4A6A]" />}
+                {(isClosed ? downloadingClosingBill : generatingInvoice) ? <Loader2 size={18} className="text-[#4A4A6A] animate-spin" /> : <Printer size={18} className="text-[#4A4A6A]" />}
                 <div>
-                  <p className="font-semibold text-sm text-[#0F0F1A]">{generatingInvoice ? "Generating PDF..." : "Print Invoice"}</p>
-                  <p className="text-xs text-[#9090A8]">Download a professional invoice PDF</p>
+                  <p className="font-semibold text-sm text-[#0F0F1A]">
+                    {(isClosed ? downloadingClosingBill : generatingInvoice) ? "Generating PDF..." : isClosed ? "Print Final Bill" : "Print Invoice"}
+                  </p>
+                  <p className="text-xs text-[#9090A8]">{isClosed ? "Download the final settlement bill PDF" : "Download a professional invoice PDF"}</p>
                 </div>
               </button>
             </div>

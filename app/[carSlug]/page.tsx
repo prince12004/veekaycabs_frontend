@@ -81,7 +81,11 @@ export default function CarSlugPage() {
   const [couponData, setCouponData] = useState<{ discountType: string; discountValue: number; maxDiscount?: number; discountAmount?: number } | null>(null);
   const [paymentMode, setPaymentMode] = useState<"token" | "full">("token");
   const [showKmModal, setShowKmModal] = useState(false);
-  const [kmPolicy, setKmPolicy] = useState({ includedKmPerDay: 250, extraKmRate: 12 });
+  // Site-wide defaults, fetched from /api/public/settings. Overridden below
+  // by this specific car's own kmPackage/extraKmRate when it has one set —
+  // otherwise every car would show the same policy regardless of what's
+  // configured on it in Add/Edit Car.
+  const [globalKmPolicy, setGlobalKmPolicy] = useState({ includedKmPerDay: 250, extraKmRate: 12 });
   const [doorstepCharge, setDoorstepCharge] = useState(500);
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryAddressError, setDeliveryAddressError] = useState(false);
@@ -113,7 +117,7 @@ export default function CarSlugPage() {
   useEffect(() => {
     api.get("/api/public/settings").then(({ data }) => {
       if (data?.data) {
-        setKmPolicy({
+        setGlobalKmPolicy({
           includedKmPerDay: data.data.includedKmPerDay || 250,
           extraKmRate: data.data.extraKmRate || 12,
         });
@@ -124,6 +128,17 @@ export default function CarSlugPage() {
       }
     }).catch(() => {});
   }, []);
+
+  // This car's own policy wins over the site-wide default whenever it's set
+  // (Add/Edit Car → Pricing). Falls back to the global setting otherwise.
+  const kmPolicy = {
+    includedKmPerDay: (() => {
+      const perDay = apiCar?.kmPackage ? parseInt(apiCar.kmPackage, 10) : NaN;
+      return Number.isFinite(perDay) && perDay > 0 ? perDay : globalKmPolicy.includedKmPerDay;
+    })(),
+    extraKmRate: apiCar?.extraKmRate > 0 ? apiCar.extraKmRate : globalKmPolicy.extraKmRate,
+  };
+
   // Restore saved state on mount
   useEffect(() => {
     try {

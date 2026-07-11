@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { FileText, RefreshCw, AlertTriangle, X, Printer, Phone, Loader2 } from "lucide-react";
+import { FileText, RefreshCw, AlertTriangle, X, Printer, Phone, Loader2, Camera, ZoomIn } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { cn } from "@/lib/utils";
 import { bookingsAPI } from "@/lib/api";
@@ -48,6 +48,29 @@ const toInputDT = (iso?: string) => {
   return d.toISOString().slice(0, 16);
 };
 
+interface ClosingBill {
+  totalKms?: number;
+  kmsLimit?: number;
+  extraKms?: number;
+  extraKmRate?: number;
+  actualReturnTime?: string;
+  lateHours?: number;
+  lateHourRate?: number;
+  lateCharges?: number;
+  pickupCharges?: number;
+  dropCharges?: number;
+  fastagStateTax?: number;
+  allStateChallan?: number;
+  overspeedingFine?: number;
+  fuelCharges?: number;
+  damageCharges?: number;
+  washingCharges?: number;
+  totalCharges?: number;
+  advancePaid?: number;
+  settlementAmount?: number;
+  closedAt?: string;
+}
+
 interface Booking {
   _id: string;
   bookingId: string;
@@ -60,9 +83,27 @@ interface Booking {
   bookingFare?: number;
   securityDeposit?: number;
   doorstepCharge?: number;
+  extraKmCharge?: number;
   status: string;
   pickupLocation?: string;
+  closingBill?: ClosingBill;
+  pickupCondition?: { recordedAt?: string };
+  returnCondition?: { recordedAt?: string };
 }
+
+interface BookingMediaItem {
+  _id: string;
+  type: "pickup_photos" | "return_photos" | "damage_photos";
+  urls: string[];
+  notes?: string;
+  uploadedAt: string;
+}
+
+const MEDIA_TYPE_LABEL: Record<string, string> = {
+  pickup_photos: "Pickup Photos",
+  return_photos: "Return Photos",
+  damage_photos: "Damage Photos",
+};
 
 export default function BookingHistoryPage() {
   const [activeTab, setActiveTab] = useState<TabType>("Upcoming");
@@ -81,6 +122,11 @@ export default function BookingHistoryPage() {
   const [billBooking, setBillBooking]   = useState<Booking | null>(null);
   const [issueBooking, setIssueBooking] = useState<Booking | null>(null);
   const [issueText, setIssueText]       = useState("");
+
+  const [photosBooking, setPhotosBooking] = useState<Booking | null>(null);
+  const [photoMedia, setPhotoMedia]       = useState<BookingMediaItem[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [lightboxUrl, setLightboxUrl]     = useState<string | null>(null);
 
   const loadBookings = useCallback(async () => {
     setLoading(true);
@@ -126,6 +172,20 @@ export default function BookingHistoryPage() {
       toast.error(e?.response?.data?.message || "Extension not available — please call us");
     } finally {
       setExtendLoading(false);
+    }
+  };
+
+  const openPhotos = async (booking: Booking) => {
+    setPhotosBooking(booking);
+    setPhotoMedia([]);
+    setPhotosLoading(true);
+    try {
+      const { data } = await bookingsAPI.getMedia(booking._id);
+      setPhotoMedia(data.data || []);
+    } catch {
+      toast.error("Failed to load photos");
+    } finally {
+      setPhotosLoading(false);
     }
   };
 
@@ -246,6 +306,14 @@ export default function BookingHistoryPage() {
                           >
                             <FileText size={12} /> Bill
                           </button>
+                          {booking.pickupCondition?.recordedAt && (
+                            <button
+                              onClick={() => openPhotos(booking)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-[#4A4A6A] text-xs font-semibold hover:border-[#6D28D9]/50 hover:text-[#6D28D9] transition-all"
+                            >
+                              <Camera size={12} /> Photos
+                            </button>
+                          )}
                           {(booking.status === "confirmed" || booking.status === "active") && (
                             <button
                               onClick={() => { setExtendBooking(booking); setNewEndTime(toInputDT(booking.endTime)); setExtendPreview(null); }}
@@ -362,6 +430,56 @@ export default function BookingHistoryPage() {
                   </p>
                 </div>
               </div>
+
+              {billBooking.status === "completed" && billBooking.closingBill?.closedAt && (() => {
+                const cb = billBooking.closingBill!;
+                const settlement = cb.settlementAmount ?? 0;
+                const extraRows = ([
+                  ["Extra KM Charges", billBooking.extraKmCharge],
+                  ["Late Return Charges", cb.lateCharges],
+                  ["Pickup Charges", cb.pickupCharges],
+                  ["Drop Charges", cb.dropCharges],
+                  ["Fastag / State Tax", cb.fastagStateTax],
+                  ["All State Challan", cb.allStateChallan],
+                  ["Overspeeding Fine", cb.overspeedingFine],
+                  ["Fuel Charges", cb.fuelCharges],
+                  ["Damages", cb.damageCharges],
+                  ["Washing", cb.washingCharges],
+                ] as Array<[string, number | undefined]>).filter(([, v]) => (v || 0) > 0);
+                return (
+                  <div className="border border-[#E4E5EF] rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-[#F8F9FC] text-xs font-bold text-[#0F0F1A] flex items-center gap-1.5">
+                      <FileText size={12} className="text-[#7C3AED]" /> Final Settlement
+                    </div>
+                    {typeof cb.totalKms === "number" && (
+                      <div className="flex justify-between px-4 py-2 border-b border-[#E4E5EF] text-xs">
+                        <span className="text-[#4A4A6A]">Total KMs Driven</span>
+                        <span className="font-semibold text-[#0F0F1A]">
+                          {cb.totalKms.toLocaleString("en-IN")} km {cb.kmsLimit ? `(limit ${cb.kmsLimit.toLocaleString("en-IN")} km)` : ""}
+                        </span>
+                      </div>
+                    )}
+                    {(cb.lateHours || 0) > 0 && (
+                      <div className="flex justify-between px-4 py-2 border-b border-[#E4E5EF] text-xs">
+                        <span className="text-[#4A4A6A]">Late Return</span>
+                        <span className="font-semibold text-[#0F0F1A]">{cb.lateHours} hr{cb.lateHours !== 1 ? "s" : ""} @ Rs. {cb.lateHourRate || 0}/hr</span>
+                      </div>
+                    )}
+                    {extraRows.map(([label, value]) => (
+                      <div key={label} className="flex justify-between px-4 py-2 border-b border-[#E4E5EF] text-xs">
+                        <span className="text-[#4A4A6A]">{label}</span>
+                        <span className="font-semibold text-[#0F0F1A]">Rs. {(value || 0).toLocaleString("en-IN")}</span>
+                      </div>
+                    ))}
+                    <div className={cn("flex justify-between px-4 py-3 font-bold text-sm",
+                      settlement === 0 ? "bg-[#D1FAE5] text-[#065F46]" : settlement < 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FFF3ED] text-[#E8540A]"
+                    )}>
+                      <span>{settlement === 0 ? "Fully Settled" : settlement < 0 ? "Refund Due to You" : "Balance Paid on Return"}</span>
+                      <span>Rs. {Math.abs(settlement).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[#9090A8]">Status</span>
@@ -505,6 +623,72 @@ export default function BookingHistoryPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Photos Modal ── */}
+      {photosBooking && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto" onClick={() => setPhotosBooking(null)}>
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl my-4 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-[#E4E5EF] flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Vehicle Condition Photos</h3>
+                <p className="text-[#9090A8] text-xs mt-0.5">#{photosBooking.bookingId} · {photosBooking.carId?.name}</p>
+              </div>
+              <button onClick={() => setPhotosBooking(null)} className="text-[#9090A8] hover:text-[#0F0F1A]"><X size={18} /></button>
+            </div>
+
+            <div className="p-5 space-y-5 overflow-y-auto">
+              {photosLoading ? (
+                <div className="flex items-center justify-center py-16 gap-3 text-[#9090A8]">
+                  <Loader2 className="animate-spin" size={20} /> Loading photos...
+                </div>
+              ) : photoMedia.length === 0 ? (
+                <div className="text-center py-16">
+                  <Camera size={32} className="mx-auto mb-2 text-[#9090A8] opacity-40" />
+                  <p className="text-[#9090A8] text-sm">Photos not uploaded yet.</p>
+                </div>
+              ) : (
+                ["pickup_photos", "return_photos", "damage_photos"].map((type) => {
+                  const group = photoMedia.filter((m) => m.type === type);
+                  if (!group.length) return null;
+                  const urls = group.flatMap((m) => m.urls);
+                  return (
+                    <div key={type}>
+                      <p className="text-xs font-bold text-[#4A4A6A] uppercase tracking-wider mb-2">{MEDIA_TYPE_LABEL[type]}</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {urls.map((url, i) => (
+                          <button
+                            key={`${type}-${i}`}
+                            onClick={() => setLightboxUrl(url)}
+                            className="relative aspect-square rounded-xl overflow-hidden bg-[#F1F2F7] group"
+                          >
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                              <ZoomIn size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button onClick={() => setLightboxUrl(null)} className="absolute top-5 right-5 text-white/80 hover:text-white">
+            <X size={26} />
+          </button>
+          <img src={lightboxUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </PageLayout>

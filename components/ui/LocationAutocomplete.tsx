@@ -2,31 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { MapPin, Loader2 } from "lucide-react";
-
-// ── Load Google Maps script once globally ────────────────────────────────────
-let scriptLoaded = false;
-let scriptLoading = false;
-const callbacks: (() => void)[] = [];
-
-function loadGoogleMaps(): Promise<void> {
-  return new Promise((resolve) => {
-    if (scriptLoaded) { resolve(); return; }
-    callbacks.push(resolve);
-    if (scriptLoading) return;
-    scriptLoading = true;
-    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "";
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=en`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      scriptLoaded = true;
-      callbacks.forEach((cb) => cb());
-      callbacks.length = 0;
-    };
-    document.head.appendChild(script);
-  });
-}
+import { loadGoogleMaps } from "@/lib/googleMaps";
 
 // ── Debounce helper ──────────────────────────────────────────────────────────
 function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number) {

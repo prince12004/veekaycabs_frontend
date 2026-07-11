@@ -197,7 +197,7 @@ export default function AdminBookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-[#F8F9FC] border-b border-[#E4E5EF]">
-                  {["Booking ID", "Customer", "Car", "Period", "Amount", "Paid", "Mode", "Status", "Action"].map(h => (
+                  {["Booking ID", "Customer", "Car", "Period", "Amount", "Paid", "Due", "Mode", "Status", "Action"].map(h => (
                     <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-widest text-[#9090A8]">{h}</th>
                   ))}
                 </tr>
@@ -222,13 +222,22 @@ export default function AdminBookingsPage() {
                         <p className="text-[#4A4A6A] text-xs">{fmtDate(b.startTime)}</p>
                         <p className="text-[#9090A8] text-xs">→ {fmtDate(b.endTime)}</p>
                       </td>
-                      <td className="px-4 py-4 font-bold text-[#0F0F1A] text-sm">
+                      <td className="px-4 py-4 font-bold text-[#0F0F1A] text-sm whitespace-nowrap">
                         Rs. {b.totalAmount?.toLocaleString("en-IN")}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`text-xs font-semibold ${b.amountPaid >= b.totalAmount ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
                           Rs. {b.amountPaid?.toLocaleString("en-IN")}
                         </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {(b.totalAmount - b.amountPaid) > 0 ? (
+                          <span className="text-xs font-bold text-[#EF4444]">
+                            Rs. {(b.totalAmount - b.amountPaid).toLocaleString("en-IN")}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-[#10B981]">Paid</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-[#4A4A6A] text-xs">{fmtMode(b.paymentMode)}</td>
                       <td className="px-4 py-4">

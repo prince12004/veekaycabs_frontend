@@ -81,6 +81,10 @@ export const bookingsApi = {
     adminApi.patch(`/api/admin/bookings/${id}/status`, data),
   updateVerification: (id: string, stage: "pickup" | "return", condition: Record<string, unknown>) =>
     adminApi.patch(`/api/admin/bookings/${id}/verification`, { stage, condition }),
+  closeBooking: (id: string, data: Record<string, unknown>) =>
+    adminApi.patch(`/api/admin/bookings/${id}/close`, data),
+  markRefundPaid: (id: string) =>
+    adminApi.patch(`/api/admin/bookings/${id}/refund-paid`),
   update: (id: string, data: Record<string, unknown>) =>
     adminApi.put(`/api/admin/bookings/${id}`, data),
   exportCsv: (params?: Record<string, string>) =>
@@ -108,6 +112,14 @@ export const bookingsApi = {
     const formData = new FormData();
     formData.append("file", file, "invoice.pdf");
     return adminApi.post(`/api/admin/bookings/${id}/invoice/send-whatsapp`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  // Upload closing/final-settlement bill PDF + send to customer via WhatsApp
+  sendClosingBillWhatsApp: (id: string, file: Blob) => {
+    const formData = new FormData();
+    formData.append("file", file, "final-bill.pdf");
+    return adminApi.post(`/api/admin/bookings/${id}/closing-bill/send-whatsapp`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
@@ -183,6 +195,7 @@ export const bookingsAPI = {
   getMy: (params?: Record<string, string>) =>
     api.get("/api/bookings/my", { params }),
   getById: (id: string) => api.get(`/api/bookings/${id}`),
+  getMedia: (id: string) => api.get(`/api/bookings/${id}/media`),
   extend: (id: string, data: Record<string, unknown>) =>
     api.post(`/api/bookings/${id}/extend`, data),
   cancel: (id: string, reason: string) =>

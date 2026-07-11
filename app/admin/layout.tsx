@@ -8,13 +8,16 @@ import {
   Link as LinkIcon, Navigation, BarChart3, BookOpen, Tag,
   MapPin, MessageSquare, LogOut, Menu, X,
   Plus, List, Info, Share2, Globe, Bell, Search,
-  ChevronRight, Activity, ExternalLink, ShieldCheck, Wrench
+  ChevronRight, Activity, ExternalLink, ShieldCheck, Wrench,
+  type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminDashboardAPI } from "@/lib/api";
 
+type NavItem = { href: string; label: string; icon: LucideIcon; badge: number | null; external?: boolean };
+
 // badge keys map to dynamic counts fetched from API
-const buildNavGroups = (counts: Record<string, number>) => [
+const buildNavGroups = (counts: Record<string, number>): { label: string; items: NavItem[] }[] => [
   {
     label: "Overview",
     items: [{ href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null }],
@@ -54,6 +57,7 @@ const buildNavGroups = (counts: Record<string, number>) => [
     label: "Operations",
     items: [
       { href: "/admin/gps", label: "GPS Tracking", icon: Navigation, badge: null },
+      { href: "/display", label: "Public Display", icon: Share2, badge: null, external: true },
       { href: "/admin/reports", label: "Reports", icon: BarChart3, badge: null },
     ],
   },
@@ -180,14 +184,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className="flex-1 h-px bg-white/[0.05]" />
             </div>
             <div className="space-y-0.5">
-              {group.items.map(({ href, label, icon: Icon, badge }) => {
-                const active = pathname === href ||
+              {group.items.map(({ href, label, icon: Icon, badge, external }) => {
+                const active = !external && (pathname === href ||
                   (href !== "/admin/dashboard" && pathname.startsWith(href + "/")) ||
-                  (href !== "/admin/dashboard" && pathname === href);
+                  (href !== "/admin/dashboard" && pathname === href));
                 return (
                   <Link
                     key={href}
                     href={href}
+                    target={external ? "_blank" : undefined}
+                    rel={external ? "noopener noreferrer" : undefined}
                     onClick={() => setSidebarOpen(false)}
                     className={cn(
                       "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all group relative",
