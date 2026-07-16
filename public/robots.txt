@@ -1,8 +1,18 @@
+User-agent: Googlebot
+User-agent: googlebot-image
+User-agent: googlebot-mobile
+User-agent: MSNBot
+User-agent: Slurp
+User-agent: Robozilla
+User-agent: ia_archiver
+User-agent: baiduspider
+
 User-agent: *
+Crawl-delay: 10
+
+Disallow: /login
 Disallow: /admin
 Disallow: /account
-Disallow: /login
 Disallow: /auth
-Allow: /
 
-Sitemap: https://veekaycabs.com/sitemap
+Sitemap: https://veekaycabs.com/sitemap.xml
