@@ -268,7 +268,7 @@ function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
       {/* Car Image */}
       <div
         className={cn(
-          "relative h-48 overflow-hidden bg-gradient-to-br",
+          "relative h-36 overflow-hidden bg-gradient-to-br",
           car.gradient
         )}
       >
@@ -288,27 +288,11 @@ function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
             </span>
           </div>
         )}
-        {/* Badge */}
-        <div
-          className="absolute top-3 left-3 px-3 py-1 rounded-full text-white text-xs font-bold shadow-md"
-          style={{ backgroundColor: car.badgeColor }}
-        >
-          {car.badge}
-        </div>
         {/* Rating */}
         <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full">
           <Star size={11} className="text-yellow-400 fill-yellow-400" />
           <span className="text-white text-xs font-semibold">{car.rating}</span>
           <span className="text-white/60 text-xs">({car.reviews})</span>
-        </div>
-        {/* Pills */}
-        <div className="absolute bottom-3 left-3 flex gap-1.5">
-          <span className="bg-black/50 backdrop-blur-sm border border-white/20 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-            {car.fuel}
-          </span>
-          <span className="bg-black/50 backdrop-blur-sm border border-white/20 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-            {car.transmission}
-          </span>
         </div>
       </div>
 
