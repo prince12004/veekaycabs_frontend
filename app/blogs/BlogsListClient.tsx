@@ -77,7 +77,7 @@ export default function BlogsListClient() {
                   <div className="lg:w-1/2 h-64 lg:h-auto bg-gradient-to-br from-[#E8540A]/20 to-[#FF9A3C]/10 flex items-center justify-center relative overflow-hidden" >
                     {featured.coverImage ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={featured.coverImage} alt={featured.title} className="w-full h-full object-cover" style={{ minHeight: "400px" }} />
+                      <img src={featured.coverImage} alt={featured.title} className="w-full h-full object-cover" style={{ height: "400px" }} />
                     ) : (
                       <BookOpen size={64} className="text-[#E8540A]/40" />
                     )}
