@@ -107,6 +107,13 @@ export default function DocumentsPage() {
         if (d?.pan?.number)     setPanNum(d.pan.number);
         if (d?.dl?.number)      setDlNum(d.dl.number);
         if (d?.dl?.validity)    setDlValidity(d.dl.validity?.slice(0, 10) || "");
+
+        // Resume at the first not-yet-verified step instead of always
+        // restarting at Aadhaar. currentStep only lived in memory, so a
+        // mobile browser reloading a backgrounded tab wiped progress even
+        // though the backend already had Aadhaar/PAN marked verified.
+        if (d?.pan?.status === "verified") setCurrentStep(2);
+        else if (d?.aadhaar?.status === "verified") setCurrentStep(1);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
