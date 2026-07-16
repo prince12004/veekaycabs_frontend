@@ -19,6 +19,11 @@ export const metadata: Metadata = {
     "self drive car rental delhi, car rental noida, car rental gurgaon, veekay cabs",
   authors: [{ name: "VeekayCabs" }],
   robots: { index: true, follow: true },
+  icons: {
+    icon: "/favi.png",
+    shortcut: "/favi.png",
+    apple: "/favi.png",
+  },
   openGraph: {
     title: "Veekay Cabs - Self Drive Car Rental",
     description: "Book self-drive cars in Delhi NCR starting from Rs. 89/hr",
