@@ -3,19 +3,35 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
 import NumberInputScrollGuard from "@/components/providers/NumberInputScrollGuard";
+import JsonLd from "@/components/seo/JsonLd";
+import { organizationSchema, websiteSchema } from "@/lib/schema";
+import { SITE_URL } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Veekay Cabs - Self Drive Car Rental in Delhi NCR",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Veekay Cabs - Self Drive Car Rental in Delhi NCR",
+    template: "%s | Veekay Cabs",
+  },
   description:
     "Delhi NCR's #1 self-drive car rental platform. Book verified cars at transparent prices. 101+ cars, 2500+ bookings, 24/7 support.",
   keywords:
     "self drive car rental delhi, car rental noida, car rental gurgaon, veekay cabs",
+  authors: [{ name: "VeekayCabs" }],
+  robots: { index: true, follow: true },
   openGraph: {
     title: "Veekay Cabs - Self Drive Car Rental",
     description: "Book self-drive cars in Delhi NCR starting from Rs. 89/hr",
-    url: "https://veekaycabs.com",
-    siteName: "Veekay Cabs",
+    url: SITE_URL,
+    siteName: "VeekayCabs",
+    locale: "en_IN",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@veekaycabs",
+    title: "Veekay Cabs - Self Drive Car Rental",
+    description: "Book self-drive cars in Delhi NCR starting from Rs. 89/hr",
   },
 };
 
@@ -28,6 +44,7 @@ export default function RootLayout({
     <html lang="en">
       <head />
       <body className="antialiased">
+        <JsonLd data={[organizationSchema(), websiteSchema()]} />
         <QueryProvider>
           <NumberInputScrollGuard />
           {children}

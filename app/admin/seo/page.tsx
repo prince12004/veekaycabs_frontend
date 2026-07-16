@@ -1,47 +1,92 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Edit, Trash2, Search, Globe, ArrowLeft, Save, ExternalLink, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Edit, Trash2, Search, Globe, ArrowLeft, Save, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adminCarSeoPagesAPI } from "@/lib/api";
+import toast from "react-hot-toast";
 
-const SEO_PAGES = [
-  { id: 1, pageName: "Self-drive car rental hauz khas", metaTitle: "Self Drive Car Rental in Hauz Khas | Veekay Cabs – Affordable & Easy Booking", keyword: "self-drive car rental hauz khas", description: "Rent a self drive car in Hauz Khas with Veekay Cabs. Choose from a wide range of well-maintained cars, easy online booking, transparent pricing and hassle-free self-drive rentals in Hauz Khas Delhi NCR.", h1Tag: "self drive car rental hauz khas", link: "/self-drive-car-rental-hauz-khas", createdAt: "08-01-2026" },
-  { id: 2, pageName: "Self Drive Car on Rent in Noida Sector 62", metaTitle: "Self Drive Car on Rent in Noida Sector 62 | Veekay Cabs", keyword: "self-drive car on rent in noida sector 62", description: "Rent a self-drive car in Noida Sector 62 with Veekay Cabs. Affordable rates, flexible plans and easy online booking.", h1Tag: "self drive car on rent in noida sector 62", link: "/self-drive-car-rent-noida-sector-62", createdAt: "08-01-2026" },
-  { id: 3, pageName: "Self Drive Car on Rent in Noida Sector 63", metaTitle: "Self Drive Car on Rent in Noida Sector 63 | Veekay Cabs", keyword: "self-drive car on rent in noida sector 63", description: "Book a self-drive car in Noida Sector 63 with Veekay Cabs. Affordable self-drive rentals, flexible plans and easy online booking.", h1Tag: "self drive car on rent in noida sector 63", link: "/self-drive-car-rent-noida-sector-63", createdAt: "08-01-2026" },
-  { id: 4, pageName: "Self Drive Car on Rent in Aerocity Delhi", metaTitle: "Self Drive Car on Rent in Aerocity Delhi | Veekay Cabs", keyword: "self drive car on rent in aerocity delhi", description: "Rent a self-drive car near Aerocity Delhi with Veekay Cabs. Affordable prices, easy booking, clean cars and flexible plans.", h1Tag: "self drive car on rent in aerocity delhi", link: "/self-drive-car-rent-aerocity-delhi", createdAt: "06-01-2026" },
-];
+interface SeoPage {
+  _id: string;
+  pageName: string;
+  pageSlug: string;
+  metaTitle: string;
+  metaKeywords?: string;
+  metaDescription: string;
+  h1Tag?: string;
+  createdAt: string;
+}
 
 interface PageForm { pageName: string; metaTitle: string; keyword: string; description: string; h1Tag: string; link: string }
 const emptyForm: PageForm = { pageName: "", metaTitle: "", keyword: "", description: "", h1Tag: "", link: "" };
 const inputCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
 
 export default function SeoPage() {
-  const [pages, setPages] = useState(SEO_PAGES);
+  const [pages, setPages] = useState<SeoPage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"list" | "add" | "edit">("list");
   const [form, setForm] = useState<PageForm>(emptyForm);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
-  const filtered = pages.filter(p => !search || p.pageName.toLowerCase().includes(search.toLowerCase()) || p.keyword.toLowerCase().includes(search.toLowerCase()));
+  const loadPages = () => {
+    setLoading(true);
+    adminCarSeoPagesAPI.getAll()
+      .then(({ data }) => setPages(data?.data || []))
+      .catch(() => toast.error("Failed to load SEO pages"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadPages(); }, []);
+
+  const filtered = pages.filter(p => !search || p.pageName.toLowerCase().includes(search.toLowerCase()) || (p.metaKeywords || "").toLowerCase().includes(search.toLowerCase()));
 
   const update = (f: keyof PageForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm(p => ({ ...p, [f]: e.target.value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editId !== null) {
-      setPages(prev => prev.map(p => p.id === editId ? { ...p, ...form } : p));
-    } else {
-      setPages(prev => [...prev, { id: Date.now(), ...form, createdAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) }]);
+    setSaving(true);
+    const payload = {
+      pageName: form.pageName,
+      pageSlug: form.link.replace(/^\/+/, ""),
+      metaTitle: form.metaTitle,
+      metaKeywords: form.keyword,
+      metaDescription: form.description,
+      h1Tag: form.h1Tag,
+    };
+    try {
+      if (editId !== null) {
+        await adminCarSeoPagesAPI.update(editId, payload);
+        toast.success("Page updated");
+      } else {
+        await adminCarSeoPagesAPI.create(payload);
+        toast.success("SEO page created");
+      }
+      setForm(emptyForm); setEditId(null); setView("list");
+      loadPages();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to save page");
+    } finally {
+      setSaving(false);
     }
-    setForm(emptyForm); setEditId(null); setView("list");
   };
 
-  const startEdit = (p: (typeof SEO_PAGES)[0]) => {
-    setForm({ pageName: p.pageName, metaTitle: p.metaTitle, keyword: p.keyword, description: p.description, h1Tag: p.h1Tag, link: p.link });
-    setEditId(p.id); setView("edit");
+  const startEdit = (p: SeoPage) => {
+    setForm({ pageName: p.pageName, metaTitle: p.metaTitle, keyword: p.metaKeywords || "", description: p.metaDescription, h1Tag: p.h1Tag || "", link: p.pageSlug });
+    setEditId(p._id); setView("edit");
   };
 
-  const deletePage = (id: number) => setPages(prev => prev.filter(p => p.id !== id));
+  const deletePage = async (id: string) => {
+    if (!confirm("Delete this SEO page?")) return;
+    try {
+      await adminCarSeoPagesAPI.remove(id);
+      setPages(prev => prev.filter(p => p._id !== id));
+      toast.success("Page deleted");
+    } catch {
+      toast.error("Failed to delete page");
+    }
+  };
 
   if (view === "add" || view === "edit") {
     return (
@@ -53,7 +98,7 @@ export default function SeoPage() {
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-[#E4E5EF] p-6 space-y-4">
           {[
             { field: "pageName" as const, label: "Page Name", placeholder: "Self-drive car rental in Delhi" },
-            { field: "link" as const, label: "Page Link (Slug)", placeholder: "/self-drive-car-rental-delhi" },
+            { field: "link" as const, label: "Page Slug", placeholder: "self-drive-car-rental-delhi" },
             { field: "metaTitle" as const, label: "Meta Title (60 chars)", placeholder: "Self Drive Car Rental in Delhi | Veekay Cabs" },
             { field: "keyword" as const, label: "Meta Keyword", placeholder: "self drive car rental delhi" },
             { field: "h1Tag" as const, label: "H1 Tag", placeholder: "self drive car rental in delhi" },
@@ -69,7 +114,9 @@ export default function SeoPage() {
             <p className="text-xs text-[#9090A8] mt-1">{form.description.length}/150 characters</p>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm"><Save size={16} /> {view === "edit" ? "Update Page" : "Add SEO Page"}</button>
+            <button type="submit" disabled={saving} className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm disabled:opacity-60">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {view === "edit" ? "Update Page" : "Add SEO Page"}
+            </button>
             <button type="button" onClick={() => { setView("list"); setForm(emptyForm); }} className="px-6 py-3.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm">Cancel</button>
           </div>
         </form>
@@ -95,6 +142,11 @@ export default function SeoPage() {
         </div>
       </div>
       <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={24} className="animate-spin text-[#E8540A]" />
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -106,7 +158,7 @@ export default function SeoPage() {
             </thead>
             <tbody>
               {filtered.map((p, i) => (
-                <tr key={p.id} className={cn("border-b border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors", i % 2 === 1 ? "bg-[#F8F9FC]/50" : "")}>
+                <tr key={p._id} className={cn("border-b border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors", i % 2 === 1 ? "bg-[#F8F9FC]/50" : "")}>
                   <td className="px-4 py-4 text-[#9090A8] text-sm">{i + 1}</td>
                   <td className="px-4 py-4 max-w-[200px]">
                     <p className="font-semibold text-sm text-[#0F0F1A] line-clamp-2">{p.pageName}</p>
@@ -115,22 +167,22 @@ export default function SeoPage() {
                     <p className="text-xs text-[#4A4A6A] line-clamp-2">{p.metaTitle}</p>
                   </td>
                   <td className="px-4 py-4">
-                    <p className="text-xs text-[#4A4A6A] max-w-[150px] truncate">{p.keyword}</p>
+                    <p className="text-xs text-[#4A4A6A] max-w-[150px] truncate">{p.metaKeywords}</p>
                   </td>
                   <td className="px-4 py-4">
                     <p className="text-xs text-[#4A4A6A] max-w-[150px] truncate">{p.h1Tag}</p>
                   </td>
                   <td className="px-4 py-4">
-                    <a href={`https://veekaycabs.com${p.link}`} target="_blank" rel="noreferrer"
+                    <a href={`https://veekaycabs.com/seo/${p.pageSlug}`} target="_blank" rel="noreferrer"
                       className="flex items-center gap-1 text-xs text-[#E8540A] font-mono hover:underline">
-                      <Globe size={11} /> {p.link} <ExternalLink size={10} />
+                      <Globe size={11} /> /seo/{p.pageSlug} <ExternalLink size={10} />
                     </a>
                   </td>
-                  <td className="px-4 py-4 text-xs text-[#9090A8]">{p.createdAt}</td>
+                  <td className="px-4 py-4 text-xs text-[#9090A8]">{new Date(p.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
                   <td className="px-4 py-4">
                     <div className="flex gap-1.5">
                       <button onClick={() => startEdit(p)} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center"><Edit size={13} /></button>
-                      <button onClick={() => deletePage(p.id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center"><Trash2 size={13} /></button>
+                      <button onClick={() => deletePage(p._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center"><Trash2 size={13} /></button>
                     </div>
                   </td>
                 </tr>
@@ -138,6 +190,7 @@ export default function SeoPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

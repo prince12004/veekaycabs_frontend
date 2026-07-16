@@ -282,6 +282,16 @@ export const carSeoPagesAPI = {
   getBySlug: (slug: string) => api.get(`/api/public/car-seo-pages/${slug}`),
 };
 
+export const adminCarSeoPagesAPI = {
+  getAll: () => adminApi.get("/api/admin/car-seo-pages"),
+  getById: (id: string) => adminApi.get(`/api/admin/car-seo-pages/${id}`),
+  create: (data: Record<string, unknown>) =>
+    adminApi.post("/api/admin/car-seo-pages", data),
+  update: (id: string, data: Record<string, unknown>) =>
+    adminApi.put(`/api/admin/car-seo-pages/${id}`, data),
+  remove: (id: string) => adminApi.delete(`/api/admin/car-seo-pages/${id}`),
+};
+
 export const contactAPI = {
   submit: (data: Record<string, unknown>) => api.post("/api/contact", data),
 };

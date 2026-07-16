@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
 import PageLayout from "@/components/layout/PageLayout";
 import Link from "next/link";
 import { Map } from "lucide-react";
+import { buildMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildMetadata({
+  title: "Sitemap",
+  description: "Browse all pages of VeekayCabs — self-drive car rental, tempo traveller hire, blogs, and legal pages.",
+  path: "/sitemap",
+});
 
 const sitemapData = [
   {
