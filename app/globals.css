@@ -162,3 +162,6 @@ input:focus, select:focus, textarea:focus {
     justify-content: center !important;
   }
 }
+.h-36{
+  height: 12rem !important;
+}

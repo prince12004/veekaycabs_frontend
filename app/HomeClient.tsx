@@ -280,7 +280,7 @@ function CarCard({ car, bookUrl }: { car: HomeCar; bookUrl: string }) {
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.opacity = "0";
           }}
-        />
+/>
         {soldOut && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <span className="bg-[#0F0F1A] text-white text-xs font-bold px-4 py-1.5 rounded-full tracking-wide">
