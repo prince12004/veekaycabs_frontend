@@ -74,10 +74,10 @@ export default function BlogsListClient() {
             {featured && (
               <Link href={`/blogs/${featured.slug}`} className="block mb-10 group">
                 <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] overflow-hidden hover:shadow-[0_12px_40px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all flex flex-col lg:flex-row">
-                  <div className="lg:w-1/2 h-64 lg:h-auto bg-gradient-to-br from-[#E8540A]/20 to-[#FF9A3C]/10 flex items-center justify-center relative overflow-hidden">
+                  <div className="lg:w-1/2 h-64 lg:h-auto bg-gradient-to-br from-[#E8540A]/20 to-[#FF9A3C]/10 flex items-center justify-center relative overflow-hidden" >
                     {featured.coverImage ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={featured.coverImage} alt={featured.title} className="w-full h-full object-cover" />
+                      <img src={featured.coverImage} alt={featured.title} className="w-full h-full object-cover" style={{ minHeight: "400px" }} />
                     ) : (
                       <BookOpen size={64} className="text-[#E8540A]/40" />
                     )}
