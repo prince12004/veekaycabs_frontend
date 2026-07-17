@@ -156,7 +156,8 @@ export const adminCarsApi = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
   remove: (id: string) => adminApi.delete(`/api/admin/cars/${id}`),
-  toggleStatus: (id: string) => adminApi.patch(`/api/admin/cars/${id}/toggle`),
+  toggleStatus: (id: string, data?: { from?: string; to?: string; reason?: string }) =>
+    adminApi.patch(`/api/admin/cars/${id}/toggle`, data),
   getExpiryAlerts: () => adminApi.get("/api/admin/cars/expiry-alerts"),
   uploadDocument: (id: string, docType: string, formData: FormData) =>
     adminApi.patch(`/api/admin/cars/${id}/documents/${docType}`, formData, {

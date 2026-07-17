@@ -138,24 +138,10 @@ function CarGridCard({
             </span>
           </div>
         )}
-        <div
-          className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full text-white text-[10px] font-bold shadow"
-          style={{ backgroundColor: car.badgeColor }}
-        >
-          {car.badge}
-        </div>
         <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/50 backdrop-blur-sm px-2 py-1 rounded-full">
           <Star size={10} className="text-yellow-400 fill-yellow-400" />
           <span className="text-white text-[11px] font-bold">{car.rating}</span>
           <span className="text-white/60 text-[10px]">({car.reviews})</span>
-        </div>
-        <div className="absolute bottom-3 left-3 flex gap-1">
-          <span className="bg-black/50 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-            {car.fuel}
-          </span>
-          <span className="bg-black/50 backdrop-blur-sm text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-            {car.transmission}
-          </span>
         </div>
       </div>
 

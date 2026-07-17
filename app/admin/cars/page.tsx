@@ -2,14 +2,87 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench, ChevronLeft, ChevronRight, X, Check } from "lucide-react";
 import { adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import CarMaintenanceModal from "@/components/admin/CarMaintenanceModal";
+import DatePicker from "@/components/ui/DatePicker";
 
 const PAGE_SIZE = 20;
 
 type StatusTab = "all" | "active" | "inactive" | "expiry";
+
+const fmtShort = (iso?: string) => iso ? new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+
+// "17 Jul 2026 – 28 Jul 2026" or "From 17 Jul 2026" if left open-ended
+const inactiveRangeLabel = (ip?: { from?: string; to?: string }) => {
+  if (!ip?.from) return "";
+  return ip.to ? `${fmtShort(ip.from)} – ${fmtShort(ip.to)}` : `From ${fmtShort(ip.from)}`;
+};
+
+// ─── Deactivate Car Modal — from/to date range + reason, required before a
+// car can be taken off the active fleet ────────────────────────────────────
+function DeactivateCarModal({
+  car, onClose, onConfirm, saving,
+}: { car: any; onClose: () => void; onConfirm: (data: { from: string; to: string; reason: string }) => void; saving: boolean }) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [reason, setReason] = useState("");
+
+  const submit = () => {
+    if (!reason.trim()) {
+      toast.error("Please enter a reason for deactivating this car");
+      return;
+    }
+    onConfirm({ from, to, reason: reason.trim() });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl my-4">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Deactivate Car</h3>
+            <p className="text-[#9090A8] text-xs mt-0.5">{car.name} · {car.registrationNo}</p>
+          </div>
+          <button onClick={onClose} className="text-[#9090A8] hover:text-[#0F0F1A]"><X size={20} /></button>
+        </div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Inactive From</label>
+              <DatePicker value={from} onChange={setFrom} placeholder="Today" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Inactive Until</label>
+              <DatePicker value={to} onChange={setTo} minDate={from || undefined} placeholder="Until reactivated" />
+            </div>
+          </div>
+          <p className="text-[11px] text-[#9090A8] -mt-2">
+            {from
+              ? `Car stays bookable till ${new Date(from + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}, then goes inactive automatically${to ? `; it reactivates automatically after ${new Date(to + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}` : ""}.`
+              : "Leave From blank to deactivate immediately. Leave Until blank to stay inactive until you reactivate it manually."}
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Reason <span className="text-red-500">*</span></label>
+            <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+              placeholder="e.g. Scheduled service, accident repair, document renewal..."
+              className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm outline-none resize-none" />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A] hover:bg-[#F8F9FC]">
+            Cancel
+          </button>
+          <button onClick={submit} disabled={saving}
+            className="flex-1 py-3 rounded-xl bg-[#EF4444] text-white font-bold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
+            {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : <><Check size={14} /> Deactivate</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminCarsPage() {
   const [cars, setCars] = useState<any[]>([]);
@@ -24,6 +97,7 @@ export default function AdminCarsPage() {
   const [total, setTotal] = useState(0);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [maintenanceCarId, setMaintenanceCarId] = useState<string | null>(null);
+  const [deactivatingCar, setDeactivatingCar] = useState<any | null>(null);
 
   // Overall fleet stats (unaffected by the current filter/tab) — fetched
   // once so the summary tiles always show the true totals.
@@ -87,17 +161,30 @@ export default function AdminCarsPage() {
     return { text: "#10B981", bg: "#D1FAE5" };
   };
 
-  const toggleCar = async (carId: string) => {
+  const toggleCar = async (carId: string, data?: { from?: string; to?: string; reason?: string }) => {
     setToggling(carId);
     try {
-      await adminCarsApi.toggleStatus(carId);
+      const { data: res } = await adminCarsApi.toggleStatus(carId, data);
+      if (res.message) toast.success(res.message);
       loadCars();
       loadOverallStats();
-    } catch {
-      toast.error("Failed to update status");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to update status");
     } finally {
       setToggling(null);
     }
+  };
+
+  // Deactivating requires a date range + reason (via modal); reactivating is instant.
+  const handleStatusClick = (car: any) => {
+    if (car.isActive) setDeactivatingCar(car);
+    else toggleCar(car._id);
+  };
+
+  const confirmDeactivate = async (data: { from: string; to: string; reason: string }) => {
+    if (!deactivatingCar) return;
+    await toggleCar(deactivatingCar._id, data);
+    setDeactivatingCar(null);
   };
 
   return (
@@ -229,8 +316,11 @@ export default function AdminCarsPage() {
                       </td>
                       <td className="px-5 py-4">
                         <button
-                          onClick={() => toggleCar(car._id)}
+                          onClick={() => handleStatusClick(car)}
                           disabled={toggling === car._id}
+                          title={car.inactivePeriod?.reason
+                            ? `${car.inactivePeriod.reason}${car.inactivePeriod.from ? ` · From ${fmtShort(car.inactivePeriod.from)}` : ""}${car.inactivePeriod.to ? ` to ${fmtShort(car.inactivePeriod.to)}` : ""}`
+                            : undefined}
                           className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 ${car.isActive ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}
                         >
                           {toggling === car._id
@@ -240,6 +330,16 @@ export default function AdminCarsPage() {
                               : <><ToggleLeft size={14} /> Inactive</>
                           }
                         </button>
+                        {car.inactivePeriod?.reason && (
+                          <div className="mt-1 max-w-[170px]">
+                            <p className="text-[10px] text-[#9090A8] truncate" title={car.inactivePeriod.reason}>
+                              {car.isActive ? "Scheduled inactive" : car.inactivePeriod.reason}
+                            </p>
+                            <p className="text-[10px] text-[#4A4A6A] font-semibold">
+                              {inactiveRangeLabel(car.inactivePeriod)}
+                            </p>
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex gap-2">
@@ -296,6 +396,15 @@ export default function AdminCarsPage() {
           carId={maintenanceCarId}
           onClose={() => setMaintenanceCarId(null)}
           onChanged={loadCars}
+        />
+      )}
+
+      {deactivatingCar && (
+        <DeactivateCarModal
+          car={deactivatingCar}
+          saving={toggling === deactivatingCar._id}
+          onClose={() => setDeactivatingCar(null)}
+          onConfirm={confirmDeactivate}
         />
       )}
     </div>

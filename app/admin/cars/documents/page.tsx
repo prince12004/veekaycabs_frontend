@@ -77,7 +77,7 @@ export default function CarDocumentsPage() {
 
   useEffect(() => {
     setLoadingCars(true);
-    adminCarsApi.getAll({ limit: 200 }).then((res) => {
+    adminCarsApi.getAll({ limit: "all" }).then((res) => {
       setCars(res.data?.data || []);
     }).finally(() => setLoadingCars(false));
   }, []);
@@ -89,7 +89,7 @@ export default function CarDocumentsPage() {
   };
 
   const refreshCar = async (carId: string) => {
-    const res = await adminCarsApi.getAll({ limit: 200 });
+    const res = await adminCarsApi.getAll({ limit: "all" });
     const updated = (res.data?.data || []).find((c: CarItem) => c._id === carId);
     if (updated) {
       setSelectedCar(updated);

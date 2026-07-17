@@ -32,13 +32,18 @@ interface BookingRow {
   createdAt: string;
 }
 
-interface CarOption { _id: string; name: string; registrationNo: string; }
+interface CarOption {
+  _id: string; name: string; registrationNo: string;
+  regularPrice: number; weekendPrice: number; securityDeposit: number;
+}
 
 interface OfflineForm {
   name: string; mobile: string; email: string;
   carId: string;
   pickupLocation: string;
   startTime: string; endTime: string;
+  bookingFare: string;
+  securityDeposit: string;
   amountPaid: string;
   paymentMode: string;
   notes: string;
@@ -48,9 +53,26 @@ const emptyForm: OfflineForm = {
   name: "", mobile: "", email: "",
   carId: "", pickupLocation: "",
   startTime: "", endTime: "",
+  bookingFare: "",
+  securityDeposit: "",
   amountPaid: "0",
   paymentMode: "offline_cash",
   notes: "",
+};
+
+// Suggests rent/security from the selected car + trip duration, mirroring the
+// server's own default calculation — the admin can still overwrite either
+// field before submitting (e.g. a negotiated rate, or security actually
+// collected differing from the car's listed deposit).
+const suggestPricing = (car: CarOption | undefined, startTime: string, endTime: string) => {
+  if (!car || !startTime || !endTime) return null;
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return null;
+  const hours = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
+  const isWeekend = [0, 6].includes(start.getDay());
+  const rate = isWeekend ? car.weekendPrice : car.regularPrice;
+  return { bookingFare: String(hours * rate), securityDeposit: String(car.securityDeposit ?? 0) };
 };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -253,6 +275,10 @@ export default function OfflineBookingsPage() {
   const [billFor, setBillFor] = useState<BookingRow | null>(null);
   const [editFor, setEditFor] = useState<BookingRow | null>(null);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
+  // Tracks the last auto-suggested rent/security so we only overwrite the
+  // fields while the admin hasn't typed a custom value of their own.
+  const autoRent = useRef<string | null>(null);
+  const autoSecurity = useRef<string | null>(null);
 
   // ── Fetch bookings ─────────────────────────────────────────────────────────
   const fetchBookings = useCallback((p = 1, s = "", status = "all") => {
@@ -272,18 +298,35 @@ export default function OfflineBookingsPage() {
 
   useEffect(() => { fetchBookings(1, search, statusFilter); setPage(1); }, [statusFilter]);
 
-  // ── Load cars for dropdown ─────────────────────────────────────────────────
+  // ── Load cars for dropdown — refetched every time the modal opens, so a
+  // car deactivated/activated elsewhere shows up without a page reload ──────
   useEffect(() => {
-    adminCarsApi.getAll({ limit: 200, isActive: "true" })
+    if (!showAddForm) return;
+    adminCarsApi.getAll({ limit: "all", isActive: "true" })
       .then(({ data }) => setCars(data.data || []))
       .catch(() => {});
-  }, []);
+  }, [showAddForm]);
 
   const handleSearch = (val: string) => {
     setSearch(val);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => { setPage(1); fetchBookings(1, val, statusFilter); }, 400);
   };
+
+  // ── Suggest rent/security whenever car or dates change ─────────────────────
+  useEffect(() => {
+    const car = cars.find(c => c._id === form.carId);
+    const suggestion = suggestPricing(car, form.startTime, form.endTime);
+    if (!suggestion) return;
+    setForm(prev => ({
+      ...prev,
+      bookingFare: (prev.bookingFare === "" || prev.bookingFare === autoRent.current) ? suggestion.bookingFare : prev.bookingFare,
+      securityDeposit: (prev.securityDeposit === "" || prev.securityDeposit === autoSecurity.current) ? suggestion.securityDeposit : prev.securityDeposit,
+    }));
+    autoRent.current = suggestion.bookingFare;
+    autoSecurity.current = suggestion.securityDeposit;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.carId, form.startTime, form.endTime, cars]);
 
   // ── Create offline booking ─────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -301,6 +344,8 @@ export default function OfflineBookingsPage() {
         pickupLocation:  form.pickupLocation || "Admin Office",
         startTime:       new Date(form.startTime).toISOString(),
         endTime:         new Date(form.endTime).toISOString(),
+        bookingFare:     form.bookingFare !== "" ? Number(form.bookingFare) : undefined,
+        securityDeposit: form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined,
         amountPaid:      Number(form.amountPaid) || 0,
         paymentMode:     form.paymentMode,
         notes:           form.notes,
@@ -517,6 +562,27 @@ export default function OfflineBookingsPage() {
                     <input type="datetime-local" value={form.endTime} onChange={update("endTime")} required className={inputCls + " pl-9"} />
                   </div>
                 </div>
+              </div>
+
+              {/* Rent & Security — auto-filled from the selected car + duration, editable */}
+              <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Rent (₹)</label>
+                    <div className="relative">
+                      <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                      <input type="number" value={form.bookingFare} onChange={update("bookingFare")} placeholder="0" min="0" className={inputCls + " pl-9"} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Security Deposit (₹)</label>
+                    <div className="relative">
+                      <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                      <input type="number" value={form.securityDeposit} onChange={update("securityDeposit")} placeholder="0" min="0" className={inputCls + " pl-9"} />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-[#9090A8] mt-1.5">Auto-filled from the selected car & duration — edit if the actual rent or security collected is different.</p>
               </div>
 
               {/* Payment */}
