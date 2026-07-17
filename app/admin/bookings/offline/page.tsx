@@ -5,12 +5,13 @@ import {
   Plus, Search, Download, Eye, QrCode, FileText, Phone,
   ChevronLeft, ChevronRight, X, IndianRupee, Calendar,
   Car, User, MapPin, Clock, Printer, Loader2, RefreshCw,
-  Pencil, Check,
+  Pencil, Check, Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bookingsApi, adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import Link from "next/link";
+import { canDelete } from "@/lib/adminPermissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BookingRow {
@@ -274,7 +275,11 @@ export default function OfflineBookingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [billFor, setBillFor] = useState<BookingRow | null>(null);
   const [editFor, setEditFor] = useState<BookingRow | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [canDeleteBooking, setCanDeleteBooking] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { setCanDeleteBooking(canDelete("bookings")); }, []);
   // Tracks the last auto-suggested rent/security so we only overwrite the
   // fields while the admin hasn't typed a custom value of their own.
   const autoRent = useRef<string | null>(null);
@@ -311,6 +316,20 @@ export default function OfflineBookingsPage() {
     setSearch(val);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => { setPage(1); fetchBookings(1, val, statusFilter); }, 400);
+  };
+
+  const deleteBooking = async (b: BookingRow) => {
+    if (!confirm(`Delete booking #${b.bookingId}? It'll disappear from all lists but the record is kept, not erased.`)) return;
+    setDeletingId(b._id);
+    try {
+      await bookingsApi.remove(b._id);
+      toast.success("Booking deleted");
+      fetchBookings(page, search, statusFilter);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to delete booking");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   // ── Suggest rent/security whenever car or dates change ─────────────────────
@@ -471,6 +490,12 @@ export default function OfflineBookingsPage() {
                             className="w-8 h-8 rounded-lg bg-[#DBEAFE] text-[#1E40AF] hover:bg-[#1E40AF] hover:text-white transition-colors flex items-center justify-center">
                             <Eye size={13} />
                           </Link>
+                          {canDeleteBooking && (
+                            <button onClick={() => deleteBooking(b)} disabled={deletingId === b._id} title="Delete"
+                              className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center disabled:opacity-50">
+                              {deletingId === b._id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

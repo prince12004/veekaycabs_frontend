@@ -77,6 +77,7 @@ export const bookingsApi = {
   getAll: (params?: Record<string, string | number>) =>
     adminApi.get("/api/admin/bookings", { params }),
   getById: (id: string) => adminApi.get(`/api/admin/bookings/${id}`),
+  remove: (id: string) => adminApi.delete(`/api/admin/bookings/${id}`),
   updateStatus: (id: string, data: { status?: string; amountPaid?: number; notes?: string }) =>
     adminApi.patch(`/api/admin/bookings/${id}/status`, data),
   updateVerification: (id: string, stage: "pickup" | "return", condition: Record<string, unknown>) =>
@@ -241,6 +242,7 @@ export const adminUsersApi = {
   toggleBlock: (id: string) => adminApi.patch(`/api/admin/users/${id}/block`, {}),
   update: (id: string, data: { name?: string; email?: string; mobile?: string; address?: string }) =>
     adminApi.put(`/api/admin/users/${id}`, data),
+  remove: (id: string) => adminApi.delete(`/api/admin/users/${id}`),
   exportCsv: () => adminApi.get("/api/admin/users/export", { responseType: "blob" }),
 };
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import { Plus, Search, Edit, Trash2, Eye, EyeOff, Users, IndianRupee, MapPin } from "lucide-react";
+import { canDelete } from "@/lib/adminPermissions";
 
 interface Tempo {
   _id: string;
@@ -27,9 +28,11 @@ export default function TempoListPage() {
   const [tempos, setTempos] = useState<Tempo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [canDeleteTempo, setCanDeleteTempo] = useState(false);
 
   useEffect(() => {
     fetchTempos();
+    setCanDeleteTempo(canDelete("tempoAdmin"));
   }, []);
 
   const fetchTempos = async () => {
@@ -172,9 +175,11 @@ export default function TempoListPage() {
                         <Link href={`/admin/tempo-admin/edit?id=${tempo._id}`} className="w-8 h-8 rounded-lg bg-[#FEF3C7] flex items-center justify-center text-[#F59E0B] hover:bg-[#F59E0B] hover:text-white transition-all">
                           <Edit size={13} />
                         </Link>
-                        <button onClick={() => handleDelete(tempo._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] flex items-center justify-center text-[#EF4444] hover:bg-[#EF4444] hover:text-white transition-all">
-                          <Trash2 size={13} />
-                        </button>
+                        {canDeleteTempo && (
+                          <button onClick={() => handleDelete(tempo._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] flex items-center justify-center text-[#EF4444] hover:bg-[#EF4444] hover:text-white transition-all">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                         <button onClick={() => handleToggle(tempo._id)} className={`px-3 h-8 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${tempo.isActive ? "bg-[#FEE2E2] text-[#EF4444] hover:bg-[#EF4444] hover:text-white" : "bg-[#D1FAE5] text-[#10B981] hover:bg-[#10B981] hover:text-white"}`}>
                           {tempo.isActive ? <><EyeOff size={11} /> Hide</> : <><Eye size={11} /> Show</>}
                         </button>

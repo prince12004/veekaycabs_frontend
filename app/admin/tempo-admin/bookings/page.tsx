@@ -5,6 +5,7 @@ import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import { Search, Eye, Edit, Trash2, IndianRupee, Calendar, Users } from "lucide-react";
 import Link from "next/link";
+import { canDelete } from "@/lib/adminPermissions";
 
 interface TempoBooking {
   _id: string;
@@ -36,9 +37,11 @@ export default function TempoBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [canDeleteBooking, setCanDeleteBooking] = useState(false);
 
   useEffect(() => {
     fetchBookings();
+    setCanDeleteBooking(canDelete("tempoAdmin"));
   }, [statusFilter]);
 
   const fetchBookings = async () => {
@@ -184,9 +187,11 @@ export default function TempoBookingsPage() {
                           >
                             <Eye size={11} /> View
                           </Link>
-                          <button onClick={() => handleDelete(b._id)} className="w-7 h-7 rounded-lg bg-[#FEE2E2] flex items-center justify-center text-[#EF4444] hover:bg-[#EF4444] hover:text-white transition-all">
-                            <Trash2 size={12} />
-                          </button>
+                          {canDeleteBooking && (
+                            <button onClick={() => handleDelete(b._id)} className="w-7 h-7 rounded-lg bg-[#FEE2E2] flex items-center justify-center text-[#EF4444] hover:bg-[#EF4444] hover:text-white transition-all">
+                              <Trash2 size={12} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -73,8 +73,8 @@ const ROLES = [
 const SECTIONS = [
   { key: "dashboard",  label: "Dashboard",          ops: ["view"] as const },
   { key: "fleet",      label: "Fleet / Cars",        ops: ["view","add","edit","delete"] as const },
-  { key: "bookings",   label: "Bookings",             ops: ["view","add","edit"] as const },
-  { key: "users",      label: "Users & KYC",          ops: ["view","edit"] as const },
+  { key: "bookings",   label: "Bookings",             ops: ["view","add","edit","delete"] as const },
+  { key: "users",      label: "Users & KYC",          ops: ["view","edit","delete"] as const },
   { key: "finance",    label: "Finance",              ops: ["view"] as const },
   { key: "settings",   label: "Settings",             ops: ["view","edit"] as const },
   { key: "tempoAdmin", label: "Tempo Admin",          ops: ["view","add","edit","delete"] as const },
@@ -123,12 +123,18 @@ const roleDefaultPerms = (roleId: string): Permissions => {
   const base = buildDefaultPerms(false);
   const rc = ROLES.find(r => r.id === roleId);
   if (!rc) return base;
-  // Apply section-level access from ROLES config, then auto-grant CRUD ops for accessible sections
+  // Apply section-level access from ROLES config, then auto-grant CRUD ops for
+  // accessible sections — except "delete", which stays off by default for
+  // every role except Super Admin. A super admin has to explicitly tick the
+  // Del checkbox to hand delete access to anyone else.
   Object.entries(rc.permissions).forEach(([key, allowed]) => {
     base[key] = !!allowed;
     if (allowed) {
       const sec = SECTIONS.find(s => s.key === key);
-      sec?.ops.forEach(op => { base[`${key}_${op}`] = true; });
+      sec?.ops.forEach(op => {
+        if (op === "delete" && roleId !== "super_admin") return;
+        base[`${key}_${op}`] = true;
+      });
     }
   });
   return base;

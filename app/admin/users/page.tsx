@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search, Shield, ShieldOff, Eye, Users, CheckCircle, Clock,
   XCircle, X, Loader2, RefreshCw, Phone, Mail, Calendar,
-  FileText, Car, ChevronLeft, ChevronRight, Pencil, Save, Download,
+  FileText, Car, ChevronLeft, ChevronRight, Pencil, Save, Download, Trash2,
 } from "lucide-react";
 import { adminUsersApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import { canDelete } from "@/lib/adminPermissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface UserRow {
@@ -75,7 +76,11 @@ export default function AdminUsersPage() {
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "", address: "" });
   const [editSaving, setEditSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [canDeleteUser, setCanDeleteUser] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => { setCanDeleteUser(canDelete("users")); }, []);
 
   // ── Fetch users ─────────────────────────────────────────────────────────────
   const fetchUsers = useCallback((p = 1, s = "", kyc = "all") => {
@@ -120,6 +125,23 @@ export default function AdminUsersPage() {
       toast.error("Failed to update user status");
     } finally {
       setBlockingId(null);
+    }
+  };
+
+  // ── Delete user (soft) ──────────────────────────────────────────────────────
+  const deleteUser = async (user: UserRow) => {
+    if (!confirm(`Delete "${user.name}"? Their account and booking history are kept, but they'll no longer be able to log in or appear in this list.`)) return;
+    setDeletingId(user._id);
+    try {
+      await adminUsersApi.remove(user._id);
+      setUsers(prev => prev.filter(u => u._id !== user._id));
+      setTotal(t => t - 1);
+      toast.success("User deleted");
+      if (detailUser?.user._id === user._id) setDetailUser(null);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to delete user");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -301,6 +323,12 @@ export default function AdminUsersPage() {
                               user.isBlocked ? "bg-[#D1FAE5] text-[#065F46] hover:bg-[#10B981] hover:text-white" : "bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white")}>
                             {blockingId === user._id ? <Loader2 size={14} className="animate-spin" /> : user.isBlocked ? <Shield size={14} /> : <ShieldOff size={14} />}
                           </button>
+                          {canDeleteUser && (
+                            <button onClick={() => deleteUser(user)} disabled={deletingId === user._id} title="Delete"
+                              className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center disabled:opacity-50">
+                              {deletingId === user._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

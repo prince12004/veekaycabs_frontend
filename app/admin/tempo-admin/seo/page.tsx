@@ -5,6 +5,7 @@ import Link from "next/link";
 import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import { Plus, Search, Edit, Trash2, ExternalLink, Globe } from "lucide-react";
+import { canDelete } from "@/lib/adminPermissions";
 
 interface SeoPage {
   _id: string;
@@ -21,9 +22,11 @@ export default function TempoSeoListPage() {
   const [pages, setPages] = useState<SeoPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [canDeletePage, setCanDeletePage] = useState(false);
 
   useEffect(() => {
     fetchPages();
+    setCanDeletePage(canDelete("tempoAdmin"));
   }, []);
 
   const fetchPages = async () => {
@@ -127,9 +130,11 @@ export default function TempoSeoListPage() {
                         <Link href={`/admin/tempo-admin/seo/add?edit=${page._id}`} className="w-7 h-7 rounded-lg bg-[#FEF3C7] flex items-center justify-center text-[#F59E0B] hover:bg-[#F59E0B] hover:text-white transition-all">
                           <Edit size={12} />
                         </Link>
-                        <button onClick={() => handleDelete(page._id)} className="w-7 h-7 rounded-lg bg-[#FEE2E2] flex items-center justify-center text-[#EF4444] hover:bg-[#EF4444] hover:text-white transition-all">
-                          <Trash2 size={12} />
-                        </button>
+                        {canDeletePage && (
+                          <button onClick={() => handleDelete(page._id)} className="w-7 h-7 rounded-lg bg-[#FEE2E2] flex items-center justify-center text-[#EF4444] hover:bg-[#EF4444] hover:text-white transition-all">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

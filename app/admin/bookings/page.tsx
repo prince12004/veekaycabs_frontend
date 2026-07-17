@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Search, Download, Eye, ChevronLeft, ChevronRight,
-  Calendar, CheckCircle, Activity, Clock, XCircle, PhoneCall, Loader2,
+  Calendar, CheckCircle, Activity, Clock, XCircle, PhoneCall, Loader2, Trash2,
 } from "lucide-react";
 import { bookingsApi } from "@/lib/api";
+import toast from "react-hot-toast";
+import { canDelete } from "@/lib/adminPermissions";
 
 interface Booking {
   _id: string;
@@ -47,6 +49,10 @@ export default function AdminBookingsPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [canDeleteBooking, setCanDeleteBooking] = useState(false);
+
+  useEffect(() => { setCanDeleteBooking(canDelete("bookings")); }, []);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -91,6 +97,21 @@ export default function AdminBookingsPage() {
   const displayed = statusFilter === "Drop-offs"
     ? bookings.filter(isDropOff)
     : bookings;
+
+  const deleteBooking = async (b: Booking) => {
+    if (!confirm(`Delete booking #${b.bookingId || b._id.slice(-8).toUpperCase()}? It'll disappear from all lists but the record is kept, not erased.`)) return;
+    setDeletingId(b._id);
+    try {
+      await bookingsApi.remove(b._id);
+      setBookings(prev => prev.filter(x => x._id !== b._id));
+      setTotal(t => t - 1);
+      toast.success("Booking deleted");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to delete booking");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleExport = async () => {
     try {
@@ -268,6 +289,12 @@ export default function AdminBookingsPage() {
                               Received
                             </a>
                           ) : null}
+                          {canDeleteBooking && (
+                            <button onClick={() => deleteBooking(b)} disabled={deletingId === b._id} title="Delete"
+                              className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center disabled:opacity-50">
+                              {deletingId === b._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

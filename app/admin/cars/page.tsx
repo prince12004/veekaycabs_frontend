@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench, ChevronLeft, ChevronRight, X, Check } from "lucide-react";
+import { Plus, Search, Edit, Eye, ToggleLeft, ToggleRight, AlertTriangle, Car, Loader2, Wrench, ChevronLeft, ChevronRight, X, Check, Trash2 } from "lucide-react";
 import { adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import CarMaintenanceModal from "@/components/admin/CarMaintenanceModal";
 import DatePicker from "@/components/ui/DatePicker";
+import { canDelete } from "@/lib/adminPermissions";
 
 const PAGE_SIZE = 20;
 
@@ -98,6 +99,10 @@ export default function AdminCarsPage() {
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [maintenanceCarId, setMaintenanceCarId] = useState<string | null>(null);
   const [deactivatingCar, setDeactivatingCar] = useState<any | null>(null);
+  const [deletingCarId, setDeletingCarId] = useState<string | null>(null);
+  const [canDeleteCar, setCanDeleteCar] = useState(false);
+
+  useEffect(() => { setCanDeleteCar(canDelete("fleet")); }, []);
 
   // Overall fleet stats (unaffected by the current filter/tab) — fetched
   // once so the summary tiles always show the true totals.
@@ -185,6 +190,23 @@ export default function AdminCarsPage() {
     if (!deactivatingCar) return;
     await toggleCar(deactivatingCar._id, data);
     setDeactivatingCar(null);
+  };
+
+  // Removes the car from the fleet entirely (distinct from Deactivate — no
+  // schedule, no coming back automatically). Soft delete server-side.
+  const deleteCar = async (car: any) => {
+    if (!confirm(`Remove "${car.name}" (${car.registrationNo}) from the fleet? This can't be undone from the UI.`)) return;
+    setDeletingCarId(car._id);
+    try {
+      await adminCarsApi.remove(car._id);
+      toast.success("Car removed from fleet");
+      loadCars();
+      loadOverallStats();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to delete car");
+    } finally {
+      setDeletingCarId(null);
+    }
   };
 
   return (
@@ -352,6 +374,12 @@ export default function AdminCarsPage() {
                           <button onClick={() => setMaintenanceCarId(car._id)} className="w-8 h-8 rounded-lg bg-[#EDE9FE] text-[#6D28D9] hover:bg-[#6D28D9] hover:text-white transition-colors flex items-center justify-center" title="Maintenance">
                             <Wrench size={14} />
                           </button>
+                          {canDeleteCar && (
+                            <button onClick={() => deleteCar(car)} disabled={deletingCarId === car._id} title="Delete"
+                              className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center disabled:opacity-50">
+                              {deletingCarId === car._id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

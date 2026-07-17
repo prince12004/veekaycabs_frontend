@@ -92,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isLoginPage = pathname === "/admin/login";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [adminUser, setAdminUser] = useState<{ name?: string; email?: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -132,7 +132,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isLoginPage) return <>{children}</>;
   if (!authChecked) return null;
 
-  const navGroups = buildNavGroups(counts);
+  // Manage Admins is deliberately not delegable — hide it from anyone who
+  // isn't super_admin (the server independently 403s the API too).
+  const navGroups = buildNavGroups(counts)
+    .map(g => ({ ...g, items: g.items.filter(i => i.href !== "/admin/manage-admins" || adminUser?.role === "super_admin") }))
+    .filter(g => g.items.length > 0);
   const allItems = navGroups.flatMap(g => g.items);
   const currentPage = allItems.find(
     item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"))

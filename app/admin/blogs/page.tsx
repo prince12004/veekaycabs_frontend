@@ -6,6 +6,7 @@ import { Plus, Search, Edit, Trash2, Eye, ImageIcon, ArrowLeft, Save, FileText, 
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { adminBlogsApi } from "@/lib/api";
+import { canDelete } from "@/lib/adminPermissions";
 
 // Loaded only when the add/edit form actually mounts — keeps the list view
 // (and the heavy Quill editor bundle) out of the initial page load.
@@ -48,7 +49,10 @@ export default function BlogsPage() {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [existingCoverImage, setExistingCoverImage] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [canDeleteBlog, setCanDeleteBlog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setCanDeleteBlog(canDelete("content")); }, []);
 
   const fetchBlogs = useCallback(() => {
     setLoading(true);
@@ -407,9 +411,11 @@ export default function BlogsPage() {
                       <button onClick={() => startEdit(blog)} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center" title="Edit">
                         <Edit size={13} />
                       </button>
-                      <button onClick={() => deleteBlog(blog._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center" title="Delete">
-                        <Trash2 size={13} />
-                      </button>
+                      {canDeleteBlog && (
+                        <button onClick={() => deleteBlog(blog._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center" title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

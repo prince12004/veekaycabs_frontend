@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Search, Globe, ArrowLeft, Save, ExternalLink, Loade
 import { cn } from "@/lib/utils";
 import { adminCarSeoPagesAPI } from "@/lib/api";
 import toast from "react-hot-toast";
+import { canDelete } from "@/lib/adminPermissions";
 
 interface SeoPage {
   _id: string;
@@ -29,6 +30,9 @@ export default function SeoPage() {
   const [view, setView] = useState<"list" | "add" | "edit">("list");
   const [form, setForm] = useState<PageForm>(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
+  const [canDeletePage, setCanDeletePage] = useState(false);
+
+  useEffect(() => { setCanDeletePage(canDelete("content")); }, []);
 
   const loadPages = () => {
     setLoading(true);
@@ -182,7 +186,9 @@ export default function SeoPage() {
                   <td className="px-4 py-4">
                     <div className="flex gap-1.5">
                       <button onClick={() => startEdit(p)} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center"><Edit size={13} /></button>
-                      <button onClick={() => deletePage(p._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center"><Trash2 size={13} /></button>
+                      {canDeletePage && (
+                        <button onClick={() => deletePage(p._id)} className="w-8 h-8 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white transition-colors flex items-center justify-center"><Trash2 size={13} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>
