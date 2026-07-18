@@ -5,7 +5,7 @@ import {
   Plus, Search, Download, Eye, QrCode, FileText, Phone,
   ChevronLeft, ChevronRight, X, IndianRupee, Calendar,
   Car, User, MapPin, Clock, Printer, Loader2, RefreshCw,
-  Pencil, Check, Trash2,
+  Pencil, Check, Trash2, Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bookingsApi, adminCarsApi } from "@/lib/api";
@@ -36,6 +36,7 @@ interface BookingRow {
 interface CarOption {
   _id: string; name: string; registrationNo: string;
   regularPrice: number; weekendPrice: number; securityDeposit: number;
+  doorstepDeliveryCharge?: number;
 }
 
 interface OfflineForm {
@@ -45,6 +46,9 @@ interface OfflineForm {
   startTime: string; endTime: string;
   bookingFare: string;
   securityDeposit: string;
+  doorstepDelivery: boolean;
+  deliveryAddress: string;
+  doorstepCharge: string;
   amountPaid: string;
   paymentMode: string;
   notes: string;
@@ -56,6 +60,9 @@ const emptyForm: OfflineForm = {
   startTime: "", endTime: "",
   bookingFare: "",
   securityDeposit: "",
+  doorstepDelivery: false,
+  deliveryAddress: "",
+  doorstepCharge: "",
   amountPaid: "0",
   paymentMode: "offline_cash",
   notes: "",
@@ -75,6 +82,8 @@ const suggestPricing = (car: CarOption | undefined, startTime: string, endTime: 
   const rate = isWeekend ? car.weekendPrice : car.regularPrice;
   return { bookingFare: String(hours * rate), securityDeposit: String(car.securityDeposit ?? 0) };
 };
+
+const DEFAULT_DOORSTEP_CHARGE = 500;
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   active:     { bg: "#DBEAFE", text: "#1E40AF" },
@@ -284,6 +293,7 @@ export default function OfflineBookingsPage() {
   // fields while the admin hasn't typed a custom value of their own.
   const autoRent = useRef<string | null>(null);
   const autoSecurity = useRef<string | null>(null);
+  const autoDoorstep = useRef<string | null>(null);
 
   // ── Fetch bookings ─────────────────────────────────────────────────────────
   const fetchBookings = useCallback((p = 1, s = "", status = "all") => {
@@ -347,11 +357,28 @@ export default function OfflineBookingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.carId, form.startTime, form.endTime, cars]);
 
+  // ── Suggest pickup & drop charge whenever it's toggled on or the car changes ─
+  useEffect(() => {
+    if (!form.doorstepDelivery) return;
+    const car = cars.find(c => c._id === form.carId);
+    const suggested = String(car?.doorstepDeliveryCharge ?? DEFAULT_DOORSTEP_CHARGE);
+    setForm(prev => ({
+      ...prev,
+      doorstepCharge: (prev.doorstepCharge === "" || prev.doorstepCharge === autoDoorstep.current) ? suggested : prev.doorstepCharge,
+    }));
+    autoDoorstep.current = suggested;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.doorstepDelivery, form.carId, cars]);
+
   // ── Create offline booking ─────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.carId || !form.startTime || !form.endTime || !form.mobile) {
       toast.error("Car, mobile, pickup & return date are required");
+      return;
+    }
+    if (form.doorstepDelivery && !form.deliveryAddress.trim()) {
+      toast.error("Delivery address is required for pickup & drop");
       return;
     }
     setSubmitting(true);
@@ -365,6 +392,9 @@ export default function OfflineBookingsPage() {
         endTime:         new Date(form.endTime).toISOString(),
         bookingFare:     form.bookingFare !== "" ? Number(form.bookingFare) : undefined,
         securityDeposit: form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined,
+        doorstepDelivery: form.doorstepDelivery,
+        deliveryAddress:  form.doorstepDelivery ? form.deliveryAddress : undefined,
+        doorstepCharge:   form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
         amountPaid:      Number(form.amountPaid) || 0,
         paymentMode:     form.paymentMode,
         notes:           form.notes,
@@ -587,6 +617,44 @@ export default function OfflineBookingsPage() {
                     <input type="datetime-local" value={form.endTime} onChange={update("endTime")} required className={inputCls + " pl-9"} />
                   </div>
                 </div>
+              </div>
+
+              {/* Pickup & Drop (Doorstep Delivery) */}
+              <div className="border-[1.5px] border-[#E4E5EF] rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Truck size={16} className="text-[#E8540A]" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#0F0F1A]">Pickup & Drop (Doorstep)</p>
+                      <p className="text-[#9090A8] text-xs">Deliver the car to the customer instead of office pickup</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, doorstepDelivery: !f.doorstepDelivery }))}
+                    className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.doorstepDelivery ? "bg-[#E8540A]" : "bg-[#E4E5EF]")}
+                  >
+                    <span className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all", form.doorstepDelivery ? "left-5" : "left-0.5")} />
+                  </button>
+                </div>
+                {form.doorstepDelivery && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Delivery Address <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                        <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                        <input value={form.deliveryAddress} onChange={update("deliveryAddress")} placeholder="Full delivery address" className={inputCls + " pl-9"} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Pickup & Drop Charge (₹)</label>
+                      <div className="relative">
+                        <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                        <input type="number" value={form.doorstepCharge} onChange={update("doorstepCharge")} placeholder="0" min="0" className={inputCls + " pl-9"} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Rent & Security — auto-filled from the selected car + duration, editable */}
