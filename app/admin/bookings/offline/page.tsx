@@ -31,6 +31,9 @@ interface BookingRow {
   isOffline: boolean;
   challanDetails?: string;
   createdAt: string;
+  doorstepDelivery?: boolean;
+  deliveryAddress?: string;
+  doorstepCharge?: number;
 }
 
 interface CarOption {
@@ -182,10 +185,17 @@ function EditModal({
     amountPaid:  String(booking.amountPaid ?? ""),
     paymentMode: booking.paymentMode ?? "offline_cash",
     notes:       booking.challanDetails ?? "",
+    doorstepDelivery: booking.doorstepDelivery ?? false,
+    deliveryAddress:  booking.deliveryAddress ?? "",
+    doorstepCharge:   String(booking.doorstepCharge ?? ""),
   });
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    if (form.doorstepDelivery && !form.deliveryAddress.trim()) {
+      toast.error("Delivery address is required for pickup & drop");
+      return;
+    }
     setSaving(true);
     try {
       const { data } = await bookingsApi.update(booking._id, {
@@ -195,6 +205,9 @@ function EditModal({
         amountPaid:  form.amountPaid  ? Number(form.amountPaid)  : undefined,
         paymentMode: form.paymentMode,
         notes:       form.notes,
+        doorstepDelivery: form.doorstepDelivery,
+        deliveryAddress:  form.doorstepDelivery ? form.deliveryAddress : undefined,
+        doorstepCharge:   form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
       });
       toast.success("Booking updated");
       onSaved(data.data);
@@ -229,6 +242,38 @@ function EditModal({
                 className={inputCls} />
             </div>
           </div>
+
+          {/* Pickup & Drop (Doorstep Delivery) */}
+          <div className="border-[1.5px] border-[#E4E5EF] rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Truck size={16} className="text-[#E8540A]" />
+                <p className="text-sm font-semibold text-[#0F0F1A]">Pickup & Drop (Doorstep)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, doorstepDelivery: !f.doorstepDelivery }))}
+                className={cn("relative w-11 h-6 rounded-full transition-colors shrink-0", form.doorstepDelivery ? "bg-[#E8540A]" : "bg-[#E4E5EF]")}
+              >
+                <span className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all", form.doorstepDelivery ? "left-5" : "left-0.5")} />
+              </button>
+            </div>
+            {form.doorstepDelivery && (
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Delivery Address <span className="text-red-500">*</span></label>
+                  <input value={form.deliveryAddress} onChange={e => setForm(f => ({ ...f, deliveryAddress: e.target.value }))}
+                    placeholder="Full delivery address" className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Pickup & Drop Charge (₹)</label>
+                  <input type="number" value={form.doorstepCharge} onChange={e => setForm(f => ({ ...f, doorstepCharge: e.target.value }))}
+                    placeholder="0" min="0" className={inputCls} />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Total Amount (₹)</label>
