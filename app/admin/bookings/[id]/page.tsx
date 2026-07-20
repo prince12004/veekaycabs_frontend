@@ -14,7 +14,7 @@ import {
   MessageSquare, RefreshCw, Camera, ChevronDown, ChevronUp,
   Printer, Shield, Fuel, Gauge, Send, X as XIcon, FileCheck, Loader2,
   MapPin, Truck, AlertTriangle, Eye, Image as ImageIcon, Zap,
-  ScanSearch, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
+  ScanSearch, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -156,6 +156,11 @@ export default function BookingDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", amountPaid: "", paymentMode: "online", notes: "" });
   const [editLoading, setEditLoading] = useState(false);
+
+  // Extend Booking modal
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [extendForm, setExtendForm] = useState({ newEndTime: "", extraAmount: "", additionalPaymentReceived: "0" });
+  const [extendLoading, setExtendLoading] = useState(false);
 
   // Invoice PDF
   const [companySettings, setCompanySettings] = useState<Record<string, any> | null>(null);
@@ -373,6 +378,66 @@ export default function BookingDetailPage() {
     }
   };
 
+  // Suggests the extra charge for a new end time — mirrors the server's own
+  // calculation (extra hours × the car's weekend/weekday rate) so the admin
+  // sees a sensible number immediately, but it's always editable before saving.
+  const suggestExtendAmount = (newEndTime: string) => {
+    if (!rawBooking?.carId || !newEndTime) return null;
+    const newEnd = new Date(newEndTime);
+    const currentEnd = new Date(rawBooking.endTime);
+    if (isNaN(newEnd.getTime()) || newEnd <= currentEnd) return null;
+    const extraHours = Math.ceil((newEnd.getTime() - currentEnd.getTime()) / (1000 * 60 * 60));
+    const isWeekend = [0, 6].includes(currentEnd.getDay());
+    const rate = isWeekend ? rawBooking.carId.weekendPrice : rawBooking.carId.regularPrice;
+    return { extraHours, extraAmount: extraHours * (rate || 0) };
+  };
+
+  const openExtendModal = () => {
+    if (!rawBooking) return;
+    const toLocal = (d: Date) => {
+      const copy = new Date(d);
+      copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset());
+      return copy.toISOString().slice(0, 16);
+    };
+    // Default to 1 day past the current return time — just a starting point.
+    const defaultNewEnd = new Date(new Date(rawBooking.endTime).getTime() + 24 * 60 * 60 * 1000);
+    const defaultNewEndStr = toLocal(defaultNewEnd);
+    const suggestion = suggestExtendAmount(defaultNewEndStr);
+    setExtendForm({
+      newEndTime: defaultNewEndStr,
+      extraAmount: suggestion ? String(suggestion.extraAmount) : "",
+      additionalPaymentReceived: "0",
+    });
+    setShowExtendModal(true);
+  };
+
+  const handleExtendNewEndTimeChange = (value: string) => {
+    const suggestion = suggestExtendAmount(value);
+    setExtendForm((f) => ({ ...f, newEndTime: value, extraAmount: suggestion ? String(suggestion.extraAmount) : f.extraAmount }));
+  };
+
+  const handleExtendSave = async () => {
+    if (!rawBooking || !extendForm.newEndTime) {
+      toast.error("Pick the new return date & time");
+      return;
+    }
+    setExtendLoading(true);
+    try {
+      const { data } = await bookingsApi.extendBooking(rawBooking._id, {
+        newEndTime: new Date(extendForm.newEndTime).toISOString(),
+        extraAmount: extendForm.extraAmount !== "" ? Number(extendForm.extraAmount) : undefined,
+        additionalPaymentReceived: Number(extendForm.additionalPaymentReceived) || 0,
+      });
+      setRawBooking(data.data);
+      setShowExtendModal(false);
+      toast.success(data.message || "Booking extended");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to extend booking");
+    } finally {
+      setExtendLoading(false);
+    }
+  };
+
   // ── Loading / not-found ─────────────────────────────────────────────────────
   if (loadingPage) {
     return (
@@ -507,6 +572,9 @@ export default function BookingDetailPage() {
     const carKmPackage = rawBooking.carId?.kmPackage as string | undefined;
     const perDayKm = carKmPackage ? parseInt(carKmPackage, 10) || 0 : 0;
     const defaultLimit = perDayKm ? perDayKm * Math.max(nights, 1) : "";
+    // Always prefer the latest live odometer reading (return verification may
+    // have been corrected after the bill was first closed) over whatever was
+    // typed into the form at the time of the original close.
     const defaultClosingMeter = returnCondition.odometer || rawBooking.odometerEnd || "";
     // Pulled from the car's own profile (set when adding/editing the car) —
     // admin can still override per-closure below.
@@ -524,15 +592,27 @@ export default function BookingDetailPage() {
       : toLocal(new Date());
     // Hourly rental rate for this car doubles as the default late-hour rate.
     const carHourlyRate = rawBooking.carId?.regularPrice;
+
+    // Recalculating an already-closed bill — re-fill the manually-entered
+    // fields (charges, notes, rates) from what was saved last time instead of
+    // blanking them out, since those aren't derivable from live booking data.
+    const prev = closingBill;
     setClosingForm({
       startingMeter: rawBooking.odometerStart != null ? String(rawBooking.odometerStart) : "",
       closingMeter: String(defaultClosingMeter),
-      kmsLimit: defaultLimit ? String(defaultLimit) : "",
-      extraKmRate: carExtraKmRate ? String(carExtraKmRate) : "",
-      actualReturnTime: defaultReturnTime,
-      lateHourRate: carHourlyRate ? String(carHourlyRate) : "",
-      pickupCharges: "", dropCharges: "", fastagStateTax: "", allStateChallan: "",
-      overspeedingFine: "", fuelCharges: "", damageCharges: "", washingCharges: "", notes: "",
+      kmsLimit: prev?.kmsLimit ? String(prev.kmsLimit) : (defaultLimit ? String(defaultLimit) : ""),
+      extraKmRate: prev?.extraKmRate ? String(prev.extraKmRate) : (carExtraKmRate ? String(carExtraKmRate) : ""),
+      actualReturnTime: prev?.actualReturnTime ? toLocal(new Date(prev.actualReturnTime)) : defaultReturnTime,
+      lateHourRate: prev?.lateHourRate ? String(prev.lateHourRate) : (carHourlyRate ? String(carHourlyRate) : ""),
+      pickupCharges: prev?.pickupCharges ? String(prev.pickupCharges) : "",
+      dropCharges: prev?.dropCharges ? String(prev.dropCharges) : "",
+      fastagStateTax: prev?.fastagStateTax ? String(prev.fastagStateTax) : "",
+      allStateChallan: prev?.allStateChallan ? String(prev.allStateChallan) : "",
+      overspeedingFine: prev?.overspeedingFine ? String(prev.overspeedingFine) : "",
+      fuelCharges: prev?.fuelCharges ? String(prev.fuelCharges) : "",
+      damageCharges: prev?.damageCharges ? String(prev.damageCharges) : "",
+      washingCharges: prev?.washingCharges ? String(prev.washingCharges) : "",
+      notes: prev?.notes || "",
     });
     setCloseBillModalOpen(true);
   };
@@ -547,16 +627,18 @@ export default function BookingDetailPage() {
       toast.error("Enter the closing meter reading");
       return;
     }
+    const wasAlreadyClosed = isClosed;
     setClosingSaving(true);
     try {
       const { data } = await bookingsApi.closeBooking(rawBooking._id, closingForm);
       setRawBooking(data.data);
       setCloseBillModalOpen(false);
       const settlement = data.data?.closingBill?.settlementAmount ?? 0;
+      const verb = wasAlreadyClosed ? "recalculated" : "closed";
       toast.success(
-        settlement > 0 ? `Booking closed — Rs. ${settlement.toLocaleString("en-IN")} due from customer`
-          : settlement < 0 ? `Booking closed — Rs. ${Math.abs(settlement).toLocaleString("en-IN")} refund due`
-            : "Booking closed — fully settled"
+        settlement > 0 ? `Booking ${verb} — Rs. ${settlement.toLocaleString("en-IN")} due from customer`
+          : settlement < 0 ? `Booking ${verb} — Rs. ${Math.abs(settlement).toLocaleString("en-IN")} refund due`
+            : `Booking ${verb} — fully settled`
       );
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Failed to close booking");
@@ -713,6 +795,12 @@ export default function BookingDetailPage() {
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors">
             <FileText size={14} /> Edit
           </button>
+          {["confirmed", "active"].includes(rawBooking.status) && (
+            <button onClick={openExtendModal}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors">
+              <Clock size={14} /> Extend Booking
+            </button>
+          )}
         </div>
       </div>
 
@@ -1290,6 +1378,12 @@ export default function BookingDetailPage() {
                       <FileText size={16} /> Close Booking &amp; Generate Bill
                     </button>
                   )}
+                  {isClosed && (
+                    <button onClick={openCloseBillModal} title="Re-run the KM/late-fee/charges calculation — e.g. if the odometer reading was corrected after closing"
+                      className="flex items-center gap-2 px-6 py-3 rounded-xl border-[1.5px] border-[#E4E5EF] text-[#4A4A6A] font-bold text-sm hover:border-[#7C3AED] hover:text-[#7C3AED] transition-colors">
+                      <Pencil size={16} /> Recalculate Closing Bill
+                    </button>
+                  )}
                 </div>
 
                 {/* Final settlement summary, once closed */}
@@ -1408,7 +1502,7 @@ export default function BookingDetailPage() {
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-5 border-b border-[#E4E5EF] flex items-center justify-between shrink-0">
               <h2 className="font-bold text-[#0F0F1A] text-base flex items-center gap-2">
-                <FileText size={16} className="text-[#7C3AED]" /> Close Booking &amp; Generate Bill
+                <FileText size={16} className="text-[#7C3AED]" /> {isClosed ? "Recalculate Closing Bill" : "Close Booking & Generate Bill"}
               </h2>
               <button onClick={() => setCloseBillModalOpen(false)} className="text-[#9090A8] hover:text-[#EF4444]"><XIcon size={18} /></button>
             </div>
@@ -1532,7 +1626,7 @@ export default function BookingDetailPage() {
               <button onClick={handleCloseBooking} disabled={closingSaving}
                 className="w-full flex items-center justify-center gap-2 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-bold hover:bg-[#6D28D9] transition-colors disabled:opacity-60">
                 {closingSaving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
-                {closingSaving ? "Closing..." : "Close Booking & Compute Bill"}
+                {closingSaving ? "Saving..." : isClosed ? "Recalculate & Save" : "Close Booking & Compute Bill"}
               </button>
             </div>
           </div>
@@ -1888,6 +1982,51 @@ export default function BookingDetailPage() {
             </button>
             <button onClick={handleEditSave} disabled={editLoading} className="flex-1 py-3 rounded-xl btn-gradient text-white font-bold text-sm disabled:opacity-60">
               {editLoading ? <><Loader2 size={14} className="animate-spin inline mr-1" />Saving...</> : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══════════════════════════════════════════════════════════════════════ */}
+    {/* Extend Booking Modal                                                    */}
+    {/* ═══════════════════════════════════════════════════════════════════════ */}
+    {showExtendModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto">
+        <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl my-4">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Extend Booking</h3>
+              <p className="text-[#9090A8] text-xs mt-0.5">#{rawBooking?.bookingId || rawBooking?._id?.slice(-8)} · Current return: {fmtDT(rawBooking?.endTime)}</p>
+            </div>
+            <button onClick={() => setShowExtendModal(false)} className="text-[#9090A8] hover:text-[#0F0F1A] transition-colors"><XIcon size={20} /></button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">New Return Date & Time</label>
+              <input type="datetime-local" value={extendForm.newEndTime} onChange={e => handleExtendNewEndTimeChange(e.target.value)}
+                className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Extra Charge (Rs.)</label>
+                <input type="number" min="0" value={extendForm.extraAmount} onChange={e => setExtendForm(f => ({ ...f, extraAmount: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Additional Payment Received (Rs.)</label>
+                <input type="number" min="0" value={extendForm.additionalPaymentReceived} onChange={e => setExtendForm(f => ({ ...f, additionalPaymentReceived: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+              </div>
+            </div>
+            <p className="text-[11px] text-[#9090A8]">Extra Charge auto-fills from the car's rate for the added hours — edit if you negotiated a different amount. It's added to the booking's total; the additional payment (if any) is added to what's already been received.</p>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setShowExtendModal(false)} className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A] hover:bg-[#F8F9FC]">
+              Cancel
+            </button>
+            <button onClick={handleExtendSave} disabled={extendLoading} className="flex-1 py-3 rounded-xl btn-gradient text-white font-bold text-sm disabled:opacity-60">
+              {extendLoading ? <><Loader2 size={14} className="animate-spin inline mr-1" />Saving...</> : "Extend Booking"}
             </button>
           </div>
         </div>

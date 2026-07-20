@@ -86,6 +86,8 @@ export const bookingsApi = {
     adminApi.patch(`/api/admin/bookings/${id}/verification`, { stage, condition }),
   closeBooking: (id: string, data: Record<string, unknown>) =>
     adminApi.patch(`/api/admin/bookings/${id}/close`, data),
+  extendBooking: (id: string, data: { newEndTime: string; extraAmount?: number; additionalPaymentReceived?: number }) =>
+    adminApi.patch(`/api/admin/bookings/${id}/extend`, data),
   markRefundPaid: (id: string) =>
     adminApi.patch(`/api/admin/bookings/${id}/refund-paid`),
   update: (id: string, data: Record<string, unknown>) =>
