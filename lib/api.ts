@@ -76,6 +76,8 @@ export const adminAuthAPI = {
 export const bookingsApi = {
   getAll: (params?: Record<string, string | number>) =>
     adminApi.get("/api/admin/bookings", { params }),
+  getSchedule: (params?: Record<string, string>) =>
+    adminApi.get("/api/admin/bookings/schedule", { params }),
   getById: (id: string) => adminApi.get(`/api/admin/bookings/${id}`),
   remove: (id: string) => adminApi.delete(`/api/admin/bookings/${id}`),
   updateStatus: (id: string, data: { status?: string; amountPaid?: number; notes?: string }) =>

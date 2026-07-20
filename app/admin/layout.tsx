@@ -8,7 +8,7 @@ import {
   Link as LinkIcon, Navigation, BarChart3, BookOpen, Tag,
   MapPin, MessageSquare, LogOut, Menu, X,
   Plus, List, Info, Share2, Globe, Bell, Search,
-  ChevronRight, Activity, ExternalLink, ShieldCheck, Wrench,
+  ChevronRight, Activity, ExternalLink, ShieldCheck, Wrench, ArrowLeftRight,
   type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ const buildNavGroups = (counts: Record<string, number>): { label: string; items:
     items: [
       { href: "/admin/bookings", label: "All Bookings", icon: Calendar, badge: counts.pendingBookings || null },
       { href: "/admin/bookings/offline", label: "Offline Booking", icon: Activity, badge: null },
+      { href: "/admin/bookings/arrivals", label: "Arrivals & Departures", icon: ArrowLeftRight, badge: null },
     ],
   },
   {
@@ -138,9 +139,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     .map(g => ({ ...g, items: g.items.filter(i => i.href !== "/admin/manage-admins" || adminUser?.role === "super_admin") }))
     .filter(g => g.items.length > 0);
   const allItems = navGroups.flatMap(g => g.items);
-  const currentPage = allItems.find(
-    item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/"))
-  );
+  // Prefer the most specific (longest) matching href — e.g. on
+  // /admin/bookings/arrivals this must resolve to "Arrivals & Departures",
+  // not "All Bookings" just because it's listed first and also prefix-matches.
+  const currentPage = allItems
+    .filter(item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/")))
+    .sort((a, b) => b.href.length - a.href.length)[0];
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });

@@ -63,6 +63,11 @@ interface DentDetectionResult {
 const fmtDT = (d: string) =>
   new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
+// Matches the server's per-request multer limit (routes/admin/bookings.js
+// `.array('files', 10)`) — pickup and return are separate upload requests,
+// so each stage gets up to 10 files of its own.
+const MAX_MEDIA_FILES = 10;
+
 const humanizePart = (part: string) =>
   part.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
@@ -941,12 +946,16 @@ export default function BookingDetailPage() {
                   <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 flex items-center gap-1.5"><Video size={13} /> Handover Video Evidence (saved to Cloud)</label>
                   <p className="text-xs text-[#9090A8] mb-2">Upload video/photos before handing over the car.</p>
                   <input ref={pickupInputRef} type="file" multiple accept="video/*,image/*" className="hidden"
-                    onChange={e => setPickupFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                    onChange={e => {
+                      const files = e.target.files ? Array.from(e.target.files) : [];
+                      if (files.length > MAX_MEDIA_FILES) toast.error(`Max ${MAX_MEDIA_FILES} files per upload — only the first ${MAX_MEDIA_FILES} were kept`);
+                      setPickupFiles(files.slice(0, MAX_MEDIA_FILES));
+                    }} />
                   <div onClick={() => pickupInputRef.current?.click()} className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-4 cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
                     <Camera size={20} className="text-[#9090A8]" />
                     <div>
                       <p className="text-sm font-semibold text-[#4A4A6A]">Select handover files</p>
-                      <p className="text-xs text-[#9090A8]">Videos (MP4, MOV) or photos — multiple supported</p>
+                      <p className="text-xs text-[#9090A8]">Videos (MP4, MOV) or photos — up to {MAX_MEDIA_FILES} files</p>
                     </div>
                     {pickupFiles.length > 0 && <span className="ml-auto text-xs font-bold text-[#10B981]">{pickupFiles.length} selected</span>}
                   </div>
@@ -1120,12 +1129,16 @@ export default function BookingDetailPage() {
                   <label className="text-xs font-semibold text-[#4A4A6A] mb-1.5 flex items-center gap-1.5"><Video size={13} /> Return Video Evidence (saved to Cloud)</label>
                   <p className="text-xs text-[#9090A8] mb-2">Upload video/photos after car is returned — used for dent comparison.</p>
                   <input ref={returnInputRef} type="file" multiple accept="video/*,image/*" className="hidden"
-                    onChange={e => setReturnFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                    onChange={e => {
+                      const files = e.target.files ? Array.from(e.target.files) : [];
+                      if (files.length > MAX_MEDIA_FILES) toast.error(`Max ${MAX_MEDIA_FILES} files per upload — only the first ${MAX_MEDIA_FILES} were kept`);
+                      setReturnFiles(files.slice(0, MAX_MEDIA_FILES));
+                    }} />
                   <div onClick={() => returnInputRef.current?.click()} className="flex items-center gap-3 border-2 border-dashed border-[#E4E5EF] rounded-xl p-4 cursor-pointer hover:border-[#E8540A]/50 hover:bg-[#FFF3ED] transition-all">
                     <Upload size={20} className="text-[#9090A8]" />
                     <div>
                       <p className="text-sm font-semibold text-[#4A4A6A]">Select return files</p>
-                      <p className="text-xs text-[#9090A8]">Compare against pickup footage for dent analysis</p>
+                      <p className="text-xs text-[#9090A8]">Compare against pickup footage for dent analysis — up to {MAX_MEDIA_FILES} files</p>
                     </div>
                     {returnFiles.length > 0 && <span className="ml-auto text-xs font-bold text-[#10B981]">{returnFiles.length} selected</span>}
                   </div>
