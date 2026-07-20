@@ -336,6 +336,8 @@ function CarListingInner() {
     if (sort === "Rating") return b.rating - a.rating;
     return 0;
   });
+  const availableCount = filtered.filter((c) => c.isAvailable).length;
+  const soldOutCount = filtered.length - availableCount;
 
   const formatDT = (val: string) => {
     if (!val) return "—";
@@ -614,8 +616,13 @@ function CarListingInner() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h1 className="font-bold text-[#0F0F1A] font-syne text-xl">
-                  {filtered.length} cars available
+                  {availableCount} cars available
                 </h1>
+                {soldOutCount > 0 && (
+                  <p className="text-[#9090A8] text-xs mt-0.5">
+                    {soldOutCount} more sold out for these dates
+                  </p>
+                )}
                 <p className="text-[#9090A8] text-xs mt-0.5">
                   {city}
                   {pickupDT && (
