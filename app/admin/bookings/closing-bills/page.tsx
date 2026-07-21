@@ -49,6 +49,7 @@ export default function ClosingBillsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [amountFilter, setAmountFilter] = useState<"all" | "due" | "refund">("all");
 
   const load = useCallback((p = 1) => {
     setLoading(true);
@@ -83,6 +84,15 @@ export default function ClosingBillsPage() {
     { due: 0, refund: 0 }
   );
 
+  // Clicking a summary tile filters the (already loaded) rows for this page —
+  // same clickable-tile pattern as the Reports → Settlements tab.
+  const displayRows = rows.filter((r) => {
+    const amt = r.closingBill?.settlementAmount ?? 0;
+    if (amountFilter === "due") return amt > 0;
+    if (amountFilter === "refund") return amt < 0 && !r.closingBill?.refundPaid;
+    return true;
+  });
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -95,20 +105,41 @@ export default function ClosingBillsPage() {
         </button>
       </div>
 
-      {/* Summary tiles — this page only, use the Settlements report for the full picture */}
+      {/* Summary tiles — click to filter the table below (this page's rows only) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-4">
+        <button
+          type="button"
+          onClick={() => setAmountFilter("all")}
+          className={cn(
+            "text-left bg-white rounded-2xl border p-4 transition-all",
+            amountFilter === "all" ? "border-[#0F0F1A] ring-2 ring-[#0F0F1A]/10" : "border-[#E4E5EF] hover:border-[#9090A8]"
+          )}
+        >
           <p className="text-2xl font-black text-[#0F0F1A] font-syne leading-none">{total}</p>
           <p className="text-[#9090A8] text-[10px] font-semibold uppercase tracking-wider mt-1">Closed Bookings</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-4">
+        </button>
+        <button
+          type="button"
+          onClick={() => setAmountFilter(amountFilter === "due" ? "all" : "due")}
+          className={cn(
+            "text-left bg-white rounded-2xl border p-4 transition-all",
+            amountFilter === "due" ? "border-[#E8540A] ring-2 ring-[#E8540A]/15" : "border-[#E4E5EF] hover:border-[#E8540A]/50"
+          )}
+        >
           <p className="text-2xl font-black text-[#E8540A] font-syne leading-none">₹{totals.due.toLocaleString("en-IN")}</p>
           <p className="text-[#9090A8] text-[10px] font-semibold uppercase tracking-wider mt-1">Due (this page)</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-4">
+        </button>
+        <button
+          type="button"
+          onClick={() => setAmountFilter(amountFilter === "refund" ? "all" : "refund")}
+          className={cn(
+            "text-left bg-white rounded-2xl border p-4 transition-all",
+            amountFilter === "refund" ? "border-[#1E40AF] ring-2 ring-[#1E40AF]/15" : "border-[#E4E5EF] hover:border-[#1E40AF]/50"
+          )}
+        >
           <p className="text-2xl font-black text-[#1E40AF] font-syne leading-none">₹{totals.refund.toLocaleString("en-IN")}</p>
           <p className="text-[#9090A8] text-[10px] font-semibold uppercase tracking-wider mt-1">Refund Pending (this page)</p>
-        </div>
+        </button>
       </div>
 
       {/* Filters */}
@@ -134,11 +165,13 @@ export default function ClosingBillsPage() {
           <div className="flex items-center justify-center gap-3 py-16 text-[#9090A8]">
             <Loader2 size={20} className="animate-spin" /> Loading closing bills...
           </div>
-        ) : rows.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <div className="text-center py-16 text-[#9090A8]">
             <FileText size={32} className="mx-auto mb-3 text-[#E4E5EF]" />
-            <p className="font-semibold">No closing bills found</p>
-            <p className="text-xs mt-1">Bills appear here once a booking has been closed</p>
+            <p className="font-semibold">{rows.length === 0 ? "No closing bills found" : "No rows match this filter on the current page"}</p>
+            <p className="text-xs mt-1">
+              {rows.length === 0 ? "Bills appear here once a booking has been closed" : "Try a different tile, or clear the filter"}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -151,7 +184,7 @@ export default function ClosingBillsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
+                {displayRows.map((r, i) => (
                   <tr key={r._id} className={cn("border-b border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors", i % 2 === 1 ? "bg-[#F8F9FC]/50" : "")}>
                     <td className="px-4 py-3.5 font-mono text-xs text-[#4A4A6A] font-bold whitespace-nowrap">#{r.bookingId}</td>
                     <td className="px-4 py-3.5">
@@ -184,7 +217,9 @@ export default function ClosingBillsPage() {
         {/* Pagination — always visible (20 per page) so the page size/count is never ambiguous */}
         {!loading && rows.length > 0 && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-[#E4E5EF]">
-            <p className="text-[#9090A8] text-sm">Showing {rows.length} of {total} closing bills · Page {page} of {totalPages}</p>
+            <p className="text-[#9090A8] text-sm">
+              Showing {displayRows.length}{displayRows.length !== rows.length ? ` of ${rows.length} on this page` : ""} · {total} total closing bills · Page {page} of {totalPages}
+            </p>
             <div className="flex gap-2">
               <button onClick={() => { const p = page - 1; setPage(p); load(p); }} disabled={page === 1}
                 className="w-9 h-9 rounded-xl border border-[#E4E5EF] flex items-center justify-center hover:border-[#E8540A] hover:text-[#E8540A] transition-colors disabled:opacity-40">
