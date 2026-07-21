@@ -8,7 +8,7 @@ import {
   Link as LinkIcon, Navigation, BarChart3, BookOpen, Tag,
   MapPin, MessageSquare, LogOut, Menu, X,
   Plus, List, Info, Share2, Globe, Bell, Search,
-  ChevronRight, Activity, ExternalLink, ShieldCheck, Wrench, ArrowLeftRight,
+  ChevronRight, Activity, ExternalLink, ShieldCheck, Wrench, ArrowLeftRight, FileText,
   type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,7 @@ const buildNavGroups = (counts: Record<string, number>): { label: string; items:
       { href: "/admin/bookings", label: "All Bookings", icon: Calendar, badge: counts.pendingBookings || null },
       { href: "/admin/bookings/offline", label: "Offline Booking", icon: Activity, badge: null },
       { href: "/admin/bookings/arrivals", label: "Arrivals & Departures", icon: ArrowLeftRight, badge: null },
+      { href: "/admin/bookings/closing-bills", label: "Closing Bills", icon: FileText, badge: null },
     ],
   },
   {

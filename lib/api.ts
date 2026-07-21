@@ -78,6 +78,8 @@ export const bookingsApi = {
     adminApi.get("/api/admin/bookings", { params }),
   getSchedule: (params?: Record<string, string>) =>
     adminApi.get("/api/admin/bookings/schedule", { params }),
+  getClosingBills: (params?: Record<string, string | number>) =>
+    adminApi.get("/api/admin/bookings/closing-bills", { params }),
   getById: (id: string) => adminApi.get(`/api/admin/bookings/${id}`),
   remove: (id: string) => adminApi.delete(`/api/admin/bookings/${id}`),
   updateStatus: (id: string, data: { status?: string; amountPaid?: number; notes?: string }) =>
@@ -316,6 +318,8 @@ export const adminReportsApi = {
     adminApi.get("/api/admin/reports/revenue", { params }),
   getBookingStats: (params: { from?: string; to?: string }) =>
     adminApi.get("/api/admin/reports/bookings", { params }),
+  getSettlements: (params: { from?: string; to?: string }) =>
+    adminApi.get("/api/admin/reports/settlements", { params }),
 };
 
 export const adminDashboardAPI = {

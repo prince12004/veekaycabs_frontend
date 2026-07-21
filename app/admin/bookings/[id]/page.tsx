@@ -1058,7 +1058,7 @@ export default function BookingDetailPage() {
                     <div className="mt-3 space-y-2">
                       <p className="text-xs font-bold text-[#9090A8]">{pickupSaved.reduce((a, m) => a + m.urls.length, 0)} file(s) saved to Cloudinary</p>
                       <div className="grid grid-cols-3 gap-2">
-                        {pickupSaved.flatMap((m) => m.urls.map((url: string) => ({ url, mediaId: m._id }))).slice(0, 6).map(({ url, mediaId }, i) => (
+                        {pickupSaved.flatMap((m) => m.urls.map((url: string) => ({ url, mediaId: m._id }))).map(({ url, mediaId }, i) => (
                           <div key={i} className="relative aspect-video bg-[#0F0F1A] rounded-xl overflow-hidden flex items-center justify-center group">
                             <a href={url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center">
                               {url.match(/\.(mp4|mov|avi|webm)/) ? (
@@ -1240,7 +1240,7 @@ export default function BookingDetailPage() {
                     <div className="mt-3 space-y-2">
                       <p className="text-xs font-bold text-[#9090A8]">{returnSaved.reduce((a, m) => a + m.urls.length, 0)} return file(s) saved</p>
                       <div className="grid grid-cols-3 gap-2">
-                        {returnSaved.flatMap((m) => m.urls.map((url: string) => ({ url, mediaId: m._id }))).slice(0, 6).map(({ url, mediaId }, i) => (
+                        {returnSaved.flatMap((m) => m.urls.map((url: string) => ({ url, mediaId: m._id }))).map(({ url, mediaId }, i) => (
                           <div key={i} className="relative aspect-video bg-[#0F0F1A] rounded-xl overflow-hidden flex items-center justify-center group">
                             <a href={url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center">
                               {url.match(/\.(mp4|mov|avi|webm)/) ? (
