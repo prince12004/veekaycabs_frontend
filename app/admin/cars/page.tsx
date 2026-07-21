@@ -102,7 +102,7 @@ export default function AdminCarsPage() {
   const [deletingCarId, setDeletingCarId] = useState<string | null>(null);
   const [canDeleteCar, setCanDeleteCar] = useState(false);
 
-  useEffect(() => { setCanDeleteCar(canDelete("fleet")); }, []);
+  useEffect(() => { setCanDeleteCar(canDelete("carListing")); }, []);
 
   // Overall fleet stats (unaffected by the current filter/tab) — fetched
   // once so the summary tiles always show the true totals.

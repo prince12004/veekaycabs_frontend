@@ -333,7 +333,7 @@ export default function OfflineBookingsPage() {
   const [canDeleteBooking, setCanDeleteBooking] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => { setCanDeleteBooking(canDelete("bookings")); }, []);
+  useEffect(() => { setCanDeleteBooking(canDelete("offlineBooking")); }, []);
   // Tracks the last auto-suggested rent/security so we only overwrite the
   // fields while the admin hasn't typed a custom value of their own.
   const autoRent = useRef<string | null>(null);

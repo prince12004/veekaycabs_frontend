@@ -13,79 +13,91 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminDashboardAPI } from "@/lib/api";
+import { canView, isSuperAdmin } from "@/lib/adminPermissions";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; badge: number | null; external?: boolean };
+type NavItem = { href: string; label: string; icon: LucideIcon; badge: number | null; external?: boolean; permKey?: string };
 
-// badge keys map to dynamic counts fetched from API
+// permKey matches a SECTIONS key from app/admin/manage-admins/page.tsx — used
+// to hide nav items (and block direct navigation) an admin hasn't been
+// granted "view" access to. Items without a permKey (currently none) are
+// always shown to any authenticated admin.
 const buildNavGroups = (counts: Record<string, number>): { label: string; items: NavItem[] }[] => [
   {
     label: "Overview",
-    items: [{ href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null }],
+    items: [{ href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, badge: null, permKey: "dashboard" }],
   },
   {
     label: "Fleet",
     items: [
-      { href: "/admin/cars", label: "Car Listing", icon: List, badge: counts.totalCars || null },
-      { href: "/admin/cars/add", label: "Add Car", icon: Plus, badge: null },
-      { href: "/admin/cars/documents", label: "Car Documents", icon: FileCheck, badge: null },
-      { href: "/admin/cars/maintenance", label: "Car Maintenance", icon: Wrench, badge: null },
-      { href: "/admin/cars/verification", label: "Vehicle Verification", icon: ShieldCheck, badge: null },
+      { href: "/admin/cars", label: "Car Listing", icon: List, badge: counts.totalCars || null, permKey: "carListing" },
+      { href: "/admin/cars/add", label: "Add Car", icon: Plus, badge: null, permKey: "addCar" },
+      { href: "/admin/cars/documents", label: "Car Documents", icon: FileCheck, badge: null, permKey: "carDocuments" },
+      { href: "/admin/cars/maintenance", label: "Car Maintenance", icon: Wrench, badge: null, permKey: "carMaintenance" },
+      { href: "/admin/cars/verification", label: "Vehicle Verification", icon: ShieldCheck, badge: null, permKey: "vehicleVerification" },
     ],
   },
   {
     label: "Bookings",
     items: [
-      { href: "/admin/bookings", label: "All Bookings", icon: Calendar, badge: counts.pendingBookings || null },
-      { href: "/admin/bookings/offline", label: "Offline Booking", icon: Activity, badge: null },
-      { href: "/admin/bookings/arrivals", label: "Arrivals & Departures", icon: ArrowLeftRight, badge: null },
-      { href: "/admin/bookings/closing-bills", label: "Closing Bills", icon: FileText, badge: null },
+      { href: "/admin/bookings", label: "All Bookings", icon: Calendar, badge: counts.pendingBookings || null, permKey: "allBookings" },
+      { href: "/admin/bookings/offline", label: "Offline Booking", icon: Activity, badge: null, permKey: "offlineBooking" },
+      { href: "/admin/bookings/arrivals", label: "Arrivals & Departures", icon: ArrowLeftRight, badge: null, permKey: "arrivals" },
+      { href: "/admin/bookings/closing-bills", label: "Closing Bills", icon: FileText, badge: null, permKey: "closingBills" },
     ],
   },
   {
     label: "Users & KYC",
     items: [
-      { href: "/admin/users", label: "User List", icon: Users, badge: null },
-      { href: "/admin/documents", label: "KYC Review", icon: FileCheck, badge: counts.pendingKyc || null },
+      { href: "/admin/users", label: "User List", icon: Users, badge: null, permKey: "userList" },
+      { href: "/admin/documents", label: "KYC Review", icon: FileCheck, badge: counts.pendingKyc || null, permKey: "kycReview" },
     ],
   },
   {
     label: "Finance",
     items: [
-      { href: "/admin/refunds", label: "Refunds", icon: RefreshCw, badge: null },
-      { href: "/admin/payment-links", label: "Payment Links", icon: LinkIcon, badge: null },
+      { href: "/admin/refunds", label: "Refunds", icon: RefreshCw, badge: null, permKey: "refunds" },
+      { href: "/admin/payment-links", label: "Payment Links", icon: LinkIcon, badge: null, permKey: "paymentLinks" },
     ],
   },
   {
     label: "Operations",
     items: [
-      { href: "/admin/gps", label: "GPS Tracking", icon: Navigation, badge: null },
-      { href: "/display", label: "Public Display", icon: Share2, badge: null, external: true },
-      { href: "/admin/reports", label: "Reports", icon: BarChart3, badge: null },
+      { href: "/admin/gps", label: "GPS Tracking", icon: Navigation, badge: null, permKey: "gpsTracking" },
+      { href: "/display", label: "Public Display", icon: Share2, badge: null, external: true, permKey: "publicDisplay" },
+      { href: "/admin/reports", label: "Reports", icon: BarChart3, badge: null, permKey: "reports" },
     ],
   },
   {
     label: "Content",
     items: [
-      { href: "/admin/blogs", label: "Blogs", icon: BookOpen, badge: null },
-      { href: "/admin/slider", label: "Slider / Banners", icon: Globe, badge: null },
-      { href: "/admin/offers", label: "Offers & Banners", icon: Tag, badge: null },
-      { href: "/admin/testimonials", label: "Testimonials", icon: MessageSquare, badge: null },
-      { href: "/admin/policy-pages", label: "Policy Pages", icon: Info, badge: null },
-      { href: "/admin/coupons", label: "Coupons", icon: Tag, badge: null },
-      { href: "/admin/cities", label: "Manage Cities", icon: MapPin, badge: null },
-      { href: "/admin/contact-requests", label: "Contact Requests", icon: MessageSquare, badge: counts.newContacts || null },
-      { href: "/admin/seo", label: "SEO Pages", icon: Globe, badge: null },
+      { href: "/admin/blogs", label: "Blogs", icon: BookOpen, badge: null, permKey: "blogs" },
+      { href: "/admin/slider", label: "Slider / Banners", icon: Globe, badge: null, permKey: "slider" },
+      { href: "/admin/offers", label: "Offers & Banners", icon: Tag, badge: null, permKey: "offers" },
+      { href: "/admin/testimonials", label: "Testimonials", icon: MessageSquare, badge: null, permKey: "testimonials" },
+      { href: "/admin/policy-pages", label: "Policy Pages", icon: Info, badge: null, permKey: "policyPages" },
+      { href: "/admin/coupons", label: "Coupons", icon: Tag, badge: null, permKey: "coupons" },
+      { href: "/admin/cities", label: "Manage Cities", icon: MapPin, badge: null, permKey: "cities" },
+      { href: "/admin/contact-requests", label: "Contact Requests", icon: MessageSquare, badge: counts.newContacts || null, permKey: "contactRequests" },
+      { href: "/admin/seo", label: "SEO Pages", icon: Globe, badge: null, permKey: "seoPages" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { href: "/admin/basic-details", label: "Basic Details", icon: Info, badge: null },
-      { href: "/admin/social-media", label: "Social Media", icon: Share2, badge: null },
+      { href: "/admin/basic-details", label: "Basic Details", icon: Info, badge: null, permKey: "basicDetails" },
+      { href: "/admin/social-media", label: "Social Media", icon: Share2, badge: null, permKey: "socialMedia" },
       { href: "/admin/manage-admins", label: "Manage Admins", icon: Users, badge: null },
-      { href: "/admin/whatsapp-test", label: "WhatsApp Test", icon: MessageSquare, badge: null },
+      { href: "/admin/whatsapp-test", label: "WhatsApp Test", icon: MessageSquare, badge: null, permKey: "whatsappTest" },
     ],
   },
+];
+
+// Extra routes reachable by direct link/URL but not themselves a sidebar
+// entry (e.g. a booking detail page opened from All Bookings) — mapped so
+// the page-access guard below still covers them.
+const EXTRA_ROUTE_PERMS: { prefix: string; permKey: string }[] = [
+  { prefix: "/admin/bookings/", permKey: "allBookings" },
+  { prefix: "/admin/tempo-admin", permKey: "tempoAdmin" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -131,21 +143,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.replace("/admin/login");
   };
 
-  if (isLoginPage) return <>{children}</>;
-  if (!authChecked) return null;
-
   // Manage Admins is deliberately not delegable — hide it from anyone who
-  // isn't super_admin (the server independently 403s the API too).
+  // isn't super_admin (the server independently 403s the API too). Every
+  // other item is hidden unless the admin has been granted "view" on its
+  // permKey — super_admin always passes inside canView().
   const navGroups = buildNavGroups(counts)
-    .map(g => ({ ...g, items: g.items.filter(i => i.href !== "/admin/manage-admins" || adminUser?.role === "super_admin") }))
+    .map(g => ({
+      ...g,
+      items: g.items.filter(i =>
+        i.href === "/admin/manage-admins" ? isSuperAdmin() : !i.permKey || canView(i.permKey)
+      ),
+    }))
     .filter(g => g.items.length > 0);
-  const allItems = navGroups.flatMap(g => g.items);
+  const allItems = buildNavGroups(counts).flatMap(g => g.items); // unfiltered — used for breadcrumb + guard matching
   // Prefer the most specific (longest) matching href — e.g. on
   // /admin/bookings/arrivals this must resolve to "Arrivals & Departures",
   // not "All Bookings" just because it's listed first and also prefix-matches.
   const currentPage = allItems
     .filter(item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/")))
     .sort((a, b) => b.href.length - a.href.length)[0];
+
+  // Central page-access guard: if the current URL maps to a permKey the
+  // admin doesn't have "view" on, bounce them out instead of just hiding the
+  // nav link — this is what actually stops typing the URL directly.
+  useEffect(() => {
+    if (isLoginPage || !authChecked) return;
+    const matched = allItems
+      .filter(item => pathname === item.href || (item.href !== "/admin/dashboard" && pathname.startsWith(item.href + "/")))
+      .sort((a, b) => b.href.length - a.href.length)[0];
+    const extra = EXTRA_ROUTE_PERMS.find(r => pathname.startsWith(r.prefix));
+    const permKey = matched?.permKey ?? extra?.permKey;
+    const needsManageAdminsGuard = pathname.startsWith("/admin/manage-admins") && !isSuperAdmin();
+    const blocked = needsManageAdminsGuard || (permKey && !canView(permKey));
+    if (blocked) {
+      const firstAllowed = navGroups[0]?.items[0]?.href || "/admin/dashboard";
+      router.replace(firstAllowed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, authChecked, isLoginPage]);
+
+  if (isLoginPage) return <>{children}</>;
+  if (!authChecked) return null;
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });

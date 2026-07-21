@@ -80,7 +80,7 @@ export default function AdminUsersPage() {
   const [canDeleteUser, setCanDeleteUser] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => { setCanDeleteUser(canDelete("users")); }, []);
+  useEffect(() => { setCanDeleteUser(canDelete("userList")); }, []);
 
   // ── Fetch users ─────────────────────────────────────────────────────────────
   const fetchUsers = useCallback((p = 1, s = "", kyc = "all") => {

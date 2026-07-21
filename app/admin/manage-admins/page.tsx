@@ -3,9 +3,54 @@
 import { useEffect, useState } from "react";
 import {
   Plus, Pencil, Trash2, X, Loader2, AlertCircle,
-  Shield, Crown, UserCog, Car, Truck, Settings,
+  Shield, Crown, UserCog, Truck, Settings,
 } from "lucide-react";
 import { adminAdminsAPI } from "@/lib/api";
+
+// Every sidebar item gets a row here. `ops` lists which of View/Add/Edit/Delete
+// are meaningfully enforceable for that page (the UI shows "—" for the rest).
+const SECTIONS = [
+  { key: "dashboard",           label: "Dashboard",              group: "Overview",     ops: ["view"] as const },
+
+  { key: "carListing",          label: "Car Listing",            group: "Fleet",         ops: ["view","edit","delete"] as const },
+  { key: "addCar",              label: "Add Car",                group: "Fleet",         ops: ["view"] as const },
+  { key: "carDocuments",        label: "Car Documents",          group: "Fleet",         ops: ["view","edit"] as const },
+  { key: "carMaintenance",      label: "Car Maintenance",        group: "Fleet",         ops: ["view","add","edit","delete"] as const },
+  { key: "vehicleVerification", label: "Vehicle Verification",   group: "Fleet",         ops: ["view","edit"] as const },
+
+  { key: "allBookings",         label: "All Bookings",           group: "Bookings",      ops: ["view","edit","delete"] as const },
+  { key: "offlineBooking",      label: "Offline Booking",        group: "Bookings",      ops: ["view","add","edit","delete"] as const },
+  { key: "arrivals",            label: "Arrivals & Departures",  group: "Bookings",      ops: ["view"] as const },
+  { key: "closingBills",        label: "Closing Bills",          group: "Bookings",      ops: ["view"] as const },
+
+  { key: "userList",            label: "User List",              group: "Users & KYC",  ops: ["view","edit","delete"] as const },
+  { key: "kycReview",           label: "KYC Review",             group: "Users & KYC",  ops: ["view","edit"] as const },
+
+  { key: "refunds",             label: "Refunds",                group: "Finance",       ops: ["view","edit"] as const },
+  { key: "paymentLinks",        label: "Payment Links",          group: "Finance",       ops: ["view","add"] as const },
+
+  { key: "gpsTracking",         label: "GPS Tracking",           group: "Operations",    ops: ["view"] as const },
+  { key: "publicDisplay",       label: "Public Display",         group: "Operations",    ops: ["view"] as const },
+  { key: "reports",             label: "Reports",                group: "Operations",    ops: ["view"] as const },
+
+  { key: "blogs",               label: "Blogs",                  group: "Content",       ops: ["view","add","edit","delete"] as const },
+  { key: "slider",              label: "Slider / Banners",       group: "Content",       ops: ["view","add","edit","delete"] as const },
+  { key: "offers",              label: "Offers & Banners",       group: "Content",       ops: ["view","add","edit","delete"] as const },
+  { key: "testimonials",        label: "Testimonials",           group: "Content",       ops: ["view","add","edit","delete"] as const },
+  { key: "policyPages",         label: "Policy Pages",           group: "Content",       ops: ["view","edit"] as const },
+  { key: "coupons",             label: "Coupons",                group: "Content",       ops: ["view","add","edit","delete"] as const },
+  { key: "cities",              label: "Manage Cities",          group: "Content",       ops: ["view","add","edit","delete"] as const },
+  { key: "contactRequests",     label: "Contact Requests",       group: "Content",       ops: ["view","edit"] as const },
+  { key: "seoPages",            label: "SEO Pages",              group: "Content",       ops: ["view","add","edit","delete"] as const },
+
+  { key: "basicDetails",        label: "Basic Details",          group: "Settings",      ops: ["view","edit"] as const },
+  { key: "socialMedia",         label: "Social Media",           group: "Settings",      ops: ["view","edit"] as const },
+  { key: "whatsappTest",        label: "WhatsApp Test",          group: "Settings",      ops: ["view"] as const },
+
+  { key: "tempoAdmin",          label: "Tempo Admin (all pages)", group: "Tempo",        ops: ["view","add","edit","delete"] as const },
+] as const;
+
+const GROUP_ORDER = ["Overview", "Fleet", "Bookings", "Users & KYC", "Finance", "Operations", "Content", "Settings", "Tempo"];
 
 const ROLES = [
   {
@@ -15,22 +60,28 @@ const ROLES = [
     icon: Crown,
     color: "#E8540A",
     bg: "#FFF3ED",
-    permissions: {
-      dashboard: true, fleet: true, bookings: true, users: true,
-      finance: true, settings: true, tempoAdmin: true, content: true,
-    },
+    // Full access — roleDefaultPerms grants every op (including delete)
+    // since roleId === "super_admin" is special-cased there.
+    permissions: Object.fromEntries(SECTIONS.map((s) => [s.key, true])) as Record<string, boolean>,
   },
   {
     id: "admin",
     label: "Admin",
-    description: "Full self-drive access, no settings",
+    description: "Full operational access, no settings/admin control",
     icon: Shield,
     color: "#7C3AED",
     bg: "#F5F3FF",
     permissions: {
-      dashboard: true, fleet: true, bookings: true, users: true,
-      finance: true, settings: false, tempoAdmin: false, content: true,
-    },
+      dashboard: true,
+      carListing: true, addCar: true, carDocuments: true, carMaintenance: true, vehicleVerification: true,
+      allBookings: true, offlineBooking: true, arrivals: true, closingBills: true,
+      userList: true, kycReview: true,
+      refunds: true, paymentLinks: true,
+      gpsTracking: true, publicDisplay: true, reports: true,
+      blogs: true, slider: true, offers: true, testimonials: true, policyPages: true,
+      coupons: true, cities: true, contactRequests: true, seoPages: true,
+      basicDetails: false, socialMedia: false, whatsappTest: false, tempoAdmin: false,
+    } as Record<string, boolean>,
   },
   {
     id: "tempo_admin",
@@ -39,10 +90,7 @@ const ROLES = [
     icon: Truck,
     color: "#0EA5E9",
     bg: "#E0F2FE",
-    permissions: {
-      dashboard: false, fleet: false, bookings: false, users: false,
-      finance: false, settings: false, tempoAdmin: true, content: false,
-    },
+    permissions: { tempoAdmin: true } as Record<string, boolean>,
   },
   {
     id: "sub_admin",
@@ -51,10 +99,7 @@ const ROLES = [
     icon: UserCog,
     color: "#10B981",
     bg: "#D1FAE5",
-    permissions: {
-      dashboard: true, fleet: false, bookings: true, users: false,
-      finance: false, settings: false, tempoAdmin: false, content: false,
-    },
+    permissions: { dashboard: true, allBookings: true } as Record<string, boolean>,
   },
   {
     id: "custom",
@@ -63,30 +108,9 @@ const ROLES = [
     icon: Settings,
     color: "#6B7280",
     bg: "#F3F4F6",
-    permissions: {
-      dashboard: false, fleet: false, bookings: false, users: false,
-      finance: false, settings: false, tempoAdmin: false, content: false,
-    },
+    permissions: {} as Record<string, boolean>,
   },
 ];
-
-const SECTIONS = [
-  { key: "dashboard",  label: "Dashboard",          ops: ["view"] as const },
-  { key: "fleet",      label: "Fleet / Cars",        ops: ["view","add","edit","delete"] as const },
-  { key: "bookings",   label: "Bookings",             ops: ["view","add","edit","delete"] as const },
-  { key: "users",      label: "Users & KYC",          ops: ["view","edit","delete"] as const },
-  { key: "finance",    label: "Finance",              ops: ["view"] as const },
-  { key: "settings",   label: "Settings",             ops: ["view","edit"] as const },
-  { key: "tempoAdmin", label: "Tempo Admin",          ops: ["view","add","edit","delete"] as const },
-  { key: "content",    label: "Blogs / SEO",          ops: ["view","add","edit","delete"] as const },
-] as const;
-
-// Keep backward-compatible flat label map for displaying chips in the table
-const PERMISSION_LABELS: Record<string, string> = {
-  dashboard: "Dashboard", fleet: "Fleet / Cars", bookings: "Bookings",
-  users: "Users & KYC", finance: "Finance", settings: "Settings",
-  tempoAdmin: "Tempo Admin", content: "Content (Blogs/SEO)",
-};
 
 type Permissions = Record<string, boolean>;
 
@@ -182,14 +206,13 @@ export default function ManageAdminsPage() {
   };
 
   const openEdit = (admin: Admin) => {
-    const rc = roleConfig(admin.role || "admin");
     setEditing(admin);
     setForm({
       name: admin.name,
       email: admin.email,
       password: "",
       role: admin.role || "admin",
-      permissions: { ...defaultPermissions, ...(admin.permissions || rc.permissions) },
+      permissions: { ...defaultPermissions, ...(admin.permissions || roleDefaultPerms(admin.role || "admin")) },
     });
     setFormError("");
     setModalOpen(true);
@@ -387,8 +410,8 @@ export default function ManageAdminsPage() {
                 filtered.map((admin, i) => {
                   const rc = roleConfig(admin.role || "admin");
                   const Icon = rc.icon;
-                  const perms = { ...defaultPermissions, ...(admin.permissions || rc.permissions) };
-                  const activePerms = Object.entries(perms).filter(([, v]) => v).map(([k]) => PERMISSION_LABELS[k]);
+                  const perms = { ...defaultPermissions, ...(admin.permissions || roleDefaultPerms(admin.role || "admin")) };
+                  const activePerms = SECTIONS.filter((s) => perms[s.key]).map((s) => s.label);
                   return (
                     <tr
                       key={admin._id}
@@ -486,14 +509,14 @@ export default function ManageAdminsPage() {
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center px-4 overflow-y-auto py-8">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#E4E5EF]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#E4E5EF] shrink-0">
               <div>
                 <h2 className="font-bold font-syne text-[#0F0F1A] text-lg">
                   {editing ? "Edit Admin" : "Create Admin"}
                 </h2>
-                <p className="text-[#9090A8] text-xs mt-0.5">Configure role and permissions</p>
+                <p className="text-[#9090A8] text-xs mt-0.5">Configure role and page-level permissions</p>
               </div>
               <button onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-xl bg-[#F0F1F6] flex items-center justify-center text-[#9090A8] hover:text-[#0F0F1A]">
                 <X size={16} />
@@ -572,59 +595,70 @@ export default function ManageAdminsPage() {
                 </div>
               </div>
 
-              {/* Permissions — CRUD per section */}
+              {/* Permissions — CRUD per sidebar item, grouped like the sidebar */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[#9090A8] text-[10px] font-bold uppercase tracking-wider">Section Permissions</label>
+                <div className="flex items-center justify-between sticky top-0 bg-white z-10 pb-1">
+                  <label className="text-[#9090A8] text-[10px] font-bold uppercase tracking-wider">Sidebar Item Permissions</label>
                   <div className="flex gap-2 text-[9px] font-bold text-[#9090A8] uppercase tracking-wider pr-1">
-                    <span className="w-10 text-center">View</span>
-                    <span className="w-10 text-center">Add</span>
-                    <span className="w-10 text-center">Edit</span>
-                    <span className="w-10 text-center">Del</span>
+                    <span className="w-9 text-center">View</span>
+                    <span className="w-9 text-center">Add</span>
+                    <span className="w-9 text-center">Edit</span>
+                    <span className="w-9 text-center">Del</span>
                   </div>
                 </div>
                 <div className="border border-[#E4E5EF] rounded-xl overflow-hidden divide-y divide-[#E4E5EF]">
-                  {SECTIONS.map(({ key, label, ops }) => {
-                    const sectionOn = !!form.permissions[key];
-                    return (
-                      <div key={key} className={`flex items-center justify-between px-3 py-2.5 transition-colors ${sectionOn ? "bg-[#FFF3ED]" : "bg-white hover:bg-[#F8F9FC]"}`}>
-                        {/* Section toggle */}
-                        <label className="flex items-center gap-2 cursor-pointer flex-1">
-                          <input
-                            type="checkbox"
-                            checked={sectionOn}
-                            onChange={e => toggleSection(key, e.target.checked)}
-                            className="w-3.5 h-3.5 accent-[#E8540A]"
-                          />
-                          <span className={`text-xs font-semibold ${sectionOn ? "text-[#E8540A]" : "text-[#4A4A6A]"}`}>{label}</span>
-                        </label>
-                        {/* CRUD ops */}
-                        <div className="flex gap-2">
-                          {(["view","add","edit","delete"] as const).map(op => {
-                            const hasOp = ops.includes(op as never);
-                            const opKey = `${key}_${op}`;
-                            return (
-                              <div key={op} className="w-10 flex justify-center">
-                                {hasOp ? (
-                                  <input
-                                    type="checkbox"
-                                    checked={!!form.permissions[opKey]}
-                                    disabled={!sectionOn}
-                                    onChange={e => toggleOp(key, op, e.target.checked)}
-                                    className="w-3.5 h-3.5 accent-[#E8540A] disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-                                  />
-                                ) : (
-                                  <span className="text-[#E4E5EF] text-xs">—</span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
+                  {GROUP_ORDER.map((group) => (
+                    <div key={group}>
+                      <div className="px-3 py-1.5 bg-[#F8F9FC] text-[9px] font-bold uppercase tracking-widest text-[#9090A8]">
+                        {group}
                       </div>
-                    );
-                  })}
+                      {SECTIONS.filter((s) => s.group === group).map(({ key, label, ops }) => {
+                        const sectionOn = !!form.permissions[key];
+                        return (
+                          <div key={key} className={`flex items-center justify-between px-3 py-2 transition-colors border-t border-[#F0F1F6] ${sectionOn ? "bg-[#FFF3ED]" : "bg-white hover:bg-[#F8F9FC]"}`}>
+                            {/* Section toggle */}
+                            <label className="flex items-center gap-2 cursor-pointer flex-1">
+                              <input
+                                type="checkbox"
+                                checked={sectionOn}
+                                onChange={e => toggleSection(key, e.target.checked)}
+                                className="w-3.5 h-3.5 accent-[#E8540A]"
+                              />
+                              <span className={`text-xs font-semibold ${sectionOn ? "text-[#E8540A]" : "text-[#4A4A6A]"}`}>{label}</span>
+                            </label>
+                            {/* CRUD ops */}
+                            <div className="flex gap-2">
+                              {(["view","add","edit","delete"] as const).map(op => {
+                                const hasOp = (ops as readonly string[]).includes(op);
+                                const opKey = `${key}_${op}`;
+                                return (
+                                  <div key={op} className="w-9 flex justify-center">
+                                    {hasOp ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={!!form.permissions[opKey]}
+                                        disabled={!sectionOn}
+                                        onChange={e => toggleOp(key, op, e.target.checked)}
+                                        className="w-3.5 h-3.5 accent-[#E8540A] disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                                      />
+                                    ) : (
+                                      <span className="text-[#E4E5EF] text-xs">—</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-                <p className="text-[10px] text-[#9090A8] px-1">Enable a section first, then toggle individual operations.</p>
+                <p className="text-[10px] text-[#9090A8] px-1">
+                  Enable a page first, then toggle which operations that admin can perform on it. "—" means that
+                  operation doesn't apply to this page (e.g. Refunds/Payment Links are view-only until wired to
+                  live data; Basic Details and Social Media share one save action).
+                </p>
               </div>
 
               {formError && (

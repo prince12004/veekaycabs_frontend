@@ -52,7 +52,7 @@ export default function BlogsPage() {
   const [canDeleteBlog, setCanDeleteBlog] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setCanDeleteBlog(canDelete("content")); }, []);
+  useEffect(() => { setCanDeleteBlog(canDelete("blogs")); }, []);
 
   const fetchBlogs = useCallback(() => {
     setLoading(true);

@@ -52,7 +52,7 @@ export default function AdminBookingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [canDeleteBooking, setCanDeleteBooking] = useState(false);
 
-  useEffect(() => { setCanDeleteBooking(canDelete("bookings")); }, []);
+  useEffect(() => { setCanDeleteBooking(canDelete("allBookings")); }, []);
 
   const fetch = useCallback(async () => {
     setLoading(true);

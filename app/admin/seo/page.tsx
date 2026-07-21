@@ -32,7 +32,7 @@ export default function SeoPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [canDeletePage, setCanDeletePage] = useState(false);
 
-  useEffect(() => { setCanDeletePage(canDelete("content")); }, []);
+  useEffect(() => { setCanDeletePage(canDelete("seoPages")); }, []);
 
   const loadPages = () => {
     setLoading(true);
