@@ -1279,7 +1279,7 @@ export default function BookingDetailPage() {
                     {!dentResult && (
                       <button onClick={() => runDentDetection(false)} disabled={dentLoading}
                         className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-[#7C3AED] text-white hover:bg-[#6D28D9] disabled:opacity-60 transition-colors">
-                        {dentLoading ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : <><Zap size={14} /> Run AI Dent Detection</>}
+                        {dentLoading ? <><Loader2 size={14} className="animate-spin" /> Analyzing...</> : <><Zap size={14} /> Run Dent Detection</>}
                       </button>
                     )}
 
@@ -1298,17 +1298,17 @@ export default function BookingDetailPage() {
                         {dentResult.damages?.length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {dentResult.damages.map((d, i) => (
-                              <div key={i} className="border border-[#E4E5EF] rounded-xl p-3">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-xs font-bold text-[#0F0F1A]">{d.location}</p>
-                                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
+                              <div key={i} className="border border-[#E4E5EF] rounded-xl p-3 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-bold text-[#0F0F1A] break-words">{d.location}</p>
+                                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
                                     d.severity === "severe" ? "bg-[#FEE2E2] text-[#991B1B]" :
                                     d.severity === "moderate" ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#F1F2F7] text-[#4A4A6A]")}>
                                     {d.severity}
                                   </span>
                                 </div>
-                                <p className="text-[11px] text-[#9090A8] mt-1">{d.type}</p>
-                                <p className="text-xs text-[#4A4A6A] mt-1">{d.description}</p>
+                                <p className="text-[11px] text-[#9090A8] mt-1 break-words">{d.type}</p>
+                                <p className="text-xs text-[#4A4A6A] mt-1 break-words">{d.description}</p>
                               </div>
                             ))}
                           </div>
@@ -2164,7 +2164,7 @@ function DentComparisonModal({
           <button onClick={runAnalysis}
             disabled={analyzing || pickupUrls.length === 0 || returnUrls.length === 0}
             className="flex items-center gap-1.5 px-3 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-colors">
-            {analyzing ? <><Loader2 size={11} className="animate-spin" /> Analyzing...</> : <><Zap size={11} /> Run AI Analysis</>}
+            {analyzing ? <><Loader2 size={11} className="animate-spin" /> Analyzing...</> : <><Zap size={11} /> Run Analysis</>}
           </button>
           <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
             <XIcon size={15} />
@@ -2294,7 +2294,7 @@ function DentComparisonModal({
           </div>
         ) : (
           <p className="text-white/30 text-xs">
-            {pickupUrls.length > 0 && returnUrls.length > 0 ? 'Click "Run AI Analysis" to detect dents' : "Upload both pickup and return media to compare"}
+            {pickupUrls.length > 0 && returnUrls.length > 0 ? 'Click "Run Analysis" to detect dents' : "Upload both pickup and return media to compare"}
           </p>
         )}
       </div>

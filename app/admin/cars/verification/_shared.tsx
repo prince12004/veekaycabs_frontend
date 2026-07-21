@@ -195,6 +195,7 @@ export function CheckedVehiclesTable({
                               {entry.challanCheck.challans.length > 0 ? (
                                 <div className="space-y-1.5">
                                   <p className="text-[#92400E] font-semibold">Total Pending: ₹{entry.challanCheck.totalPendingAmount.toLocaleString("en-IN")}</p>
+                                  <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                                   {entry.challanCheck.challans.map((c, i) => (
                                     <div key={i} className="border border-[#E4E5EF] rounded-lg px-2.5 py-1.5">
                                       <div className="flex items-center justify-between">
@@ -208,6 +209,7 @@ export function CheckedVehiclesTable({
                                       </div>
                                     </div>
                                   ))}
+                                  </div>
                                 </div>
                               ) : (
                                 <p className="text-[#10B981]">No pending challans found</p>
