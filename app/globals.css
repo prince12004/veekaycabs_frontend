@@ -165,6 +165,3 @@ input:focus, select:focus, textarea:focus {
 .h-36{
   height: 12rem !important;
 }
-.text-xs{
-  white-space: nowrap !important;
-}
