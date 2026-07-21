@@ -7,9 +7,21 @@ import {
 } from "lucide-react";
 import { adminAdminsAPI } from "@/lib/api";
 
+type SectionDef = {
+  key: string;
+  label: string;
+  group: string;
+  ops: readonly ("view" | "add" | "edit" | "delete")[];
+  // A handful of booking actions (upload verification images, extend) are
+  // narrower than full "Edit" and delegable independently of it — these
+  // don't fit the fixed 4-column View/Add/Edit/Delete grid, so they render
+  // as an extra sub-row just for the sections that declare them.
+  extraOps?: readonly { key: string; label: string }[];
+};
+
 // Every sidebar item gets a row here. `ops` lists which of View/Add/Edit/Delete
 // are meaningfully enforceable for that page (the UI shows "—" for the rest).
-const SECTIONS = [
+const SECTIONS: SectionDef[] = [
   { key: "dashboard",           label: "Dashboard",              group: "Overview",     ops: ["view"] as const },
 
   { key: "carListing",          label: "Car Listing",            group: "Fleet",         ops: ["view","edit","delete"] as const },
@@ -18,8 +30,22 @@ const SECTIONS = [
   { key: "carMaintenance",      label: "Car Maintenance",        group: "Fleet",         ops: ["view","add","edit","delete"] as const },
   { key: "vehicleVerification", label: "Vehicle Verification",   group: "Fleet",         ops: ["view","edit"] as const },
 
-  { key: "allBookings",         label: "All Bookings",           group: "Bookings",      ops: ["view","edit","delete"] as const },
-  { key: "offlineBooking",      label: "Offline Booking",        group: "Bookings",      ops: ["view","add","edit","delete"] as const },
+  {
+    key: "allBookings", label: "All Bookings", group: "Bookings", ops: ["view","edit","delete"] as const,
+    // Full "Edit" already covers these — extraOps let a super admin hand out
+    // just image uploads or just extend, without full booking edit access.
+    extraOps: [
+      { key: "uploadMedia", label: "Upload Pickup/Return Images" },
+      { key: "extend", label: "Extend Booking" },
+    ],
+  },
+  {
+    key: "offlineBooking", label: "Offline Booking", group: "Bookings", ops: ["view","add","edit","delete"] as const,
+    extraOps: [
+      { key: "uploadMedia", label: "Upload Pickup/Return Images" },
+      { key: "extend", label: "Extend Booking" },
+    ],
+  },
   { key: "arrivals",            label: "Arrivals & Departures",  group: "Bookings",      ops: ["view"] as const },
   { key: "closingBills",        label: "Closing Bills",          group: "Bookings",      ops: ["view"] as const },
 
@@ -48,7 +74,7 @@ const SECTIONS = [
   { key: "whatsappTest",        label: "WhatsApp Test",          group: "Settings",      ops: ["view"] as const },
 
   { key: "tempoAdmin",          label: "Tempo Admin (all pages)", group: "Tempo",        ops: ["view","add","edit","delete"] as const },
-] as const;
+];
 
 const GROUP_ORDER = ["Overview", "Fleet", "Bookings", "Users & KYC", "Finance", "Operations", "Content", "Settings", "Tempo"];
 
@@ -131,12 +157,19 @@ type FormState = {
   permissions: Permissions;
 };
 
+// All toggleable op keys for a section — the 4 standard CRUD ops plus any
+// section-specific extraOps (e.g. allBookings' "uploadMedia"/"extend").
+const sectionOpKeys = (sec: SectionDef): string[] => [
+  ...sec.ops,
+  ...(sec.extraOps?.map(e => e.key) ?? []),
+];
+
 // Flat permission keys: section key (access toggle) + section_op (CRUD granularity)
 const buildDefaultPerms = (on = false): Permissions => {
   const p: Permissions = {};
-  SECTIONS.forEach(({ key, ops }) => {
-    p[key] = on;
-    ops.forEach(op => { p[`${key}_${op}`] = on; });
+  SECTIONS.forEach((sec) => {
+    p[sec.key] = on;
+    sectionOpKeys(sec).forEach(op => { p[`${sec.key}_${op}`] = on; });
   });
   return p;
 };
@@ -155,7 +188,8 @@ const roleDefaultPerms = (roleId: string): Permissions => {
     base[key] = !!allowed;
     if (allowed) {
       const sec = SECTIONS.find(s => s.key === key);
-      sec?.ops.forEach(op => {
+      if (!sec) return;
+      sectionOpKeys(sec).forEach(op => {
         if (op === "delete" && roleId !== "super_admin") return;
         base[`${key}_${op}`] = true;
       });
@@ -222,23 +256,23 @@ export default function ManageAdminsPage() {
     setForm((f) => ({ ...f, role: roleId, permissions: roleDefaultPerms(roleId) }));
   };
 
-  // Toggle a section's access (also toggle all its CRUD ops)
+  // Toggle a section's access (also toggle all its CRUD ops + extraOps)
   const toggleSection = (key: string, checked: boolean) => {
     const sec = SECTIONS.find(s => s.key === key);
     setForm(f => {
       const p = { ...f.permissions, [key]: checked };
-      sec?.ops.forEach(op => { p[`${key}_${op}`] = checked; });
+      if (sec) sectionOpKeys(sec).forEach(op => { p[`${key}_${op}`] = checked; });
       return { ...f, permissions: p, role: "custom" };
     });
   };
 
-  // Toggle a single CRUD op within a section
+  // Toggle a single op (standard CRUD or an extraOp) within a section
   const toggleOp = (key: string, op: string, checked: boolean) => {
     setForm(f => {
       const p = { ...f.permissions, [`${key}_${op}`]: checked };
       // If any op is enabled, section access should be true
       const sec = SECTIONS.find(s => s.key === key);
-      const anyOp = sec?.ops.some(o => p[`${key}_${o}`]);
+      const anyOp = sec && sectionOpKeys(sec).some(o => p[`${key}_${o}`]);
       p[key] = !!anyOp;
       return { ...f, permissions: p, role: "custom" };
     });
@@ -612,42 +646,62 @@ export default function ManageAdminsPage() {
                       <div className="px-3 py-1.5 bg-[#F8F9FC] text-[9px] font-bold uppercase tracking-widest text-[#9090A8]">
                         {group}
                       </div>
-                      {SECTIONS.filter((s) => s.group === group).map(({ key, label, ops }) => {
+                      {SECTIONS.filter((s) => s.group === group).map(({ key, label, ops, extraOps }) => {
                         const sectionOn = !!form.permissions[key];
                         return (
-                          <div key={key} className={`flex items-center justify-between px-3 py-2 transition-colors border-t border-[#F0F1F6] ${sectionOn ? "bg-[#FFF3ED]" : "bg-white hover:bg-[#F8F9FC]"}`}>
-                            {/* Section toggle */}
-                            <label className="flex items-center gap-2 cursor-pointer flex-1">
-                              <input
-                                type="checkbox"
-                                checked={sectionOn}
-                                onChange={e => toggleSection(key, e.target.checked)}
-                                className="w-3.5 h-3.5 accent-[#E8540A]"
-                              />
-                              <span className={`text-xs font-semibold ${sectionOn ? "text-[#E8540A]" : "text-[#4A4A6A]"}`}>{label}</span>
-                            </label>
-                            {/* CRUD ops */}
-                            <div className="flex gap-2">
-                              {(["view","add","edit","delete"] as const).map(op => {
-                                const hasOp = (ops as readonly string[]).includes(op);
-                                const opKey = `${key}_${op}`;
-                                return (
-                                  <div key={op} className="w-9 flex justify-center">
-                                    {hasOp ? (
-                                      <input
-                                        type="checkbox"
-                                        checked={!!form.permissions[opKey]}
-                                        disabled={!sectionOn}
-                                        onChange={e => toggleOp(key, op, e.target.checked)}
-                                        className="w-3.5 h-3.5 accent-[#E8540A] disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-                                      />
-                                    ) : (
-                                      <span className="text-[#E4E5EF] text-xs">—</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                          <div key={key}>
+                            <div className={`flex items-center justify-between px-3 py-2 transition-colors border-t border-[#F0F1F6] ${sectionOn ? "bg-[#FFF3ED]" : "bg-white hover:bg-[#F8F9FC]"}`}>
+                              {/* Section toggle */}
+                              <label className="flex items-center gap-2 cursor-pointer flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={sectionOn}
+                                  onChange={e => toggleSection(key, e.target.checked)}
+                                  className="w-3.5 h-3.5 accent-[#E8540A]"
+                                />
+                                <span className={`text-xs font-semibold ${sectionOn ? "text-[#E8540A]" : "text-[#4A4A6A]"}`}>{label}</span>
+                              </label>
+                              {/* CRUD ops */}
+                              <div className="flex gap-2">
+                                {(["view","add","edit","delete"] as const).map(op => {
+                                  const hasOp = (ops as readonly string[]).includes(op);
+                                  const opKey = `${key}_${op}`;
+                                  return (
+                                    <div key={op} className="w-9 flex justify-center">
+                                      {hasOp ? (
+                                        <input
+                                          type="checkbox"
+                                          checked={!!form.permissions[opKey]}
+                                          disabled={!sectionOn}
+                                          onChange={e => toggleOp(key, op, e.target.checked)}
+                                          className="w-3.5 h-3.5 accent-[#E8540A] disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                                        />
+                                      ) : (
+                                        <span className="text-[#E4E5EF] text-xs">—</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
+                            {/* Fine-grained extras — independent of full Edit (e.g. give only
+                                "upload verification images" or only "extend" without full booking edit) */}
+                            {extraOps && extraOps.length > 0 && (
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 pl-8 py-1.5 bg-[#FAFBFF] border-t border-[#F0F1F6]">
+                                {extraOps.map(({ key: opKey, label: opLabel }) => (
+                                  <label key={opKey} className={`flex items-center gap-1.5 ${sectionOn ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={!!form.permissions[`${key}_${opKey}`]}
+                                      disabled={!sectionOn}
+                                      onChange={e => toggleOp(key, opKey, e.target.checked)}
+                                      className="w-3 h-3 accent-[#E8540A] disabled:cursor-not-allowed"
+                                    />
+                                    <span className="text-[10px] font-medium text-[#4A4A6A]">{opLabel}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
