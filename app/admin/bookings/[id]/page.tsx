@@ -154,7 +154,7 @@ export default function BookingDetailPage() {
 
   // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", amountPaid: "", paymentMode: "online", notes: "" });
+  const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", bookingFare: "", amountPaid: "", paymentMode: "online", notes: "" });
   const [editLoading, setEditLoading] = useState(false);
 
   // Extend Booking modal
@@ -349,6 +349,7 @@ export default function BookingDetailPage() {
       startTime:   toLocal(rawBooking.startTime),
       endTime:     toLocal(rawBooking.endTime),
       totalAmount: String(rawBooking.totalAmount || ""),
+      bookingFare: String(rawBooking.bookingFare || ""),
       amountPaid:  String(rawBooking.amountPaid  || ""),
       paymentMode: rawBooking.paymentMode || "online",
       notes:       rawBooking.challanDetails || "",
@@ -364,6 +365,7 @@ export default function BookingDetailPage() {
         startTime:   editForm.startTime  ? new Date(editForm.startTime).toISOString()  : undefined,
         endTime:     editForm.endTime    ? new Date(editForm.endTime).toISOString()    : undefined,
         totalAmount: editForm.totalAmount ? Number(editForm.totalAmount) : undefined,
+        bookingFare: editForm.bookingFare ? Number(editForm.bookingFare) : undefined,
         amountPaid:  editForm.amountPaid  ? Number(editForm.amountPaid)  : undefined,
         paymentMode: editForm.paymentMode,
         notes:       editForm.notes,
@@ -600,7 +602,11 @@ export default function BookingDetailPage() {
     setClosingForm({
       startingMeter: rawBooking.odometerStart != null ? String(rawBooking.odometerStart) : "",
       closingMeter: String(defaultClosingMeter),
-      kmsLimit: prev?.kmsLimit ? String(prev.kmsLimit) : (defaultLimit ? String(defaultLimit) : ""),
+      // Unlike the other manually-entered fields below, the km limit IS
+      // derivable from the car's package × current nights — prefer that
+      // fresh value over whatever was saved last time, since the booking's
+      // dates may have been edited (shortened/extended) since it was closed.
+      kmsLimit: defaultLimit ? String(defaultLimit) : (prev?.kmsLimit ? String(prev.kmsLimit) : ""),
       extraKmRate: prev?.extraKmRate ? String(prev.extraKmRate) : (carExtraKmRate ? String(carExtraKmRate) : ""),
       actualReturnTime: prev?.actualReturnTime ? toLocal(new Date(prev.actualReturnTime)) : defaultReturnTime,
       lateHourRate: prev?.lateHourRate ? String(prev.lateHourRate) : (carHourlyRate ? String(carHourlyRate) : ""),
@@ -1959,6 +1965,14 @@ export default function BookingDetailPage() {
                 <input type="number" value={editForm.amountPaid} onChange={e => setEditForm(f => ({ ...f, amountPaid: e.target.value }))}
                   className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Day Rental (Rs.)</label>
+              <input type="number" value={editForm.bookingFare} onChange={e => setEditForm(f => ({ ...f, bookingFare: e.target.value }))}
+                className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+              <p className="text-[10px] text-[#9090A8] mt-1">
+                Feeds the Final Settlement / closing bill — update this too if you're changing the duration, otherwise the closing bill will keep showing the old rent.
+              </p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Mode</label>
