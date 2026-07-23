@@ -581,17 +581,17 @@ export default function BookingDetailPage() {
     // Pulled from the car's own profile (set when adding/editing the car) —
     // admin can still override per-closure below.
     const carExtraKmRate = rawBooking.carId?.extraKmRate;
-    // Actual return time defaults to when "Mark Car Returned" was recorded,
-    // falling back to now — admin can correct it if the car physically came
-    // back at a different time than when this was processed in the system.
+    // Actual return time defaults to the booking's own scheduled end time —
+    // not "now" or whenever the admin happened to click Mark Car Returned in
+    // the system, since neither reflects when the car was actually physically
+    // returned. Assume on-time by default; admin edits this only when the
+    // return really was late.
     const toLocal = (d: Date) => {
       const copy = new Date(d);
       copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset());
       return copy.toISOString().slice(0, 16);
     };
-    const defaultReturnTime = rawBooking.returnCondition?.recordedAt
-      ? toLocal(new Date(rawBooking.returnCondition.recordedAt))
-      : toLocal(new Date());
+    const defaultReturnTime = toLocal(new Date(rawBooking.endTime));
     // Hourly rental rate for this car doubles as the default late-hour rate.
     const carHourlyRate = rawBooking.carId?.regularPrice;
 
