@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { TrendingUp, Calendar, BarChart2, XCircle, Loader2, Wallet, IndianRupee, Check, Eye, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, Calendar, BarChart2, XCircle, Loader2, Wallet, IndianRupee, Check, Eye, Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   AreaChart,
@@ -62,6 +62,29 @@ const defaultFrom = () => {
 };
 
 const PAGE_SIZE = 10;
+
+// Client-side CSV export — exports exactly what's currently filtered/visible
+// on screen (same rows the admin is looking at), no extra server round-trip.
+const downloadCsv = (filename: string, headers: string[], rows: (string | number)[][]) => {
+  const escape = (v: string | number) => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers, ...rows].map(row => row.map(escape).join(",")).join("\n");
+  const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+const settlementRowsToCsv = (rows: SettlementRow[]) =>
+  rows.map(r => [r.bookingCode, r.customer, r.mobile, r.car, r.regNo, r.closed ? "Closed" : r.status, r.amount]);
+const SETTLEMENT_CSV_HEADERS = ["Booking ID", "Customer", "Mobile", "Car", "Reg. No.", "Status", "Amount (Rs.)"];
 
 function AdminReportsPageInner() {
   const router = useRouter();
@@ -391,11 +414,22 @@ function AdminReportsPageInner() {
             <>
               {/* Pending Collection — money due FROM customers, running + closed */}
               <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
-                <div className="px-5 py-4 border-b border-[#E4E5EF] flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-[#E4E5EF] flex items-center justify-between gap-3">
                   <h3 className="font-bold font-syne text-[#0F0F1A] text-sm">Pending Collection — money we need to collect</h3>
-                  {(settlementStatusFilter !== "all" || settlementSearch.trim()) && (
-                    <span className="text-[10px] font-semibold text-[#9090A8]">{filteredCollection.length} of {settlements?.pendingCollection.length || 0} shown</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {(settlementStatusFilter !== "all" || settlementSearch.trim()) && (
+                      <span className="text-[10px] font-semibold text-[#9090A8] whitespace-nowrap">{filteredCollection.length} of {settlements?.pendingCollection.length || 0} shown</span>
+                    )}
+                    {filteredCollection.length > 0 && (
+                      <button
+                        onClick={() => downloadCsv(`pending-collection-${Date.now()}.csv`, SETTLEMENT_CSV_HEADERS, settlementRowsToCsv(filteredCollection))}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-[11px] font-semibold text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A] transition-colors whitespace-nowrap"
+                        title="Download as CSV"
+                      >
+                        <Download size={12} /> Export CSV
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {filteredCollection.length === 0 ? (
                   <p className="text-center py-10 text-[#9090A8] text-sm">
@@ -458,11 +492,22 @@ function AdminReportsPageInner() {
 
               {/* Pending Refunds — money due TO customers (post-closing only) */}
               <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
-                <div className="px-5 py-4 border-b border-[#E4E5EF] flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-[#E4E5EF] flex items-center justify-between gap-3">
                   <h3 className="font-bold font-syne text-[#0F0F1A] text-sm">Pending Refunds — money we owe customers</h3>
-                  {(settlementStatusFilter !== "all" || settlementSearch.trim()) && (
-                    <span className="text-[10px] font-semibold text-[#9090A8]">{filteredRefunds.length} of {settlements?.pendingRefunds.length || 0} shown</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {(settlementStatusFilter !== "all" || settlementSearch.trim()) && (
+                      <span className="text-[10px] font-semibold text-[#9090A8] whitespace-nowrap">{filteredRefunds.length} of {settlements?.pendingRefunds.length || 0} shown</span>
+                    )}
+                    {filteredRefunds.length > 0 && (
+                      <button
+                        onClick={() => downloadCsv(`pending-refunds-${Date.now()}.csv`, SETTLEMENT_CSV_HEADERS, settlementRowsToCsv(filteredRefunds))}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-[11px] font-semibold text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A] transition-colors whitespace-nowrap"
+                        title="Download as CSV"
+                      >
+                        <Download size={12} /> Export CSV
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {filteredRefunds.length === 0 ? (
                   <p className="text-center py-10 text-[#9090A8] text-sm">
