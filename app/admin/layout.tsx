@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -108,6 +108,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [authChecked, setAuthChecked] = useState(false);
   const [adminUser, setAdminUser] = useState<{ name?: string; email?: string; role?: string } | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isLoginPage) return;
@@ -135,6 +138,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const interval = setInterval(fetchCounts, 60000);
     return () => clearInterval(interval);
   }, [isLoginPage]);
+
+  // ⌘K / Ctrl+K opens the quick-search palette from anywhere in the admin
+  // panel; Escape closes it. Matches the "⌘K" hint already shown in the
+  // sidebar search box.
+  useEffect(() => {
+    if (isLoginPage) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      } else if (e.key === "Escape") {
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isLoginPage]);
+
+  useEffect(() => {
+    if (searchOpen) {
+      setSearchQuery("");
+      // Wait a tick for the modal to mount before focusing.
+      setTimeout(() => searchInputRef.current?.focus(), 0);
+    }
+  }, [searchOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem("vk_admin_token");
@@ -185,6 +213,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isLoginPage) return <>{children}</>;
   if (!authChecked) return null;
 
+  // Quick search only offers pages this admin can actually see — same
+  // permission-filtered navGroups the sidebar itself renders.
+  const searchResults = searchQuery.trim()
+    ? navGroups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label })))
+        .filter((i) => i.label.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : navGroups.flatMap((g) => g.items.map((i) => ({ ...i, group: g.label })));
+
+  const goToSearchResult = (item: NavItem) => {
+    setSearchOpen(false);
+    setSidebarOpen(false);
+    if (item.external) {
+      window.open(item.href, "_blank", "noopener,noreferrer");
+    } else {
+      router.push(item.href);
+    }
+  };
+
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   const dayStr = now.toLocaleDateString("en-IN", { weekday: "long" });
@@ -215,11 +260,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Search */}
       <div className="px-3 pt-3 pb-1 shrink-0">
-        <div className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="w-full flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.06] rounded-xl hover:bg-white/[0.07] hover:border-white/[0.12] transition-colors"
+        >
           <Search size={13} className="text-white/25 shrink-0" />
           <span className="text-white/25 text-xs">Quick search...</span>
           <span className="ml-auto text-[10px] text-white/15 font-mono bg-white/5 px-1.5 py-0.5 rounded">⌘K</span>
-        </div>
+        </button>
       </div>
 
       {/* Nav */}
@@ -305,6 +353,51 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="hidden lg:flex flex-col w-64 shrink-0 shadow-[4px_0_30px_rgba(0,0,0,0.12)]">
         <SidebarContent />
       </div>
+
+      {/* Quick Search (⌘K) */}
+      {searchOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[60] flex items-start justify-center pt-24 px-4"
+          onClick={() => setSearchOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#E4E5EF]">
+              <Search size={16} className="text-[#9090A8] shrink-0" />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchResults[0]) goToSearchResult(searchResults[0]);
+                }}
+                placeholder="Search pages — Cars, Bookings, Reports..."
+                className="flex-1 text-sm outline-none text-[#0F0F1A] placeholder:text-[#9090A8]"
+              />
+              <kbd className="text-[10px] font-mono text-[#9090A8] bg-[#F0F1F6] px-1.5 py-0.5 rounded">Esc</kbd>
+            </div>
+            <div className="max-h-80 overflow-y-auto py-2">
+              {searchResults.length === 0 ? (
+                <p className="text-center text-[#9090A8] text-sm py-8">No matching pages</p>
+              ) : (
+                searchResults.map((item) => (
+                  <button
+                    key={item.href}
+                    onClick={() => goToSearchResult(item)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8F9FC] transition-colors text-left"
+                  >
+                    <item.icon size={15} className="text-[#9090A8] shrink-0" />
+                    <span className="text-sm text-[#0F0F1A] font-medium">{item.label}</span>
+                    <span className="ml-auto text-[10px] text-[#9090A8] uppercase tracking-wider">{item.group}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
