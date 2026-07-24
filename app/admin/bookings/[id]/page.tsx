@@ -1578,9 +1578,23 @@ export default function BookingDetailPage() {
               <p className="text-xs font-bold text-[#9090A8] uppercase tracking-wider pt-1">Late Return</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">
-                    Actual Return Date &amp; Time <span className="text-[#9090A8] font-normal">· scheduled {fmtDT(booking.end)}</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-[#4A4A6A]">
+                      Actual Return Date &amp; Time <span className="text-[#9090A8] font-normal">· scheduled {fmtDT(booking.end)}</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date(rawBooking.endTime);
+                        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                        setClosingForm((f) => ({ ...f, actualReturnTime: d.toISOString().slice(0, 16) }));
+                      }}
+                      className="text-[10px] font-semibold text-[#7C3AED] hover:underline shrink-0"
+                      title="Reset this to the scheduled return time — use this if the value here was carried over from before the on-time-by-default fix and the return wasn't actually late"
+                    >
+                      Reset to scheduled
+                    </button>
+                  </div>
                   <input type="datetime-local" value={closingForm.actualReturnTime}
                     onChange={(e) => setClosingForm((f) => ({ ...f, actualReturnTime: e.target.value }))}
                     className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" />
