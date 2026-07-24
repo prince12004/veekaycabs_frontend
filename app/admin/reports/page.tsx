@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TrendingUp, Calendar, BarChart2, XCircle, Loader2, Wallet, IndianRupee, Check, Eye, Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
@@ -111,6 +111,11 @@ function AdminReportsPageInner() {
   const [settlementSearch, setSettlementSearch] = useState("");
   const [collectionPage, setCollectionPage] = useState(1);
   const [refundsPage, setRefundsPage] = useState(1);
+  const collectionSectionRef = useRef<HTMLDivElement>(null);
+  const refundsSectionRef = useRef<HTMLDivElement>(null);
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   useEffect(() => { setCollectionPage(1); }, [settlementStatusFilter, settlementSearch]);
   useEffect(() => { setRefundsPage(1); }, [settlementStatusFilter, settlementSearch]);
@@ -384,9 +389,14 @@ function AdminReportsPageInner() {
               className="w-full pl-9 pr-4 py-2.5 border-[1.5px] border-[#E4E5EF] rounded-xl text-sm focus:border-[#E8540A] outline-none bg-white" />
           </div>
 
-          {/* Money tiles */}
+          {/* Money tiles — click to jump straight to that table below */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => scrollToSection(collectionSectionRef)}
+              className="text-left bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm hover:border-[#E8540A]/50 hover:shadow-md transition-all"
+              title="Jump to Pending Collection table"
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#FFF3ED" }}>
                   <IndianRupee size={18} style={{ color: "#E8540A" }} />
@@ -394,8 +404,13 @@ function AdminReportsPageInner() {
               </div>
               <p className="font-black font-syne text-2xl text-[#0F0F1A] leading-none mb-1">Rs. {(settlements?.totalPendingCollection || 0).toLocaleString("en-IN")}</p>
               <p className="text-[#9090A8] text-xs font-semibold uppercase tracking-wider">Pending Collection — {settlements?.pendingCollection.length || 0} booking{settlements?.pendingCollection.length !== 1 ? "s" : ""}</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm">
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection(refundsSectionRef)}
+              className="text-left bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm hover:border-[#1E40AF]/50 hover:shadow-md transition-all"
+              title="Jump to Pending Refunds table"
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#DBEAFE" }}>
                   <Wallet size={18} style={{ color: "#1E40AF" }} />
@@ -403,7 +418,7 @@ function AdminReportsPageInner() {
               </div>
               <p className="font-black font-syne text-2xl text-[#0F0F1A] leading-none mb-1">Rs. {(settlements?.totalPendingRefunds || 0).toLocaleString("en-IN")}</p>
               <p className="text-[#9090A8] text-xs font-semibold uppercase tracking-wider">Pending Refunds — {settlements?.pendingRefunds.length || 0} booking{settlements?.pendingRefunds.length !== 1 ? "s" : ""}</p>
-            </div>
+            </button>
           </div>
 
           {settlementsLoading ? (
@@ -413,7 +428,7 @@ function AdminReportsPageInner() {
           ) : (
             <>
               {/* Pending Collection — money due FROM customers, running + closed */}
-              <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
+              <div ref={collectionSectionRef} className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden scroll-mt-4">
                 <div className="px-5 py-4 border-b border-[#E4E5EF] flex items-center justify-between gap-3">
                   <h3 className="font-bold font-syne text-[#0F0F1A] text-sm">Pending Collection — money we need to collect</h3>
                   <div className="flex items-center gap-2">
@@ -491,7 +506,7 @@ function AdminReportsPageInner() {
               </div>
 
               {/* Pending Refunds — money due TO customers (post-closing only) */}
-              <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
+              <div ref={refundsSectionRef} className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden scroll-mt-4">
                 <div className="px-5 py-4 border-b border-[#E4E5EF] flex items-center justify-between gap-3">
                   <h3 className="font-bold font-syne text-[#0F0F1A] text-sm">Pending Refunds — money we owe customers</h3>
                   <div className="flex items-center gap-2">
