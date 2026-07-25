@@ -30,6 +30,7 @@ interface BookingRow {
   status: string;
   isOffline: boolean;
   challanDetails?: string;
+  bookedBy?: string;
   createdAt: string;
   doorstepDelivery?: boolean;
   deliveryAddress?: string;
