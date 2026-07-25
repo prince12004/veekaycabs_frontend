@@ -44,6 +44,7 @@ interface CarOption {
 
 interface OfflineForm {
   name: string; mobile: string; email: string;
+  bookedBy: string;
   carId: string;
   pickupLocation: string;
   startTime: string; endTime: string;
@@ -59,6 +60,7 @@ interface OfflineForm {
 
 const emptyForm: OfflineForm = {
   name: "", mobile: "", email: "",
+  bookedBy: "",
   carId: "", pickupLocation: "",
   startTime: "", endTime: "",
   bookingFare: "",
@@ -89,11 +91,11 @@ const suggestPricing = (car: CarOption | undefined, startTime: string, endTime: 
 const DEFAULT_DOORSTEP_CHARGE = 500;
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  active:     { bg: "#DBEAFE", text: "#1E40AF" },
-  confirmed:  { bg: "#EDE9FE", text: "#4C1D95" },
-  completed:  { bg: "#D1FAE5", text: "#065F46" },
-  cancelled:  { bg: "#FEE2E2", text: "#991B1B" },
-  pending:    { bg: "#FEF3C7", text: "#92400E" },
+  active: { bg: "#DBEAFE", text: "#1E40AF" },
+  confirmed: { bg: "#EDE9FE", text: "#4C1D95" },
+  completed: { bg: "#D1FAE5", text: "#065F46" },
+  cancelled: { bg: "#FEE2E2", text: "#991B1B" },
+  pending: { bg: "#FEF3C7", text: "#92400E" },
 };
 
 const fmtDT = (iso: string) => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
@@ -179,15 +181,15 @@ function EditModal({
   booking, onClose, onSaved,
 }: { booking: BookingRow; onClose: () => void; onSaved: (updated: BookingRow) => void }) {
   const [form, setForm] = useState({
-    startTime:   toLocalDT(booking.startTime),
-    endTime:     toLocalDT(booking.endTime),
+    startTime: toLocalDT(booking.startTime),
+    endTime: toLocalDT(booking.endTime),
     totalAmount: String(booking.totalAmount ?? ""),
-    amountPaid:  String(booking.amountPaid ?? ""),
+    amountPaid: String(booking.amountPaid ?? ""),
     paymentMode: booking.paymentMode ?? "offline_cash",
-    notes:       booking.challanDetails ?? "",
+    notes: booking.challanDetails ?? "",
     doorstepDelivery: booking.doorstepDelivery ?? false,
-    deliveryAddress:  booking.deliveryAddress ?? "",
-    doorstepCharge:   String(booking.doorstepCharge ?? ""),
+    deliveryAddress: booking.deliveryAddress ?? "",
+    doorstepCharge: String(booking.doorstepCharge ?? ""),
   });
   const [saving, setSaving] = useState(false);
 
@@ -199,15 +201,15 @@ function EditModal({
     setSaving(true);
     try {
       const { data } = await bookingsApi.update(booking._id, {
-        startTime:   form.startTime ? new Date(form.startTime).toISOString() : undefined,
-        endTime:     form.endTime   ? new Date(form.endTime).toISOString()   : undefined,
+        startTime: form.startTime ? new Date(form.startTime).toISOString() : undefined,
+        endTime: form.endTime ? new Date(form.endTime).toISOString() : undefined,
         totalAmount: form.totalAmount ? Number(form.totalAmount) : undefined,
-        amountPaid:  form.amountPaid  ? Number(form.amountPaid)  : undefined,
+        amountPaid: form.amountPaid ? Number(form.amountPaid) : undefined,
         paymentMode: form.paymentMode,
-        notes:       form.notes,
+        notes: form.notes,
         doorstepDelivery: form.doorstepDelivery,
-        deliveryAddress:  form.doorstepDelivery ? form.deliveryAddress : undefined,
-        doorstepCharge:   form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
+        deliveryAddress: form.doorstepDelivery ? form.deliveryAddress : undefined,
+        doorstepCharge: form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
       });
       toast.success("Booking updated");
       onSaved(data.data);
@@ -364,7 +366,7 @@ export default function OfflineBookingsPage() {
     if (!showAddForm) return;
     adminCarsApi.getAll({ limit: "all", isActive: "true" })
       .then(({ data }) => setCars(data.data || []))
-      .catch(() => {});
+      .catch(() => { });
   }, [showAddForm]);
 
   const handleSearch = (val: string) => {
@@ -429,20 +431,21 @@ export default function OfflineBookingsPage() {
     setSubmitting(true);
     try {
       await bookingsApi.createOffline({
-        mobile:          form.mobile,
-        name:            form.name || `Walk-in ${form.mobile.slice(-4)}`,
-        carId:           form.carId,
-        pickupLocation:  form.pickupLocation || "Admin Office",
-        startTime:       new Date(form.startTime).toISOString(),
-        endTime:         new Date(form.endTime).toISOString(),
-        bookingFare:     form.bookingFare !== "" ? Number(form.bookingFare) : undefined,
+        mobile: form.mobile,
+        name: form.name || `Walk-in ${form.mobile.slice(-4)}`,
+        bookedBy: form.bookedBy || undefined,
+        carId: form.carId,
+        pickupLocation: form.pickupLocation || "Admin Office",
+        startTime: new Date(form.startTime).toISOString(),
+        endTime: new Date(form.endTime).toISOString(),
+        bookingFare: form.bookingFare !== "" ? Number(form.bookingFare) : undefined,
         securityDeposit: form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined,
         doorstepDelivery: form.doorstepDelivery,
-        deliveryAddress:  form.doorstepDelivery ? form.deliveryAddress : undefined,
-        doorstepCharge:   form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
-        amountPaid:      Number(form.amountPaid) || 0,
-        paymentMode:     form.paymentMode,
-        notes:           form.notes,
+        deliveryAddress: form.doorstepDelivery ? form.deliveryAddress : undefined,
+        doorstepCharge: form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
+        amountPaid: Number(form.amountPaid) || 0,
+        paymentMode: form.paymentMode,
+        notes: form.notes,
       });
       toast.success("Offline booking created");
       setForm(emptyForm);
@@ -458,7 +461,7 @@ export default function OfflineBookingsPage() {
   const update = (f: keyof OfflineForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [f]: e.target.value }));
 
-  const activeCount    = bookings.filter(b => b.status === "active" || b.status === "confirmed").length;
+  const activeCount = bookings.filter(b => b.status === "active" || b.status === "confirmed").length;
 
   return (
     <div className="p-6 space-y-5">
@@ -528,6 +531,7 @@ export default function OfflineBookingsPage() {
                       <td className="px-4 py-3.5">
                         <p className="font-semibold text-[#0F0F1A] text-sm">{b.userId?.name ?? "—"}</p>
                         <p className="text-[#9090A8] text-xs">{b.userId?.mobile ?? "—"}</p>
+                        {b.bookedBy ? <p className="text-[#4A4A6A] text-[10px] mt-1">Booked by: {b.bookedBy}</p> : null}
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="font-medium text-[#0F0F1A] text-sm">{b.carId?.name ?? "—"}</p>
@@ -623,6 +627,13 @@ export default function OfflineBookingsPage() {
                   <div className="relative">
                     <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
                     <input value={form.mobile} onChange={update("mobile")} required placeholder="10-digit mobile" className={inputCls + " pl-9"} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Booked By</label>
+                  <div className="relative">
+                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                    <input value={form.bookedBy} onChange={update("bookedBy")} placeholder="Booking source / agent name" className={inputCls + " pl-9"} />
                   </div>
                 </div>
                 <div>

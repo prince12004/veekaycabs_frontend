@@ -23,6 +23,15 @@ import DatePicker from "@/components/ui/DatePicker";
 interface RevenuePoint { _id: string; totalRevenue: number; collectedRevenue: number; bookingCount: number; avgBookingValue: number }
 interface CityRow { cityName: string; totalRevenue: number; bookingCount: number }
 
+interface CarRevenueRow {
+  month: string;
+  carId: string;
+  carName: string;
+  registrationNo: string;
+  totalRevenue: number;
+  collectedRevenue: number;
+  bookingCount: number;
+}
 interface SettlementRow {
   bookingId: string;
   bookingCode: string;
@@ -91,8 +100,8 @@ function AdminReportsPageInner() {
   const searchParams = useSearchParams();
   // Tab lives in the URL (?tab=settlements) so a reload — or sharing the link —
   // lands back on the same tab instead of always resetting to Overview.
-  const tab = (searchParams.get("tab") === "settlements" ? "settlements" : "overview") as "overview" | "settlements";
-  const setTab = (t: "overview" | "settlements") => {
+  const tab = (searchParams.get("tab") === "settlements" ? "settlements" : searchParams.get("tab") === "carRevenue" ? "carRevenue" : "overview") as "overview" | "settlements" | "carRevenue";
+  const setTab = (t: "overview" | "settlements" | "carRevenue") => {
     const params = new URLSearchParams(searchParams.toString());
     if (t === "overview") params.delete("tab"); else params.set("tab", t);
     router.replace(`/admin/reports${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
@@ -102,6 +111,7 @@ function AdminReportsPageInner() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
+  const [carRevenue, setCarRevenue] = useState<CarRevenueRow[] | null>(null);
   const [cancellationRate, setCancellationRate] = useState(0);
 
   const [settlements, setSettlements] = useState<SettlementsData | null>(null);
@@ -125,10 +135,12 @@ function AdminReportsPageInner() {
     Promise.all([
       adminReportsApi.getRevenue({ from: dateFrom, to: dateTo, groupBy: "month" }),
       adminReportsApi.getBookingStats({ from: dateFrom, to: dateTo }),
+      adminReportsApi.getCarRevenue({ from: dateFrom, to: dateTo }),
     ])
-      .then(([revRes, bookingRes]) => {
+      .then(([revRes, bookingRes, carRevRes]) => {
         setRevenue(revRes.data.data);
         setCancellationRate(bookingRes.data.data.cancellationRate || 0);
+        setCarRevenue(carRevRes.data.data || []);
       })
       .catch(() => toast.error("Failed to load reports"))
       .finally(() => setLoading(false));
@@ -230,6 +242,7 @@ function AdminReportsPageInner() {
       <div className="flex gap-1 bg-white border border-[#E4E5EF] p-1.5 rounded-2xl w-fit">
         {([
           { key: "overview", label: "Overview" },
+          { key: "carRevenue", label: "Car Revenue" },
           { key: "settlements", label: "Settlements" },
         ] as const).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -240,116 +253,164 @@ function AdminReportsPageInner() {
       </div>
 
       {tab === "overview" && (
-      <>
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div key={card.label} className="bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: card.bg }}>
-                  <Icon size={18} style={{ color: card.color }} />
-                </div>
-              </div>
-              <p className="font-black font-syne text-2xl text-[#0F0F1A] leading-none mb-1">{card.value}</p>
-              <p className="text-[#9090A8] text-xs font-semibold uppercase tracking-wider">{card.label}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Revenue Chart */}
-      <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
-        <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">Monthly Revenue</h3>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-              <defs>
-                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#E8540A" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#E8540A" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E4E5EF" />
-              <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9090A8" }} axisLine={false} tickLine={false} />
-              <YAxis
-                tick={{ fontSize: 11, fill: "#9090A8" }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`}
-              />
-              <Tooltip
-                contentStyle={{ borderRadius: 12, border: "1px solid #E4E5EF", fontSize: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
-                formatter={(v: number) => [`Rs. ${v.toLocaleString("en-IN")}`, "Revenue"]}
-              />
-              <Area type="monotone" dataKey="revenue" stroke="#E8540A" strokeWidth={2.5} fill="url(#revenueGrad)" dot={{ fill: "#E8540A", r: 4 }} activeDot={{ r: 6 }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Bookings Chart */}
-      <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
-        <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">Monthly Bookings</h3>
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E4E5EF" />
-              <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9090A8" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#9090A8" }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: 12, border: "1px solid #E4E5EF", fontSize: 12 }}
-                formatter={(v: number) => [v, "Bookings"]}
-              />
-              <Bar dataKey="bookings" fill="#E8540A" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* City Breakdown */}
-      <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
-        <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">City-wise Breakdown</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#E4E5EF]">
-                {["City", "Total Bookings", "Revenue", "Share", "Progress"].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-[#9090A8] text-xs font-bold uppercase tracking-wider">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cityRows.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-8 text-[#9090A8] text-sm">No bookings in this date range</td></tr>
-              ) : cityRows.map((row) => (
-                <tr key={row.city} className="border-b border-[#E4E5EF] last:border-0 hover:bg-[#F8F9FC] transition-colors">
-                  <td className="px-4 py-3.5 font-semibold text-[#0F0F1A] text-sm">{row.city}</td>
-                  <td className="px-4 py-3.5 text-[#4A4A6A] text-sm">{row.bookings}</td>
-                  <td className="px-4 py-3.5 font-bold text-[#0F0F1A] text-sm">Rs. {row.revenue.toLocaleString("en-IN")}</td>
-                  <td className="px-4 py-3.5">
-                    <span className="bg-[#FFF3ED] text-[#E8540A] text-xs font-bold px-2 py-1 rounded-full">
-                      {row.percentage}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-3.5 w-48">
-                    <div className="w-full h-2 bg-[#E4E5EF] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#E8540A] rounded-full transition-all"
-                        style={{ width: `${row.percentage}%` }}
-                      />
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {summaryCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.label} className="bg-white rounded-2xl border border-[#E4E5EF] p-5 shadow-sm">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: card.bg }}>
+                      <Icon size={18} style={{ color: card.color }} />
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <p className="font-black font-syne text-2xl text-[#0F0F1A] leading-none mb-1">{card.value}</p>
+                  <p className="text-[#9090A8] text-xs font-semibold uppercase tracking-wider">{card.label}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Revenue Chart */}
+          <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
+            <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">Monthly Revenue</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#E8540A" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#E8540A" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E4E5EF" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9090A8" }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#9090A8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 12, border: "1px solid #E4E5EF", fontSize: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
+                    formatter={(v: number) => [`Rs. ${v.toLocaleString("en-IN")}`, "Revenue"]}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#E8540A" strokeWidth={2.5} fill="url(#revenueGrad)" dot={{ fill: "#E8540A", r: 4 }} activeDot={{ r: 6 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Bookings Chart */}
+          <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
+            <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">Monthly Bookings</h3>
+            <div className="h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E4E5EF" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#9090A8" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "#9090A8" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 12, border: "1px solid #E4E5EF", fontSize: 12 }}
+                    formatter={(v: number) => [v, "Bookings"]}
+                  />
+                  <Bar dataKey="bookings" fill="#E8540A" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* City Breakdown */}
+          <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6 shadow-sm">
+            <h3 className="font-bold font-syne text-[#0F0F1A] text-lg mb-5">City-wise Breakdown</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#E4E5EF]">
+                    {["City", "Total Bookings", "Revenue", "Share", "Progress"].map((h) => (
+                      <th key={h} className="text-left px-4 py-3 text-[#9090A8] text-xs font-bold uppercase tracking-wider">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cityRows.length === 0 ? (
+                    <tr><td colSpan={5} className="text-center py-8 text-[#9090A8] text-sm">No bookings in this date range</td></tr>
+                  ) : cityRows.map((row) => (
+                    <tr key={row.city} className="border-b border-[#E4E5EF] last:border-0 hover:bg-[#F8F9FC] transition-colors">
+                      <td className="px-4 py-3.5 font-semibold text-[#0F0F1A] text-sm">{row.city}</td>
+                      <td className="px-4 py-3.5 text-[#4A4A6A] text-sm">{row.bookings}</td>
+                      <td className="px-4 py-3.5 font-bold text-[#0F0F1A] text-sm">Rs. {row.revenue.toLocaleString("en-IN")}</td>
+                      <td className="px-4 py-3.5">
+                        <span className="bg-[#FFF3ED] text-[#E8540A] text-xs font-bold px-2 py-1 rounded-full">
+                          {row.percentage}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 w-48">
+                        <div className="w-full h-2 bg-[#E4E5EF] rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#E8540A] rounded-full transition-all"
+                            style={{ width: `${row.percentage}%` }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === "carRevenue" && (
+        <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5">
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div>
+              <h2 className="font-bold text-[#0F0F1A] text-lg">Monthly Car Revenue</h2>
+              <p className="text-[#9090A8] text-sm">Revenue and booking counts for each car by month.</p>
+            </div>
+            <button onClick={() => carRevenue && downloadCsv("car-revenue.csv", ["Month", "Car", "Reg. No.", "Revenue", "Collected", "Bookings"], carRevenue.map(r => [r.month, r.carName, r.registrationNo, r.totalRevenue, r.collectedRevenue, r.bookingCount]))}
+              className="btn-gradient px-4 py-2.5 rounded-xl text-white font-semibold text-sm">
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
+          {loading ? (
+            <div className="py-16 text-center text-[#9090A8] flex items-center justify-center gap-3">
+              <Loader2 size={18} className="animate-spin" /> Loading car revenue...
+            </div>
+          ) : !carRevenue || carRevenue.length === 0 ? (
+            <div className="py-16 text-center text-[#9090A8]">
+              <p className="font-semibold">No car revenue data available</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-[#F8F9FC] border-b border-[#E4E5EF]">
+                    {['Month', 'Car', 'Reg. No.', 'Revenue', 'Collected', 'Bookings'].map((label) => (
+                      <th key={label} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[#9090A8]">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {carRevenue.map((row) => (
+                    <tr key={`${row.carId}-${row.month}`} className="border-b border-[#E4E5EF] hover:bg-[#F8F9FC] transition-colors">
+                      <td className="px-4 py-3 text-sm text-[#0F0F1A]">{monthLabel(row.month)}</td>
+                      <td className="px-4 py-3 text-sm text-[#0F0F1A]">{row.carName}</td>
+                      <td className="px-4 py-3 text-sm text-[#4A4A6A]">{row.registrationNo}</td>
+                      <td className="px-4 py-3 text-sm font-semibold">₹{row.totalRevenue.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-sm">₹{row.collectedRevenue.toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-sm">{row.bookingCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </div>
-      </>
       )}
 
       {tab === "settlements" && (

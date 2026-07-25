@@ -318,6 +318,8 @@ export const adminReportsApi = {
     adminApi.get("/api/admin/reports/revenue", { params }),
   getBookingStats: (params: { from?: string; to?: string }) =>
     adminApi.get("/api/admin/reports/bookings", { params }),
+  getCarRevenue: (params: { from?: string; to?: string }) =>
+    adminApi.get("/api/admin/reports/car-revenue", { params }),
   getSettlements: (params: { from?: string; to?: string }) =>
     adminApi.get("/api/admin/reports/settlements", { params }),
 };
