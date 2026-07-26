@@ -62,7 +62,37 @@ interface DentDetectionResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmtDT = (d: string) =>
-  new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
+
+// Formats a UTC instant into the "YYYY-MM-DDTHH:mm" wall-clock string a
+// <input type="datetime-local"> needs to show real IST time. Deliberately
+// uses an explicit Asia/Kolkata timezone via Intl instead of the old
+// `d.getMinutes() - d.getTimezoneOffset()` trick, which silently rendered
+// the wrong time whenever the admin's own browser/OS wasn't set to IST —
+// e.g. a booking scheduled for 10:30 PM IST would prefill as 4:00 AM the
+// next day on a browser reporting a different timezone, which then made a
+// perfectly on-time return look "6 hrs late" in the closing bill.
+const toISTLocalInput = (d: Date | string) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(d));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+};
+
+// The reverse direction: a <input type="datetime-local"> value is a naive
+// "YYYY-MM-DDTHH:mm" string with no timezone — but every date/time shown in
+// this admin panel is IST, so that's what the digits mean. Appending an
+// explicit +05:30 offset before parsing means the resulting instant is
+// correct regardless of what timezone the browser or the server process
+// itself happens to be running in — without this, `new Date(naiveString)`
+// silently used whatever machine it ran on as "local", which is exactly what
+// produced spurious ~5.5h-shifted "late return" charges even for genuinely
+// on-time returns.
+const istInputToISOString = (localStr: string): string =>
+  localStr ? new Date(`${localStr}:00+05:30`).toISOString() : "";
 
 // Matches the server's per-request multer limit (routes/admin/bookings.js
 // `.array('files', 10)`) — pickup and return are separate upload requests,
@@ -349,14 +379,9 @@ export default function BookingDetailPage() {
 
   const openEditModal = () => {
     if (!rawBooking) return;
-    const toLocal = (iso: string) => {
-      const d = new Date(iso);
-      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      return d.toISOString().slice(0, 16);
-    };
     setEditForm({
-      startTime: toLocal(rawBooking.startTime),
-      endTime: toLocal(rawBooking.endTime),
+      startTime: toISTLocalInput(rawBooking.startTime),
+      endTime: toISTLocalInput(rawBooking.endTime),
       totalAmount: String(rawBooking.totalAmount || ""),
       bookingFare: String(rawBooking.bookingFare || ""),
       amountPaid: String(rawBooking.amountPaid || ""),
@@ -376,8 +401,8 @@ export default function BookingDetailPage() {
     setEditLoading(true);
     try {
       const { data } = await bookingsApi.update(rawBooking._id, {
-        startTime: editForm.startTime ? new Date(editForm.startTime).toISOString() : undefined,
-        endTime: editForm.endTime ? new Date(editForm.endTime).toISOString() : undefined,
+        startTime: editForm.startTime ? istInputToISOString(editForm.startTime) : undefined,
+        endTime: editForm.endTime ? istInputToISOString(editForm.endTime) : undefined,
         totalAmount: editForm.totalAmount ? Number(editForm.totalAmount) : undefined,
         bookingFare: editForm.bookingFare ? Number(editForm.bookingFare) : undefined,
         amountPaid: editForm.amountPaid ? Number(editForm.amountPaid) : undefined,
@@ -404,7 +429,7 @@ export default function BookingDetailPage() {
   // sees a sensible number immediately, but it's always editable before saving.
   const suggestExtendAmount = (newEndTime: string) => {
     if (!rawBooking?.carId || !newEndTime) return null;
-    const newEnd = new Date(newEndTime);
+    const newEnd = new Date(istInputToISOString(newEndTime));
     const currentEnd = new Date(rawBooking.endTime);
     if (isNaN(newEnd.getTime()) || newEnd <= currentEnd) return null;
     const extraHours = Math.ceil((newEnd.getTime() - currentEnd.getTime()) / (1000 * 60 * 60));
@@ -415,14 +440,9 @@ export default function BookingDetailPage() {
 
   const openExtendModal = () => {
     if (!rawBooking) return;
-    const toLocal = (d: Date) => {
-      const copy = new Date(d);
-      copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset());
-      return copy.toISOString().slice(0, 16);
-    };
     // Default to 1 day past the current return time — just a starting point.
     const defaultNewEnd = new Date(new Date(rawBooking.endTime).getTime() + 24 * 60 * 60 * 1000);
-    const defaultNewEndStr = toLocal(defaultNewEnd);
+    const defaultNewEndStr = toISTLocalInput(defaultNewEnd);
     const suggestion = suggestExtendAmount(defaultNewEndStr);
     setExtendForm({
       newEndTime: defaultNewEndStr,
@@ -445,7 +465,7 @@ export default function BookingDetailPage() {
     setExtendLoading(true);
     try {
       const { data } = await bookingsApi.extendBooking(rawBooking._id, {
-        newEndTime: new Date(extendForm.newEndTime).toISOString(),
+        newEndTime: istInputToISOString(extendForm.newEndTime),
         extraAmount: extendForm.extraAmount !== "" ? Number(extendForm.extraAmount) : undefined,
         additionalPaymentReceived: Number(extendForm.additionalPaymentReceived) || 0,
       });
@@ -605,14 +625,7 @@ export default function BookingDetailPage() {
     // the system, since neither reflects when the car was actually physically
     // returned. Assume on-time by default; admin edits this only when the
     // return really was late.
-    const toLocal = (d: Date) => {
-      const copy = new Date(d);
-      copy.setMinutes(copy.getMinutes() - copy.getTimezoneOffset());
-      return copy.toISOString().slice(0, 16);
-    };
-    const defaultReturnTime = toLocal(new Date(rawBooking.endTime));
-    // Hourly rental rate for this car doubles as the default late-hour rate.
-    const carHourlyRate = rawBooking.carId?.regularPrice;
+    const defaultReturnTime = toISTLocalInput(rawBooking.endTime);
 
     // Recalculating an already-closed bill — re-fill the manually-entered
     // fields (charges, notes, rates) from what was saved last time instead of
@@ -627,8 +640,18 @@ export default function BookingDetailPage() {
       // dates may have been edited (shortened/extended) since it was closed.
       kmsLimit: defaultLimit ? String(defaultLimit) : (prev?.kmsLimit ? String(prev.kmsLimit) : ""),
       extraKmRate: prev?.extraKmRate ? String(prev.extraKmRate) : (carExtraKmRate ? String(carExtraKmRate) : ""),
-      actualReturnTime: prev?.actualReturnTime ? toLocal(new Date(prev.actualReturnTime)) : defaultReturnTime,
-      lateHourRate: prev?.lateHourRate ? String(prev.lateHourRate) : (carHourlyRate ? String(carHourlyRate) : ""),
+      // Always the booking's scheduled end time — never carried forward from
+      // a previous close. A saved actualReturnTime can't be trusted as "the
+      // admin deliberately confirmed this was late": it's just as likely a
+      // leftover from before this defaulted correctly. Assume on-time every
+      // time the modal opens; admin picks a different time only when a
+      // return genuinely was late.
+      actualReturnTime: defaultReturnTime,
+      // Blank by default, same as actualReturnTime — since we now always
+      // assume on-time, there's nothing to charge a rate against yet. If the
+      // admin actually picks a later return time, the server falls back to
+      // the car's own hourly rate automatically when this is left blank.
+      lateHourRate: "",
       pickupCharges: prev?.pickupCharges ? String(prev.pickupCharges) : "",
       dropCharges: prev?.dropCharges ? String(prev.dropCharges) : "",
       fastagStateTax: prev?.fastagStateTax ? String(prev.fastagStateTax) : "",
@@ -655,7 +678,15 @@ export default function BookingDetailPage() {
     const wasAlreadyClosed = isClosed;
     setClosingSaving(true);
     try {
-      const { data } = await bookingsApi.closeBooking(rawBooking._id, closingForm);
+      // actualReturnTime is a naive datetime-local string ("YYYY-MM-DDTHH:mm")
+      // meant as IST wall-clock time — convert it to an unambiguous ISO string
+      // before sending, so the server (which may not run in the IST timezone)
+      // doesn't misinterpret it and produce a spurious late-return charge.
+      const payload = {
+        ...closingForm,
+        actualReturnTime: closingForm.actualReturnTime ? istInputToISOString(closingForm.actualReturnTime) : "",
+      };
+      const { data } = await bookingsApi.closeBooking(rawBooking._id, payload);
       setRawBooking(data.data);
       setCloseBillModalOpen(false);
       const settlement = data.data?.closingBill?.settlementAmount ?? 0;
@@ -1603,11 +1634,7 @@ export default function BookingDetailPage() {
                       </label>
                       <button
                         type="button"
-                        onClick={() => {
-                          const d = new Date(rawBooking.endTime);
-                          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-                          setClosingForm((f) => ({ ...f, actualReturnTime: d.toISOString().slice(0, 16) }));
-                        }}
+                        onClick={() => setClosingForm((f) => ({ ...f, actualReturnTime: toISTLocalInput(rawBooking.endTime) }))}
                         className="text-[10px] font-semibold text-[#7C3AED] hover:underline shrink-0"
                         title="Reset this to the scheduled return time — use this if the value here was carried over from before the on-time-by-default fix and the return wasn't actually late"
                       >
@@ -1629,7 +1656,7 @@ export default function BookingDetailPage() {
                 </div>
                 {(() => {
                   const scheduledEnd = new Date(booking.end);
-                  const actualReturn = closingForm.actualReturnTime ? new Date(closingForm.actualReturnTime) : null;
+                  const actualReturn = closingForm.actualReturnTime ? new Date(istInputToISOString(closingForm.actualReturnTime)) : null;
                   const lateHours = actualReturn && !isNaN(actualReturn.getTime()) && actualReturn > scheduledEnd
                     ? Math.ceil((actualReturn.getTime() - scheduledEnd.getTime()) / (60 * 60 * 1000)) : 0;
                   const lateCharges = lateHours * (Number(closingForm.lateHourRate) || 0);
