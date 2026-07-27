@@ -7,16 +7,15 @@ import { Wrench, Plus, X, Loader2, IndianRupee, Trash2, CheckCircle2, XCircle, A
 import { cn } from "@/lib/utils";
 import { adminMaintenanceApi, adminCarsApi } from "@/lib/api";
 
-const CATEGORIES = ["Service", "Parts Replacement", "Tyre", "Alignment", "Battery", "AC", "Denting/Painting", "Other"] as const;
+const CATEGORIES = ["Service", "Fare", "Fuel", "Tyre", "Denting Painting", "Engine Work", "Other"] as const;
 
 const CATEGORY_COLOR: Record<string, string> = {
   Service: "#3B82F6",
-  "Parts Replacement": "#8B5CF6",
-  Tyre: "#F59E0B",
-  Alignment: "#EC4899",
-  Battery: "#10B981",
-  AC: "#06B6D4",
-  "Denting/Painting": "#EF4444",
+  Fare: "#8B5CF6",
+  Fuel: "#F59E0B",
+  Tyre: "#EC4899",
+  "Denting Painting": "#EF4444",
+  "Engine Work": "#06B6D4",
   Other: "#9090A8",
 };
 

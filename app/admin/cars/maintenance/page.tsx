@@ -10,7 +10,7 @@ import toast from "react-hot-toast";
 type CarItem = { _id: string; name: string; registrationNo: string; type: string };
 type Totals = { carId: string; total: number; count: number; lastDate: string };
 
-const CATEGORIES = ["Service", "Parts Replacement", "Tyre", "Alignment", "Battery", "AC", "Denting/Painting", "Other"] as const;
+const CATEGORIES = ["Service", "Fare", "Fuel", "Tyre", "Denting Painting", "Engine Work", "Other"] as const;
 const PAGE_SIZE = 20;
 const CAR_FIELDS = "name,registrationNo,type";
 
