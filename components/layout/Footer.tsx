@@ -236,7 +236,7 @@ export default function Footer() {
                 {seoPages.map((p) => (
                   <Link
                     key={p.pageSlug}
-                    href={`/seo/${p.pageSlug}`}
+                    href={`/car/${p.pageSlug}`}
                     className="text-[#4A4A6A] text-sm hover:text-[#E8540A] py-1.5 truncate"
                   >
                     {p.pageName}

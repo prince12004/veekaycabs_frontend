@@ -14,7 +14,7 @@ export default function AddMobilePage() {
   const [error, setError] = useState("");
 
   const handleSendOtp = async () => {
-    if (!/^\d{10}$/.test(mobile)) {
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
       setError("Enter a valid 10-digit mobile number");
       return;
     }
@@ -41,7 +41,11 @@ export default function AddMobilePage() {
       // Verify OTP + save mobile in one call (won't create a new user)
       const res = await usersAPI.addMobile(mobile, otp);
       localStorage.setItem("vk_user", JSON.stringify(res.data.data));
-      router.replace("/account");
+      // Same redirect convention as /login and the Google success page — lets
+      // the booking flow send the user here and land back where they left off.
+      const dest = localStorage.getItem("vk_login_redirect") || "/account";
+      localStorage.removeItem("vk_login_redirect");
+      router.replace(dest);
     } catch (e: any) {
       setError(e?.response?.data?.message || "Invalid OTP. Please try again.");
     } finally {

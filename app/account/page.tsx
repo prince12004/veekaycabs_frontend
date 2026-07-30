@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { cn } from "@/lib/utils";
-import { usersAPI } from "@/lib/api";
+import { usersAPI, bookingsAPI } from "@/lib/api";
 
 const NAV_ITEMS = [
   { id: "profile", icon: User, label: "Profile" },
@@ -26,32 +26,14 @@ const NAV_ITEMS = [
   { id: "active", icon: Car, label: "Active Booking" },
 ];
 
-const RECENT_BOOKINGS = [
-  {
-    id: "VK20260012",
-    car: "Hyundai Creta",
-    start: "Jun 12, 2026",
-    end: "Jun 14, 2026",
-    amount: 12450,
-    status: "confirmed",
-  },
-  {
-    id: "VK20260009",
-    car: "Maruti Swift",
-    start: "May 28, 2026",
-    end: "May 30, 2026",
-    amount: 4990,
-    status: "completed",
-  },
-  {
-    id: "VK20260006",
-    car: "Honda City",
-    start: "May 10, 2026",
-    end: "May 11, 2026",
-    amount: 3200,
-    status: "completed",
-  },
-];
+type BookingRow = {
+  id: string;
+  car: string;
+  start: string;
+  end: string;
+  amount: number;
+  status: string;
+};
 
 const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-[#DBEAFE] text-[#1E40AF]",
@@ -61,10 +43,23 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-[#FEE2E2] text-[#991B1B]",
 };
 
-const KYC_STEPS = [
-  { label: "Aadhaar", status: "complete" },
-  { label: "PAN", status: "complete" },
-  { label: "Driving Licence", status: "pending" },
+const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" });
+
+// Maps a raw /api/bookings/my row into the shape this page's cards render.
+const toBookingRow = (b: any): BookingRow => ({
+  id: b.bookingId || b._id,
+  car: b.carId?.name || "Car",
+  start: fmtDate(b.startTime),
+  end: fmtDate(b.endTime),
+  amount: b.totalAmount || 0,
+  status: b.status,
+});
+
+type DocStatus = "not_uploaded" | "pending" | "verified" | "rejected";
+const KYC_LABELS: { key: "aadhaarStatus" | "panStatus" | "dlStatus"; label: string }[] = [
+  { key: "aadhaarStatus", label: "Aadhaar" },
+  { key: "panStatus", label: "PAN" },
+  { key: "dlStatus", label: "Driving Licence" },
 ];
 
 export default function AccountPage() {
@@ -81,7 +76,11 @@ export default function AccountPage() {
   const [memberSince, setMemberSince] = useState("");
   const [totalBookings, setTotalBookings] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [isGoogleUser, setIsGoogleUser] = useState(false);
+  const [kycDocs, setKycDocs] = useState<Record<string, DocStatus> | null>(null);
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
 
   const applyUser = (user: any) => {
     const next = {
@@ -117,17 +116,37 @@ export default function AccountPage() {
         const user = res.data.data.user;
         applyUser(user);
         localStorage.setItem("vk_user", JSON.stringify(user));
+        setKycDocs(res.data.data.documents || { aadhaarStatus: "not_uploaded", panStatus: "not_uploaded", dlStatus: "not_uploaded" });
       })
       .catch(() => {});
+
+    bookingsAPI
+      .getMy({ limit: "5" })
+      .then((res) => setBookings((res.data.data || []).map(toBookingRow)))
+      .catch(() => {})
+      .finally(() => setBookingsLoading(false));
   }, [router]);
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const handleSave = async () => {
+    if (temp.email && !EMAIL_RE.test(temp.email)) {
+      setSaveError("Enter a valid email address");
+      return;
+    }
+    if (temp.address.length > 100) {
+      setSaveError("Address must be 100 characters or less");
+      return;
+    }
+    setSaveError("");
     setSaving(true);
     try {
       const res = await usersAPI.updateProfile(temp);
       applyUser(res.data.data);
       localStorage.setItem("vk_user", JSON.stringify(res.data.data));
       setEditing(false);
+    } catch (e: any) {
+      setSaveError(e?.response?.data?.message || "Failed to save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -237,6 +256,8 @@ export default function AccountPage() {
                       )}
                     </div>
 
+                    {saveError && <p className="text-[#EF4444] text-xs font-medium mb-4">{saveError}</p>}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       {[
                         { label: "Full Name", key: "name", type: "text" },
@@ -248,12 +269,18 @@ export default function AccountPage() {
                             {label}
                           </label>
                           {editing ? (
-                            <input
-                              type={type}
-                              value={temp[key as keyof typeof temp]}
-                              onChange={(e) => setTemp({ ...temp, [key]: e.target.value })}
-                              className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A]"
-                            />
+                            <>
+                              <input
+                                type={type}
+                                maxLength={key === "address" ? 100 : undefined}
+                                value={temp[key as keyof typeof temp]}
+                                onChange={(e) => { setTemp({ ...temp, [key]: e.target.value }); if (saveError) setSaveError(""); }}
+                                className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A]"
+                              />
+                              {key === "address" && (
+                                <p className="text-[10px] text-[#9090A8] mt-1 text-right">{temp.address.length}/100</p>
+                              )}
+                            </>
                           ) : (
                             <p className="text-[#0F0F1A] text-sm font-medium bg-[#F8F9FC] rounded-xl px-4 py-2.5 border border-[#E4E5EF]">
                               {profile[key as keyof typeof profile]}
@@ -271,57 +298,80 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  {/* KYC Status */}
-                  <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] p-6">
-                    <div className="flex items-center justify-between mb-5">
-                      <h3 className="font-bold font-syne text-[#0F0F1A] text-lg flex items-center gap-2">
-                        <Shield size={18} className="text-[#E8540A]" />
-                        KYC Verification
-                      </h3>
-                      <span className="bg-[#FEF3C7] text-[#92400E] text-xs font-bold px-3 py-1 rounded-full">
-                        2/3 Verified
-                      </span>
-                    </div>
-
-                    {/* 3-step bar */}
-                    <div className="flex items-center gap-0 mb-6">
-                      {KYC_STEPS.map((step, idx) => (
-                        <div key={step.label} className="flex items-center flex-1">
-                          <div className="flex flex-col items-center flex-1">
-                            <div className={cn(
-                              "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-1",
-                              step.status === "complete"
-                                ? "bg-[#10B981] text-white"
-                                : "bg-[#FFF3ED] border-2 border-[#E8540A] text-[#E8540A]"
-                            )}>
-                              {step.status === "complete" ? <CheckCircle size={14} /> : idx + 1}
-                            </div>
-                            <p className="text-xs font-semibold text-[#4A4A6A] text-center">{step.label}</p>
-                            <p className={cn(
-                              "text-[10px] font-bold mt-0.5",
-                              step.status === "complete" ? "text-[#10B981]" : "text-[#E8540A]"
-                            )}>
-                              {step.status === "complete" ? "Verified" : "Pending"}
-                            </p>
-                          </div>
-                          {idx < KYC_STEPS.length - 1 && (
-                            <div className={cn(
-                              "flex-1 h-0.5 -mt-4 mx-1",
-                              idx === 0 ? "bg-[#10B981]" : "bg-[#E4E5EF]"
-                            )} />
-                          )}
+                  {/* KYC Status — driven by the user's real document verification
+                      status (fetched via getProfile), not a fixed placeholder. */}
+                  {kycDocs && (() => {
+                    const steps = KYC_LABELS.map(({ key, label }) => ({ label, status: kycDocs[key] || "not_uploaded" }));
+                    const verifiedCount = steps.filter((s) => s.status === "verified").length;
+                    const allVerified = verifiedCount === steps.length;
+                    return (
+                      <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] p-6">
+                        <div className="flex items-center justify-between mb-5">
+                          <h3 className="font-bold font-syne text-[#0F0F1A] text-lg flex items-center gap-2">
+                            <Shield size={18} className="text-[#E8540A]" />
+                            KYC Verification
+                          </h3>
+                          <span className={cn(
+                            "text-xs font-bold px-3 py-1 rounded-full",
+                            allVerified ? "bg-[#D1FAE5] text-[#065F46]" : verifiedCount > 0 ? "bg-[#FEF3C7] text-[#92400E]" : "bg-[#FEE2E2] text-[#991B1B]"
+                          )}>
+                            {verifiedCount}/{steps.length} Verified
+                          </span>
                         </div>
-                      ))}
-                    </div>
 
-                    <Link
-                      href="/account/documents"
-                      className="inline-flex items-center gap-2 btn-gradient px-5 py-2.5 rounded-xl text-white font-semibold text-sm"
-                    >
-                      <FileText size={14} />
-                      Complete KYC
-                    </Link>
-                  </div>
+                        {/* 3-step bar */}
+                        <div className="flex items-center gap-0 mb-6">
+                          {steps.map((step, idx) => {
+                            const complete = step.status === "verified";
+                            const rejected = step.status === "rejected";
+                            return (
+                              <div key={step.label} className="flex items-center flex-1">
+                                <div className="flex flex-col items-center flex-1">
+                                  <div className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-1",
+                                    complete
+                                      ? "bg-[#10B981] text-white"
+                                      : rejected
+                                        ? "bg-[#FEE2E2] border-2 border-[#EF4444] text-[#EF4444]"
+                                        : "bg-[#FFF3ED] border-2 border-[#E8540A] text-[#E8540A]"
+                                  )}>
+                                    {complete ? <CheckCircle size={14} /> : idx + 1}
+                                  </div>
+                                  <p className="text-xs font-semibold text-[#4A4A6A] text-center">{step.label}</p>
+                                  <p className={cn(
+                                    "text-[10px] font-bold mt-0.5",
+                                    complete ? "text-[#10B981]" : rejected ? "text-[#EF4444]" : "text-[#E8540A]"
+                                  )}>
+                                    {complete ? "Verified" : rejected ? "Rejected" : step.status === "pending" ? "In Review" : "Pending"}
+                                  </p>
+                                </div>
+                                {idx < steps.length - 1 && (
+                                  <div className={cn(
+                                    "flex-1 h-0.5 -mt-4 mx-1",
+                                    steps[idx].status === "verified" ? "bg-[#10B981]" : "bg-[#E4E5EF]"
+                                  )} />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {allVerified ? (
+                          <p className="inline-flex items-center gap-2 text-[#10B981] font-semibold text-sm">
+                            <CheckCircle size={16} /> Your KYC is fully verified
+                          </p>
+                        ) : (
+                          <Link
+                            href="/account/documents"
+                            className="inline-flex items-center gap-2 btn-gradient px-5 py-2.5 rounded-xl text-white font-semibold text-sm"
+                          >
+                            <FileText size={14} />
+                            Complete KYC
+                          </Link>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Recent Bookings */}
                   <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] p-6">
@@ -335,23 +385,29 @@ export default function AccountPage() {
                       </Link>
                     </div>
                     <div className="space-y-3">
-                      {RECENT_BOOKINGS.map((b) => (
-                        <div
-                          key={b.id}
-                          className="flex items-center justify-between p-4 bg-[#F8F9FC] rounded-xl border border-[#E4E5EF]"
-                        >
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-sm text-[#0F0F1A]">{b.car}</span>
-                              <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", STATUS_STYLES[b.status])}>
-                                {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
-                              </span>
+                      {bookingsLoading ? (
+                        <p className="text-center text-sm text-[#9090A8] py-6">Loading...</p>
+                      ) : bookings.length === 0 ? (
+                        <p className="text-center text-sm text-[#9090A8] py-6">No bookings yet</p>
+                      ) : (
+                        bookings.slice(0, 3).map((b) => (
+                          <div
+                            key={b.id}
+                            className="flex items-center justify-between p-4 bg-[#F8F9FC] rounded-xl border border-[#E4E5EF]"
+                          >
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-sm text-[#0F0F1A]">{b.car}</span>
+                                <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", STATUS_STYLES[b.status] || STATUS_STYLES.pending)}>
+                                  {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-[#9090A8]">{b.id} • {b.start} → {b.end}</p>
                             </div>
-                            <p className="text-xs text-[#9090A8]">{b.id} • {b.start} → {b.end}</p>
+                            <p className="text-[#E8540A] font-bold text-sm">Rs. {b.amount.toLocaleString("en-IN")}</p>
                           </div>
-                          <p className="text-[#E8540A] font-bold text-sm">Rs. {b.amount.toLocaleString("en-IN")}</p>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 </>
@@ -362,23 +418,29 @@ export default function AccountPage() {
                 <div className="bg-white rounded-2xl border border-[#E4E5EF] p-6">
                   <h2 className="font-black font-syne text-xl text-[#0F0F1A] mb-5">My Bookings</h2>
                   <div className="space-y-3">
-                    {RECENT_BOOKINGS.map((b) => (
-                      <div key={b.id} className="flex items-center justify-between p-4 bg-[#F8F9FC] rounded-xl border border-[#E4E5EF]">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-sm text-[#0F0F1A]">{b.car}</span>
-                            <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", STATUS_STYLES[b.status])}>
-                              {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
-                            </span>
+                    {bookingsLoading ? (
+                      <p className="text-center text-sm text-[#9090A8] py-6">Loading...</p>
+                    ) : bookings.length === 0 ? (
+                      <p className="text-center text-sm text-[#9090A8] py-6">No bookings yet</p>
+                    ) : (
+                      bookings.map((b) => (
+                        <div key={b.id} className="flex items-center justify-between p-4 bg-[#F8F9FC] rounded-xl border border-[#E4E5EF]">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-sm text-[#0F0F1A]">{b.car}</span>
+                              <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", STATUS_STYLES[b.status] || STATUS_STYLES.pending)}>
+                                {b.status.charAt(0).toUpperCase() + b.status.slice(1)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#9090A8]">{b.id} • {b.start} → {b.end}</p>
                           </div>
-                          <p className="text-xs text-[#9090A8]">{b.id} • {b.start} → {b.end}</p>
+                          <div className="text-right">
+                            <p className="text-[#E8540A] font-bold text-sm">Rs. {b.amount.toLocaleString("en-IN")}</p>
+                            <Link href="/account/history" className="text-xs text-[#9090A8] hover:text-[#E8540A]">View details →</Link>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[#E8540A] font-bold text-sm">Rs. {b.amount.toLocaleString("en-IN")}</p>
-                          <Link href="/account/history" className="text-xs text-[#9090A8] hover:text-[#E8540A]">View details →</Link>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                   <div className="mt-4 text-center">
                     <Link href="/account/history" className="btn-gradient px-6 py-2.5 rounded-xl text-white font-semibold text-sm inline-flex items-center gap-2">

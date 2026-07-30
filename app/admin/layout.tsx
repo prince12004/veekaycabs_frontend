@@ -112,6 +112,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Lock background scroll while the mobile sidebar drawer is open.
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [sidebarOpen]);
+
   useEffect(() => {
     if (isLoginPage) return;
     const token = localStorage.getItem("vk_admin_token");

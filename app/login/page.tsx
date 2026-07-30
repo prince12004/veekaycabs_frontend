@@ -26,11 +26,16 @@ function LoginPageContent() {
   const [tab, setTab] = useState<"otp" | "google">("otp");
   const [step, setStep] = useState<1 | 2>(1);
   const [mobile, setMobile] = useState("");
+  const [mobileError, setMobileError] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = useState(45);
   const [loading, setLoading] = useState(false);
   const [canResend, setCanResend] = useState(false);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Indian mobile numbers are always 10 digits starting 6-9 — "10 digits"
+  // alone let through obviously-invalid numbers (e.g. starting with 0-5).
+  const isValidMobile = (v: string) => /^[6-9]\d{9}$/.test(v);
 
   useEffect(() => {
     if (step === 2 && timer > 0) {
@@ -41,7 +46,11 @@ function LoginPageContent() {
   }, [step, timer]);
 
   const sendOtp = async () => {
-    if (mobile.length < 10) return;
+    if (!isValidMobile(mobile)) {
+      setMobileError("Enter a valid 10-digit mobile number");
+      return;
+    }
+    setMobileError("");
     setLoading(true);
     try {
       await authAPI.sendOtp(mobile);
@@ -79,25 +88,56 @@ function LoginPageContent() {
     }
   };
 
-  const handleOtpChange = (idx: number, val: string) => {
-    if (!/^\d*$/.test(val)) return;
+  // Backward navigation lives ONLY in handleOtpKeyDown below — handleOtpChange
+  // used to also jump back whenever the value became empty, and the two
+  // handlers firing for the same backspace keystroke (once on keydown, once
+  // on the resulting change event) raced and could leave focus one box off
+  // from where it should land. Change now only ever moves forward.
+  const handleOtpChange = (idx: number, rawVal: string) => {
+    const val = rawVal.replace(/\D/g, "").slice(-1);
     const next = [...otp];
-    next[idx] = val.slice(-1);
+    next[idx] = val;
     setOtp(next);
     if (val && idx < 5) otpRefs.current[idx + 1]?.focus();
-    if (!val && idx > 0) otpRefs.current[idx - 1]?.focus();
     // Auto-submit when last digit entered
     if (val && idx === 5) {
-      const full = [...next].join("");
+      const full = next.join("");
       if (full.length === 6) setTimeout(() => verifyOtp(), 100);
     }
   };
 
-  const handleOtpKeyDown = (idx: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otp[idx] && idx > 0) {
+  const handleOtpKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (otp[idx]) return; // let the default clear happen; stay put
+      if (idx > 0) {
+        e.preventDefault();
+        const next = [...otp];
+        next[idx - 1] = "";
+        setOtp(next);
+        otpRefs.current[idx - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft" && idx > 0) {
+      e.preventDefault();
       otpRefs.current[idx - 1]?.focus();
+    } else if (e.key === "ArrowRight" && idx < 5) {
+      e.preventDefault();
+      otpRefs.current[idx + 1]?.focus();
+    } else if (e.key === "Enter") {
+      verifyOtp();
     }
-    if (e.key === "Enter") verifyOtp();
+  };
+
+  // Lets someone paste the whole 6-digit code (e.g. from an SMS) into any box.
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const digits = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!digits) return;
+    e.preventDefault();
+    const next = [...otp];
+    for (let i = 0; i < digits.length; i++) next[i] = digits[i];
+    setOtp(next);
+    const lastIdx = Math.min(digits.length, 6) - 1;
+    otpRefs.current[Math.min(lastIdx + 1, 5)]?.focus();
+    if (digits.length === 6) setTimeout(() => verifyOtp(), 100);
   };
 
   const handleMobileKeyDown = (e: React.KeyboardEvent) => {
@@ -168,15 +208,23 @@ function LoginPageContent() {
                       </div>
                       <input
                         type="tel"
+                        inputMode="numeric"
                         maxLength={10}
                         value={mobile}
-                        onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))}
+                        onChange={(e) => {
+                          setMobile(e.target.value.replace(/\D/g, "").slice(0, 10));
+                          if (mobileError) setMobileError("");
+                        }}
                         onKeyDown={handleMobileKeyDown}
                         placeholder="Enter 10-digit number"
                         autoFocus
-                        className="flex-1 border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-3 text-sm text-[#0F0F1A] placeholder:text-[#9090A8] outline-none"
+                        className={cn(
+                          "flex-1 border-[1.5px] rounded-xl px-4 py-3 text-sm text-[#0F0F1A] placeholder:text-[#9090A8] outline-none",
+                          mobileError ? "border-[#EF4444]" : "border-[#E4E5EF] focus:border-[#E8540A]"
+                        )}
                       />
                     </div>
+                    {mobileError && <p className="text-[#EF4444] text-xs mt-1.5">{mobileError}</p>}
                   </div>
 
                   <button
@@ -214,17 +262,21 @@ function LoginPageContent() {
                   </div>
 
                   <label className="text-[#4A4A6A] text-xs font-semibold mb-3 block">Enter 6-Digit OTP</label>
-                  <div className="flex gap-2 mb-5 justify-between">
+                  <div className="flex gap-1.5 sm:gap-2 mb-5 justify-between">
                     {otp.map((digit, idx) => (
                       <input
                         key={idx}
                         ref={(el) => { otpRefs.current[idx] = el; }}
-                        type="number"
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete={idx === 0 ? "one-time-code" : "off"}
                         maxLength={1}
                         value={digit}
                         onChange={(e) => handleOtpChange(idx, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        className="w-12 h-12 text-center border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl text-lg font-bold text-[#0F0F1A] outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        onPaste={handleOtpPaste}
+                        className="w-9 h-9 sm:w-12 sm:h-12 text-center border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl text-base sm:text-lg font-bold text-[#0F0F1A] outline-none"
                       />
                     ))}
                   </div>

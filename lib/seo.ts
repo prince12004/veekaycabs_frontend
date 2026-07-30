@@ -10,7 +10,6 @@ interface SeoInput {
   title: string;
   description: string;
   keywords?: string;
-  /** Route path starting with "/", e.g. "/about" or "/blogs/my-post" */
   path: string;
   image?: string;
   noIndex?: boolean;

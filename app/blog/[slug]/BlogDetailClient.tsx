@@ -129,7 +129,7 @@ export default function BlogDetailClient({ initialBlog }: { initialBlog?: BlogDe
         <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-6">
           <BookOpen size={40} className="text-[#E4E5EF] mb-4" />
           <p className="text-[#0F0F1A] font-bold mb-2">Blog post not found</p>
-          <Link href="/blogs" className="text-[#E8540A] font-semibold text-sm hover:underline">Back to Blog</Link>
+          <Link href="/blog" className="text-[#E8540A] font-semibold text-sm hover:underline">Back to Blog</Link>
         </div>
       </PageLayout>
     );
@@ -148,7 +148,7 @@ export default function BlogDetailClient({ initialBlog }: { initialBlog?: BlogDe
       {/* Hero */}
       <section className="bg-gradient-to-b from-[#0F0F1A] to-[#1C1C2E] pt-32 pb-16">
         <div className="max-w-4xl blog_details mx-auto px-6">
-          <Link href="/blogs" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-8 text-sm">
+          <Link href="/blog" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-8 text-sm">
             <ArrowLeft size={16} /> Back to Blog
           </Link>
           {blog.tags?.[0] && (
@@ -249,7 +249,7 @@ export default function BlogDetailClient({ initialBlog }: { initialBlog?: BlogDe
               <h3 className="text-xl font-bold text-[#0F0F1A] font-syne mb-6">Related Articles</h3>
               <div className="grid sm:grid-cols-3 gap-4">
                 {related.map(post => (
-                  <Link key={post._id} href={`/blogs/${post.slug}`}>
+                  <Link key={post._id} href={`/blog/${post.slug}`}>
                     <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 hover:border-[#E8540A]/30 hover:-translate-y-1 hover:shadow-lg transition-all duration-200 group">
                       <BookOpen size={28} className="text-[#E8540A]/40 mb-3" />
                       <h4 className="font-bold text-[#0F0F1A] text-sm mb-2 group-hover:text-[#E8540A] transition-colors line-clamp-3 leading-snug">{post.title}</h4>

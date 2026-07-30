@@ -72,7 +72,7 @@ export default function BlogsListClient() {
           <>
             {/* Featured Post */}
             {featured && (
-              <Link href={`/blogs/${featured.slug}`} className="block mb-10 group">
+              <Link href={`/blog/${featured.slug}`} className="block mb-10 group">
                 <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] overflow-hidden hover:shadow-[0_12px_40px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all flex flex-col lg:flex-row">
                   <div className="lg:w-1/2 h-64 lg:h-auto bg-gradient-to-br from-[#E8540A]/20 to-[#FF9A3C]/10 flex items-center justify-center relative overflow-hidden" >
                     {featured.coverImage ? (
@@ -117,7 +117,7 @@ export default function BlogsListClient() {
               {rest.map((blog) => (
                 <Link
                   key={blog._id}
-                  href={`/blogs/${blog.slug}`}
+                  href={`/blog/${blog.slug}`}
                   className="block bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] overflow-hidden hover:shadow-[0_8px_32px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all group"
                 >
                   <div className="h-48 bg-gradient-to-br from-[#E8540A]/15 to-[#FF9A3C]/5 flex items-center justify-center relative overflow-hidden">

@@ -10,7 +10,7 @@ const STATIC_ROUTES = [
   "/tempo-traveller/listing",
   "/about",
   "/contact",
-  "/blogs",
+  "/blog",
   "/sitemap",
   "/privacy",
   "/terms",
@@ -44,14 +44,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   const blogEntries: MetadataRoute.Sitemap = blogs.map((b) => ({
-    url: `${SITE_URL}/blogs/${b.slug}`,
+    url: `${SITE_URL}/blog/${b.slug}`,
     lastModified: b.publishedAt ? new Date(b.publishedAt) : new Date(),
     changeFrequency: "monthly",
     priority: 0.6,
   }));
 
   const carSeoEntries: MetadataRoute.Sitemap = carSeoPages.map((p) => ({
-    url: `${SITE_URL}/seo/${p.pageSlug}`,
+    url: `${SITE_URL}/car/${p.pageSlug}`,
     lastModified: new Date(),
     changeFrequency: "weekly",
     priority: 0.8,

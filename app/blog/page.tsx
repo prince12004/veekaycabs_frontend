@@ -9,13 +9,13 @@ export const metadata: Metadata = buildMetadata({
   description:
     "Tips, guides and news on self-drive car rental, road trips, and travel in Delhi NCR from the VeekayCabs team.",
   keywords: "veekay cabs blog, self drive car rental tips, road trip guides delhi ncr",
-  path: "/blogs",
+  path: "/blog",
 });
 
 export default function BlogsPage() {
   return (
     <>
-      <JsonLd data={breadcrumbSchema([{ name: "Home", path: "/" }, { name: "Blog", path: "/blogs" }])} />
+      <JsonLd data={breadcrumbSchema([{ name: "Home", path: "/" }, { name: "Blog", path: "/blog" }])} />
       <BlogsListClient />
     </>
   );

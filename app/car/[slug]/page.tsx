@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return buildMetadata({
       title: "Page Not Found",
       description: "The page you're looking for doesn't exist.",
-      path: `/seo/${slug}`,
+      path: `/car/${slug}`,
       noIndex: true,
     });
   }
@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: page.metaTitle,
     description: page.metaDescription,
     keywords: page.metaKeywords,
-    path: `/seo/${slug}`,
+    path: `/car/${slug}`,
     noIndex: isNoIndexRobots(page.robots),
   });
 }
@@ -67,7 +67,7 @@ export default async function CarSeoLandingPage({ params }: Props) {
         <JsonLd
           data={breadcrumbSchema([
             { name: "Home", path: "/" },
-            { name: page.pageName, path: `/seo/${slug}` },
+            { name: page.pageName, path: `/car/${slug}` },
           ])}
         />
       )}

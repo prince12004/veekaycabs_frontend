@@ -207,10 +207,22 @@ export default function CarSlugClient() {
 
   const proceedToPayment = async () => {
     const token = typeof window !== "undefined" ? localStorage.getItem("vk_token") : null;
+    const redirectTarget = `/${carSlug}?city=${city}&carId=${carId}&start=${startSlot}&end=${endSlot}`;
     if (!token) {
       toast.error("Please login to continue booking");
-      const redirectTarget = `/${carSlug}?city=${city}&carId=${carId}&start=${startSlot}&end=${endSlot}`;
       router.push(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
+      return;
+    }
+
+    // Google sign-in leaves a placeholder mobile until the user adds and
+    // OTP-verifies a real one — booking confirmations go out over WhatsApp/
+    // SMS, so send them to add it first instead of letting the booking fail
+    // server-side with no number to actually notify.
+    const currentUser = JSON.parse(localStorage.getItem("vk_user") || "{}");
+    if (String(currentUser?.mobile || "").startsWith("google_")) {
+      toast.error("Please add and verify your mobile number before booking");
+      localStorage.setItem("vk_login_redirect", redirectTarget);
+      router.push("/auth/add-mobile");
       return;
     }
 
@@ -295,6 +307,13 @@ export default function CarSlugClient() {
     } catch (e: any) {
       const msg = e?.response?.data?.message || "Something went wrong. Please try again.";
       toast.error(msg);
+      // Defense in depth — the client-side check above should already catch
+      // this, but if localStorage's cached user was stale, fall back to the
+      // server's own rejection here.
+      if (e?.response?.data?.code === "MOBILE_NOT_VERIFIED") {
+        localStorage.setItem("vk_login_redirect", redirectTarget);
+        router.push("/auth/add-mobile");
+      }
     } finally {
       setPayLoading(false);
     }

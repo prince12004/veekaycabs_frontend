@@ -23,6 +23,14 @@ export default function TempoAdminLayout({ children }: { children: React.ReactNo
   const [authChecked, setAuthChecked] = useState(false);
   const [adminUser, setAdminUser] = useState<{ name?: string; email?: string } | null>(null);
 
+  // Lock background scroll while the mobile sidebar drawer is open.
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [sidebarOpen]);
+
   useEffect(() => {
     const token = localStorage.getItem("vk_admin_token");
     if (!token) { router.replace("/admin/login"); return; }

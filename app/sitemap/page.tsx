@@ -19,7 +19,7 @@ const sitemapData = [
       { href: "/tempo-traveller", label: "Tempo Traveller on Rent" },
       { href: "/about", label: "About Us" },
       { href: "/contact", label: "Contact Us" },
-      { href: "/blogs", label: "Blogs & Travel Guides" },
+      { href: "/blog", label: "Blogs & Travel Guides" },
     ],
   },
   {
@@ -54,10 +54,10 @@ const sitemapData = [
   {
     group: "Blog Categories",
     links: [
-      { href: "/blogs?tag=road-trips", label: "Road Trip Guides" },
-      { href: "/blogs?tag=tips", label: "Car Rental Tips" },
-      { href: "/blogs?tag=travel-guide", label: "Travel Guides" },
-      { href: "/blogs?tag=money-saving", label: "Money Saving Tips" },
+      { href: "/blog?tag=road-trips", label: "Road Trip Guides" },
+      { href: "/blog?tag=tips", label: "Car Rental Tips" },
+      { href: "/blog?tag=travel-guide", label: "Travel Guides" },
+      { href: "/blog?tag=money-saving", label: "Money Saving Tips" },
     ],
   },
 ];

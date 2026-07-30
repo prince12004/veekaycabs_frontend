@@ -177,7 +177,7 @@ export default function SeoPage() {
                     <p className="text-xs text-[#4A4A6A] max-w-[150px] truncate">{p.h1Tag}</p>
                   </td>
                   <td className="px-4 py-4">
-                    <a href={`https://veekaycabs.com/seo/${p.pageSlug}`} target="_blank" rel="noreferrer"
+                    <a href={`https://veekaycabs.com/car/${p.pageSlug}`} target="_blank" rel="noreferrer"
                       className="flex items-center gap-1 text-xs text-[#E8540A] font-mono hover:underline">
                       <Globe size={11} /> /seo/{p.pageSlug} <ExternalLink size={10} />
                     </a>

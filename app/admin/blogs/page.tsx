@@ -405,7 +405,7 @@ export default function BlogsPage() {
                   <td className="px-5 py-4 text-xs text-[#4A4A6A]">{fmtDate(blog.createdAt)}</td>
                   <td className="px-5 py-4">
                     <div className="flex gap-1.5">
-                      <a href={`/blogs/${blog.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#DBEAFE] text-[#1E40AF] hover:bg-[#1E40AF] hover:text-white transition-colors flex items-center justify-center" title="View live">
+                      <a href={`/blog/${blog.slug}`} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-[#DBEAFE] text-[#1E40AF] hover:bg-[#1E40AF] hover:text-white transition-colors flex items-center justify-center" title="View live">
                         <Eye size={13} />
                       </a>
                       <button onClick={() => startEdit(blog)} className="w-8 h-8 rounded-lg bg-[#FEF3C7] text-[#92400E] hover:bg-[#F59E0B] hover:text-white transition-colors flex items-center justify-center" title="Edit">

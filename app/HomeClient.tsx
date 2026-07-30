@@ -1126,7 +1126,7 @@ export default function HomeClient() {
                 </p>
               </div>
               <Link
-                href="/blogs"
+                href="/blog"
                 className="btn-gradient px-6 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2 w-fit shrink-0"
               >
                 View All Posts
@@ -1187,7 +1187,7 @@ export default function HomeClient() {
                       {blog.excerpt}
                     </p>
                     <Link
-                      href={`/blogs/${blog.slug}`}
+                      href={`/blog/${blog.slug}`}
                       className="flex items-center gap-2 text-[#E8540A] text-sm font-semibold hover:gap-3 transition-all"
                     >
                       Read Article

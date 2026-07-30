@@ -247,16 +247,16 @@ function CarListingInner() {
   // Fetch real cars from API
   useEffect(() => {
     const start = pickupDT || getEarliestPickup();
-    const end   = dropDT   || addHoursToSlot(start, MIN_BOOKING_HOURS);
+    const end = dropDT || addHoursToSlot(start, MIN_BOOKING_HOURS);
     setLoading(true);
     carsAPI.getAvailable({
       city,
       startTime: new Date(start.replace(" ", "T")).toISOString(),
-      endTime:   new Date(end.replace(" ", "T")).toISOString(),
+      endTime: new Date(end.replace(" ", "T")).toISOString(),
     }).then(({ data }) => {
       setApiCars((data.data || []).map(mapApiCar));
     }).catch(() => setApiCars([]))
-    .finally(() => setLoading(false));
+      .finally(() => setLoading(false));
   }, [city, pickupDT, dropDT]);
 
   const toggleArr = (
@@ -312,9 +312,9 @@ function CarListingInner() {
   const buildCarUrl = (car: ReturnType<typeof mapApiCar>) => {
     const params = new URLSearchParams({
       city,
-      start:  pickupDT || getEarliestPickup(),
-      end:    dropDT   || addHoursToSlot(pickupDT || getEarliestPickup(), MIN_BOOKING_HOURS),
-      carId:  car._id,
+      start: pickupDT || getEarliestPickup(),
+      end: dropDT || addHoursToSlot(pickupDT || getEarliestPickup(), MIN_BOOKING_HOURS),
+      carId: car._id,
     });
     return `/${car.id}?${params.toString()}`;
   };
@@ -470,9 +470,9 @@ function CarListingInner() {
         </div>
       </div>
 
-      <button className="w-full btn-gradient py-2.5 rounded-xl text-white font-semibold text-sm">
+      {/* <button className="w-full btn-gradient py-2.5 rounded-xl text-white font-semibold text-sm">
         Apply Filters
-      </button>
+      </button> */}
     </div>
   );
 

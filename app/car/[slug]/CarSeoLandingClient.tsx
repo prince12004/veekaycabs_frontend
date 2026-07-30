@@ -207,7 +207,7 @@ export default function CarSeoLandingClient({ initialPage }: { initialPage?: Seo
                       {related.map((p) => (
                         <li key={p.pageSlug}>
                           <Link
-                            href={`/seo/${p.pageSlug}`}
+                            href={`/car/${p.pageSlug}`}
                             className="text-[#4A4A6A] text-sm hover:text-[#E8540A] transition-colors block leading-snug"
                           >
                             {p.pageName}

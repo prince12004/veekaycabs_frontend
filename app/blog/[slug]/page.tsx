@@ -28,7 +28,7 @@ interface BlogSeoData {
 
 async function fetchBlog(slug: string): Promise<BlogSeoData | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/blogs/${slug}`, {
+    const res = await fetch(`${API_BASE}/api/blog/${slug}`, {
       next: { revalidate: 300 },
     });
     if (!res.ok) return null;
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return buildMetadata({
       title: "Blog",
       description: "Read the latest from Veekay Cabs on self-drive car rentals in Delhi NCR.",
-      path: `/blogs/${slug}`,
+      path: `/blog/${slug}`,
       noIndex: true,
     });
   }
@@ -60,7 +60,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     keywords,
-    path: `/blogs/${slug}`,
+    path: `/blog/${slug}`,
     image: blog.coverImage,
   });
 }
@@ -80,12 +80,12 @@ export default async function BlogDetailPage({ params }: Props) {
               image: blog.coverImage,
               datePublished: blog.publishedAt,
               author: blog.author,
-              url: `/blogs/${slug}`,
+              url: `/blog/${slug}`,
             }),
             breadcrumbSchema([
               { name: "Home", path: "/" },
-              { name: "Blogs", path: "/blogs" },
-              { name: blog.title, path: `/blogs/${slug}` },
+              { name: "Blogs", path: "/blog" },
+              { name: blog.title, path: `/blog/${slug}` },
             ]),
           ]}
         />
