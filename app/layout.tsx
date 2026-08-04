@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
@@ -47,7 +48,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head />
+      <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18348859511"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-gtag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'AW-18348859511');
+          `}
+        </Script>
+      </head>
       <body className="antialiased">
         <JsonLd data={[organizationSchema(), websiteSchema()]} />
         <QueryProvider>
