@@ -28,7 +28,7 @@ interface BlogSeoData {
 
 async function fetchBlog(slug: string): Promise<BlogSeoData | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/blog/${slug}`, {
+    const res = await fetch(`${API_BASE}/api/blogs/${slug}`, {
       next: { revalidate: 300 },
     });
     if (!res.ok) return null;

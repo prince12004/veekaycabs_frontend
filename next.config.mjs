@@ -10,6 +10,15 @@ const nextConfig = {
         protocol: "https",
         hostname: "images.pexels.com",
       },
+      {
+        // All real uploaded car/tempo photos live here (see
+        // server/src/middleware/upload.js) — without this, next/image
+        // rejects them outright, which is why every photo on the site is
+        // still a plain <img> with none of Next's automatic resizing,
+        // lazy-loading, or modern-format (WebP/AVIF) conversion.
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
     ],
   },
   // Permanent redirects for the /seo/ -> /car/ and /blogs/ -> /blog/ URL

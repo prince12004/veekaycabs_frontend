@@ -195,6 +195,7 @@ function TempoListingContent() {
                       <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value)}
+                        aria-label="Sort tempo travellers by"
                         className="appearance-none border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-3 pr-8 py-1.5 text-xs font-semibold text-[#0F0F1A] outline-none bg-white cursor-pointer"
                       >
                         {SORT_OPTIONS.map((o) => (

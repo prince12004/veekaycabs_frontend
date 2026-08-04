@@ -185,7 +185,7 @@ export default function BookingDetailPage() {
 
   // Edit modal
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", bookingFare: "", amountPaid: "", paymentMode: "online", notes: "", carId: "", bookedBy: "", doorstepDelivery: false, deliveryAddress: "", doorstepCharge: "" });
+  const [editForm, setEditForm] = useState({ startTime: "", endTime: "", totalAmount: "", bookingFare: "", gst: "", amountPaid: "", paymentMode: "online", notes: "", carId: "", bookedBy: "", doorstepDelivery: false, deliveryAddress: "", doorstepCharge: "" });
   const [editLoading, setEditLoading] = useState(false);
   const [availableCars, setAvailableCars] = useState<AdminCarOption[]>([]);
 
@@ -384,6 +384,7 @@ export default function BookingDetailPage() {
       endTime: toISTLocalInput(rawBooking.endTime),
       totalAmount: String(rawBooking.totalAmount || ""),
       bookingFare: String(rawBooking.bookingFare || ""),
+      gst: String(rawBooking.gst || ""),
       amountPaid: String(rawBooking.amountPaid || ""),
       paymentMode: rawBooking.paymentMode || "online",
       notes: rawBooking.challanDetails || "",
@@ -405,6 +406,7 @@ export default function BookingDetailPage() {
         endTime: editForm.endTime ? istInputToISOString(editForm.endTime) : undefined,
         totalAmount: editForm.totalAmount ? Number(editForm.totalAmount) : undefined,
         bookingFare: editForm.bookingFare ? Number(editForm.bookingFare) : undefined,
+        gst: editForm.gst !== "" ? Number(editForm.gst) : undefined,
         amountPaid: editForm.amountPaid ? Number(editForm.amountPaid) : undefined,
         paymentMode: editForm.paymentMode,
         notes: editForm.notes,
@@ -2044,13 +2046,23 @@ export default function BookingDetailPage() {
                     className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="Agent or referral source" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Day Rental (Rs.)</label>
-                <input type="number" value={editForm.bookingFare} onChange={e => setEditForm(f => ({ ...f, bookingFare: e.target.value }))}
-                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
-                <p className="text-[10px] text-[#9090A8] mt-1">
-                  Feeds the Final Settlement / closing bill — update this too if you're changing the duration, otherwise the closing bill will keep showing the old rent.
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Day Rental (Rs.)</label>
+                  <input type="number" value={editForm.bookingFare} onChange={e => setEditForm(f => ({ ...f, bookingFare: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+                  <p className="text-[10px] text-[#9090A8] mt-1">
+                    Feeds the Final Settlement / closing bill — update this too if you're changing the duration.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">GST (Rs., optional)</label>
+                  <input type="number" value={editForm.gst} onChange={e => setEditForm(f => ({ ...f, gst: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="0" />
+                  <p className="text-[10px] text-[#9090A8] mt-1">
+                    Shown as a separate line on the invoice when set. Leave 0 for no GST.
+                  </p>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Mode</label>

@@ -579,6 +579,7 @@ export default function HomeClient() {
                       <select
                         value={selectedCity}
                         onChange={(e) => setSelectedCity(e.target.value)}
+                        aria-label="Select city"
                         className="flex-1 bg-transparent text-[#0F0F1A] font-medium appearance-none cursor-pointer focus:outline-none"
                       >
                         {activeCities.map((c) => (
@@ -1050,6 +1051,7 @@ export default function HomeClient() {
                 <button
                   onClick={() => setReviewPage((p) => Math.max(0, p - 1))}
                   disabled={reviewPage === 0}
+                  aria-label="Previous reviews"
                   className={cn(
                     "w-10 h-10 rounded-full border flex items-center justify-center transition-all",
                     reviewPage === 0
@@ -1067,6 +1069,7 @@ export default function HomeClient() {
                     setReviewPage((p) => Math.min(totalReviewPages - 1, p + 1))
                   }
                   disabled={reviewPage === totalReviewPages - 1}
+                  aria-label="Next reviews"
                   className={cn(
                     "w-10 h-10 rounded-full border flex items-center justify-center transition-all",
                     reviewPage === totalReviewPages - 1

@@ -5,7 +5,7 @@ import {
   Plus, Search, Download, Eye, QrCode, FileText, Phone,
   ChevronLeft, ChevronRight, X, IndianRupee, Calendar,
   Car, User, MapPin, Clock, Printer, Loader2, RefreshCw,
-  Pencil, Check, Trash2, Truck,
+  Pencil, Check, Trash2, Truck, Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bookingsApi, adminCarsApi } from "@/lib/api";
@@ -51,6 +51,7 @@ interface OfflineForm {
   startTime: string; endTime: string;
   bookingFare: string;
   securityDeposit: string;
+  gstPercent: string;
   doorstepDelivery: boolean;
   deliveryAddress: string;
   doorstepCharge: string;
@@ -66,6 +67,7 @@ const emptyForm: OfflineForm = {
   startTime: "", endTime: "",
   bookingFare: "",
   securityDeposit: "",
+  gstPercent: "",
   doorstepDelivery: false,
   deliveryAddress: "",
   doorstepCharge: "",
@@ -441,6 +443,7 @@ export default function OfflineBookingsPage() {
         endTime: new Date(form.endTime).toISOString(),
         bookingFare: form.bookingFare !== "" ? Number(form.bookingFare) : undefined,
         securityDeposit: form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined,
+        gstPercent: form.gstPercent !== "" ? Number(form.gstPercent) : undefined,
         doorstepDelivery: form.doorstepDelivery,
         deliveryAddress: form.doorstepDelivery ? form.deliveryAddress : undefined,
         doorstepCharge: form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
@@ -716,7 +719,7 @@ export default function OfflineBookingsPage() {
 
               {/* Rent & Security — auto-filled from the selected car + duration, editable */}
               <div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Rent (₹)</label>
                     <div className="relative">
@@ -731,8 +734,23 @@ export default function OfflineBookingsPage() {
                       <input type="number" value={form.securityDeposit} onChange={update("securityDeposit")} placeholder="0" min="0" className={inputCls + " pl-9"} />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">GST % (optional)</label>
+                    <div className="relative">
+                      <Percent size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                      <input type="number" value={form.gstPercent} onChange={update("gstPercent")} placeholder="0" min="0" max="100" className={inputCls + " pl-9"} />
+                    </div>
+                    {form.gstPercent !== "" && Number(form.gstPercent) > 0 && form.bookingFare !== "" && (
+                      <p className="text-[10px] text-[#9090A8] mt-1">
+                        ≈ ₹{Math.round(Number(form.bookingFare) * (Number(form.gstPercent) / 100)).toLocaleString("en-IN")} GST on this rent
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[10px] text-[#9090A8] mt-1.5">Auto-filled from the selected car & duration — edit if the actual rent or security collected is different.</p>
+                <p className="text-[10px] text-[#9090A8] mt-1.5">
+                  Rent & security auto-fill from the selected car &amp; duration — edit if the actual amount collected is different.
+                  GST is off by default; set a % only if this booking needs a GST-inclusive invoice.
+                </p>
               </div>
 
               {/* Payment */}

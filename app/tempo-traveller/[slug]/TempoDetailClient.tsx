@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   MapPin, Users, Fuel, IndianRupee, Phone, ChevronRight,
   CheckCircle, Calendar, Clock, Shield, Star, ArrowLeft,
@@ -242,7 +243,14 @@ export default function TempoDetailClient() {
             <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden">
               <div className="relative h-72 md:h-96 bg-gradient-to-br from-[#7C3AED]/10 to-[#A855F7]/5">
                 {tempo.images?.[activeImage] ? (
-                  <img src={tempo.images[activeImage]} alt={tempo.name} className="w-full h-full object-cover" />
+                  <Image
+                    src={tempo.images[activeImage]}
+                    alt={tempo.name}
+                    fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 66vw"
+                    className="object-cover"
+                  />
                 ) : (
                   <div className="flex items-center justify-center h-full">
                     <span className="text-8xl opacity-30">🚐</span>
@@ -258,8 +266,8 @@ export default function TempoDetailClient() {
                 <div className="p-3 flex gap-2 overflow-x-auto">
                   {tempo.images.map((img, i) => (
                     <button key={i} onClick={() => setActiveImage(i)}
-                      className={`w-16 h-12 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${i === activeImage ? "border-[#7C3AED]" : "border-transparent"}`}>
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 shrink-0 transition-all ${i === activeImage ? "border-[#7C3AED]" : "border-transparent"}`}>
+                      <Image src={img} alt="" fill sizes="64px" className="object-cover" />
                     </button>
                   ))}
                 </div>
@@ -390,6 +398,7 @@ export default function TempoDetailClient() {
                   <select
                     value={passengers}
                     onChange={e => setPassengers(Number(e.target.value))}
+                    aria-label="Number of passengers"
                     className="w-full px-3 py-2.5 border-[1.5px] border-[#E4E5EF] rounded-xl text-sm focus:border-[#7C3AED] outline-none bg-white"
                   >
                     {Array.from({ length: tempo.seats }, (_, i) => i + 1).map(n => (

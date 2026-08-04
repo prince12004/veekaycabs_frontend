@@ -291,6 +291,11 @@ export const carSeoPagesAPI = {
   getBySlug: (slug: string) => api.get(`/api/public/car-seo-pages/${slug}`),
 };
 
+export const tempoSeoPagesAPI = {
+  getAll: () => api.get("/api/public/tempo-seo-pages"),
+  getBySlug: (slug: string) => api.get(`/api/public/tempo-seo-pages/${slug}`),
+};
+
 export const adminCarSeoPagesAPI = {
   getAll: () => adminApi.get("/api/admin/car-seo-pages"),
   getById: (id: string) => adminApi.get(`/api/admin/car-seo-pages/${id}`),

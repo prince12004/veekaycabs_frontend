@@ -534,6 +534,7 @@ function CarListingInner() {
                     <select
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
+                      aria-label="Select city"
                       className="flex-1 bg-transparent text-white font-medium appearance-none cursor-pointer focus:outline-none"
                     >
                       {activeCities.map((c) => (
@@ -637,6 +638,7 @@ function CarListingInner() {
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value)}
+                  aria-label="Sort cars by"
                   className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-[#E4E5EF] text-sm text-[#0F0F1A] bg-white focus:border-[#E8540A] font-medium focus:outline-none"
                 >
                   {SORT_OPTIONS.map((s) => (

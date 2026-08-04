@@ -1,0 +1,24 @@
+# Veekay Cabs
+
+> Veekay Cabs is a self-drive car rental and Tempo Traveller hire company serving Delhi NCR (Delhi, Noida, Gurugram, Ghaziabad, Faridabad, and Greater Noida). Customers book hatchbacks, sedans, SUVs, and luxury self-drive cars, or hire 9 to 26 seater Tempo Travellers for group travel, weddings, pilgrimages, and corporate trips — all online, with doorstep delivery and transparent pricing.
+
+## Core pages
+
+- [Home](https://veekaycabs.com/): Overview of self-drive car rental and Tempo Traveller services in Delhi NCR.
+- [Book a Car](https://veekaycabs.com/book): Search and book available self-drive cars by city and date.
+- [Tempo Traveller](https://veekaycabs.com/tempo-traveller): Hire 9 to 26 seater AC Tempo Travellers for group travel.
+- [Tempo Traveller Listing](https://veekaycabs.com/tempo-traveller/listing): Browse available Tempo Travellers by seating capacity and price.
+- [About Us](https://veekaycabs.com/about): Company background and service areas.
+- [Contact Us](https://veekaycabs.com/contact): Phone, WhatsApp, and office address.
+- [Blog](https://veekaycabs.com/blog): Travel guides, rental tips, and destination guides for Delhi NCR.
+
+## Policies
+
+- [Terms & Conditions](https://veekaycabs.com/terms)
+- [Privacy Policy](https://veekaycabs.com/privacy)
+- [Cancellation & Refund Policy](https://veekaycabs.com/cancellation)
+
+## Notes
+
+- Individual car and Tempo Traveller listings are available dynamically at `/{car-slug}` and `/tempo-traveller/{slug}`; see the sitemap at https://veekaycabs.com/sitemap.xml for the current list.
+- For business inquiries, contact +91 99999 26867 or sales@veekaycabs.com.

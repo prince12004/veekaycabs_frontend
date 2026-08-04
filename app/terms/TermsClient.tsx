@@ -25,7 +25,7 @@ We reserve the right to deny rental to anyone who does not meet these criteria.`
 • Bookings are confirmed only after successful payment processing.
 • Veekay Cabs accepts online payments via Razorpay (cards, UPI, net banking) and offline payments at pickup.
 • Booking ID format: DL_{CarName}_{UserName}_{4digits}_{year}
-• GST (18%) is applicable on all rental charges.`,
+• GST (12%) is applicable on all rental charges.`,
   },
   {
     id: "fuel-policy",
