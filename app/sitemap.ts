@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
+import { CITY_PAGES } from "@/lib/cityPages";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -15,6 +16,7 @@ const STATIC_ROUTES = [
   "/privacy",
   "/terms",
   "/cancellation",
+  ...CITY_PAGES.map((c) => `/self-drive-cars-in-${c.slug}`),
 ];
 
 async function fetchJson<T>(path: string): Promise<T[]> {

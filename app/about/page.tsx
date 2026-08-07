@@ -7,7 +7,7 @@ import AboutClient from "./AboutClient";
 export const metadata: Metadata = buildMetadata({
   title: "About Us",
   description:
-    "Learn about VeekayCabs — Delhi NCR's trusted self-drive car rental company since 2004. 101+ verified cars, 2500+ happy customers, transparent pricing.",
+    "Learn about VeekayCabs — Delhi NCR's trusted self-drive car rental company since 2003. 101+ verified cars, 2500+ happy customers, transparent pricing.",
   keywords: "about veekay cabs, self drive car rental company delhi, car rental company noida gurgaon",
   path: "/about",
 });

@@ -266,7 +266,7 @@ export default function CarDocumentsPage() {
               : null;
 
             return (
-              <div key={key} className="bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-4">
+              <div key={`${selectedCar._id}-${key}`} className="bg-white rounded-2xl border border-[#E4E5EF] p-5 space-y-4">
                 {/* Title */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

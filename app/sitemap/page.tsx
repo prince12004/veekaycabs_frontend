@@ -36,11 +36,11 @@ const sitemapData = [
   {
     group: "Cities We Serve",
     links: [
-      { href: "/book?city=delhi", label: "Self Drive Cars in Delhi" },
-      { href: "/book?city=noida", label: "Self Drive Cars in Noida" },
-      { href: "/book?city=gurgaon", label: "Self Drive Cars in Gurgaon" },
-      { href: "/book?city=ghaziabad", label: "Self Drive Cars in Ghaziabad" },
-      { href: "/book?city=greater-noida", label: "Self Drive Cars in Greater Noida" },
+      { href: "/self-drive-cars-in-delhi", label: "Self Drive Cars in Delhi" },
+      { href: "/self-drive-cars-in-noida", label: "Self Drive Cars in Noida" },
+      { href: "/self-drive-cars-in-gurgaon", label: "Self Drive Cars in Gurgaon" },
+      { href: "/self-drive-cars-in-ghaziabad", label: "Self Drive Cars in Ghaziabad" },
+      { href: "/self-drive-cars-in-greater-noida", label: "Self Drive Cars in Greater Noida" },
     ],
   },
   {

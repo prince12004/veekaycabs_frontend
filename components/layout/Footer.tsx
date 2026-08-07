@@ -9,13 +9,22 @@ import {
   MapPin,
   Facebook,
   Instagram,
-  Twitter,
   Linkedin,
   X,
   Search,
 } from "lucide-react";
-import { useActiveCities } from "@/lib/useActiveCities";
 import { carSeoPagesAPI } from "@/lib/api";
+import { CITY_PAGES } from "@/lib/cityPages";
+
+// lucide-react has no dedicated Pinterest glyph — a minimal inline mark instead
+// of pulling in a whole brand-icon package for one icon.
+function PinterestIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12.017 0C5.396 0 0 5.396 0 12.017c0 5.084 3.163 9.42 7.627 11.174-.105-.949-.2-2.406.042-3.443.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738.098.119.112.224.083.345-.09.375-.293 1.194-.332 1.361-.052.221-.174.267-.401.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146 1.124.347 2.317.535 3.554.535 6.621 0 12.017-5.396 12.017-12.017C24.034 5.396 18.638 0 12.017 0z" />
+    </svg>
+  );
+}
 
 const quickLinks = [
   { href: "/book", label: "Self Drive Rental" },
@@ -27,14 +36,14 @@ const quickLinks = [
 ];
 
 const socialLinks = [
-  { icon: Facebook, href: "#", label: "Facebook" },
-  { icon: Instagram, href: "#", label: "Instagram" },
-  { icon: Twitter, href: "#", label: "Twitter" },
-  { icon: Linkedin, href: "#", label: "LinkedIn" },
+  { icon: Facebook, href: "https://www.facebook.com/veekaycabs/", label: "Facebook" },
+  { icon: Instagram, href: "https://www.instagram.com/veekay_cabs/", label: "Instagram" },
+  { icon: PinterestIcon, href: "https://in.pinterest.com/veekay_cabs/", label: "Pinterest" },
+  { icon: Linkedin, href: "https://www.linkedin.com/company/veekaycabs/", label: "LinkedIn" },
+  { icon: X, href: "https://x.com/veekaycabs", label: "X (Twitter)" },
 ];
 
 export default function Footer() {
-  const cities = useActiveCities();
   const [seoPages, setSeoPages] = useState<{ pageName: string; pageSlug: string }[]>([]);
   const [showSeoModal, setShowSeoModal] = useState(false);
 
@@ -74,6 +83,8 @@ export default function Footer() {
                 <a
                   key={label}
                   href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   aria-label={label}
                   className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 hover:bg-[#E8540A] hover:border-[#E8540A] hover:text-white transition-all duration-200"
                 >
@@ -119,10 +130,10 @@ export default function Footer() {
               Our Cities
             </h4>
             <ul className="space-y-3">
-              {cities.map((city) => (
+              {CITY_PAGES.map((city) => (
                 <li key={city.slug}>
                   <Link
-                    href={`/book?city=${city.slug}`}
+                    href={`/self-drive-cars-in-${city.slug}`}
                     className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
                   >
                     {city.name}

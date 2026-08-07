@@ -90,6 +90,7 @@ export interface ClosingBillData {
   billNo: string;
   billDate: string;
   customer: { name: string; mobile: string; email: string };
+  bookedBy?: string;
   car: { name: string; regNo: string; type: string; fuel: string };
   start: string;
   end: string;
@@ -192,6 +193,9 @@ export default function ClosingBillDocument({ data }: { data: ClosingBillData })
             <View style={s.cardRow}><Text style={s.cardLabel}>Mobile</Text><Text style={s.cardValue}>{data.customer.mobile}</Text></View>
             <View style={s.cardRow}><Text style={s.cardLabel}>Departure</Text><Text style={s.cardValue}>{dt(data.start)}</Text></View>
             <View style={s.cardRow}><Text style={s.cardLabel}>Arrival</Text><Text style={s.cardValue}>{dt(data.end)}</Text></View>
+            {data.bookedBy ? (
+              <View style={s.cardRow}><Text style={s.cardLabel}>Booked By</Text><Text style={s.cardValue}>{data.bookedBy}</Text></View>
+            ) : null}
           </View>
           <View style={s.card}>
             <Text style={s.cardTitle}>Vehicle Details</Text>

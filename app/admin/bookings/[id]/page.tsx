@@ -508,6 +508,7 @@ export default function BookingDetailPage() {
       email: rawBooking.userId?.email || "—",
       kyc: rawBooking.userId?.kycStatus || "pending",
     },
+    bookedBy: rawBooking.bookedBy || "",
     car: {
       name: rawBooking.carId?.name || "—",
       regNo: rawBooking.carId?.registrationNo || "—",
@@ -544,6 +545,7 @@ export default function BookingDetailPage() {
     invoiceDate: new Date().toISOString(),
     status: booking.status,
     customer: booking.customer,
+    bookedBy: booking.bookedBy || undefined,
     car: booking.car,
     start: booking.start,
     end: booking.end,
@@ -710,6 +712,7 @@ export default function BookingDetailPage() {
     billNo: `BILL-${String(booking.id).replace(/\W/g, "").slice(-8).toUpperCase()}`,
     billDate: closingBill?.closedAt || new Date().toISOString(),
     customer: booking.customer,
+    bookedBy: booking.bookedBy || undefined,
     car: booking.car,
     start: booking.start,
     end: booking.end,
