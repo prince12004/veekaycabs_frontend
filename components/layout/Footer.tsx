@@ -205,13 +205,6 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-
-        {/* Divider + copyright */}
-        <div className="border-t border-white/[0.08] pt-6">
-          <p className="text-center text-white/40 text-sm">
-            © 2026 Veekay Cabs. All Rights Reserved. | Built with ❤️ in India
-          </p>
-        </div>
       </div>
 
       {/* Orange bottom bar */}
