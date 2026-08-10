@@ -31,6 +31,7 @@ const buildNavGroups = (counts: Record<string, number>): { label: string; items:
     items: [
       { href: "/admin/cars", label: "Car Listing", icon: List, badge: counts.totalCars || null, permKey: "carListing" },
       { href: "/admin/cars/add", label: "Add Car", icon: Plus, badge: null, permKey: "addCar" },
+      { href: "/admin/cars/bulk-price-update", label: "Bulk Price Update", icon: Tag, badge: null, permKey: "carListing" },
       { href: "/admin/cars/documents", label: "Car Documents", icon: FileCheck, badge: null, permKey: "carDocuments" },
       { href: "/admin/cars/maintenance", label: "Car Maintenance", icon: Wrench, badge: null, permKey: "carMaintenance" },
       { href: "/admin/cars/verification", label: "Vehicle Verification", icon: ShieldCheck, badge: null, permKey: "vehicleVerification" },

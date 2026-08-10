@@ -33,6 +33,15 @@ const quickLinks = [
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/cancellation", label: "Cancellation Policy" },
   { href: "/sitemap", label: "Sitemap" },
+  { href: "/sitemap.xml", label: "XML Sitemap", external: true },
+];
+
+const tempoLinks = [
+  { href: "/tempo-traveller", label: "Hire Tempo Traveller in Delhi" },
+  { href: "/tempo-traveller/tempo-traveller-in-noida", label: "Book Tempo Traveller in Noida" },
+  { href: "/tempo-traveller/best-tempo-traveller-services-faridabad", label: "Tempo Traveller Price in Faridabad" },
+  { href: "/tempo-traveller/tempo-traveller-in-ghaziabad", label: "Tempo Traveller Ghaziabad" },
+  { href: "/tempo-traveller/tempo-traveller-in-gurugram", label: "Book Tempo Traveller in Gurugram" },
 ];
 
 const socialLinks = [
@@ -59,7 +68,7 @@ export default function Footer() {
   return (
     <footer className="bg-gradient-to-b from-[#0F0F1A] to-[#080810]">
       <div className="max-w-7xl mx-auto px-6 lg:px-12 pt-16 pb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
           {/* Brand Column */}
           <div>
             <div className="flex items-center gap-3 mb-4">
@@ -100,16 +109,27 @@ export default function Footer() {
               Quick Links
             </h4>
             <ul className="space-y-3">
-              {quickLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              {quickLinks.map((link) =>
+                "external" in link && link.external ? (
+                  <li key={link.href}>
+                    <a
+                      href={link.href}
+                      className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ) : (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                )
+              )}
               {seoPages.length > 0 && (
                 <li>
                   <button
@@ -121,6 +141,25 @@ export default function Footer() {
                   </button>
                 </li>
               )}
+            </ul>
+          </div>
+
+          {/* Tempo Traveller */}
+          <div>
+            <h4 className="text-white font-semibold uppercase tracking-wider text-xs mb-5">
+              Tempo Traveller
+            </h4>
+            <ul className="space-y-3">
+              {tempoLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 

@@ -170,6 +170,8 @@ export const adminCarsApi = {
     adminApi.patch(`/api/admin/cars/${id}/documents/${docType}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+  bulkUpdatePrice: (data: Record<string, unknown>) =>
+    adminApi.patch("/api/admin/cars/bulk-price", data),
 };
 
 export const adminMaintenanceApi = {
