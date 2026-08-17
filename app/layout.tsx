@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     "self drive car rental delhi, car rental noida, car rental gurgaon, veekay cabs",
   authors: [{ name: "VeekayCabs" }],
   robots: { index: true, follow: true },
+  verification: {
+    google: "2IN6m_g6qsunbcJfEDroMrreYBNAHcMopYEXdezFSkM",
+  },
   icons: {
     icon: "/favi.png",
     shortcut: "/favi.png",

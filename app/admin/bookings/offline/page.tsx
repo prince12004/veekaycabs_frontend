@@ -49,6 +49,7 @@ interface OfflineForm {
   carId: string;
   pickupLocation: string;
   startTime: string; endTime: string;
+  hourlyRate: string;
   bookingFare: string;
   securityDeposit: string;
   gstPercent: string;
@@ -65,6 +66,7 @@ const emptyForm: OfflineForm = {
   bookedBy: "",
   carId: "", pickupLocation: "",
   startTime: "", endTime: "",
+  hourlyRate: "",
   bookingFare: "",
   securityDeposit: "",
   gstPercent: "",
@@ -76,19 +78,33 @@ const emptyForm: OfflineForm = {
   notes: "",
 };
 
-// Suggests rent/security from the selected car + trip duration, mirroring the
-// server's own default calculation — the admin can still overwrite either
-// field before submitting (e.g. a negotiated rate, or security actually
-// collected differing from the car's listed deposit).
-const suggestPricing = (car: CarOption | undefined, startTime: string, endTime: string) => {
-  if (!car || !startTime || !endTime) return null;
+// Hours between two datetime-local strings, or null if either is missing/invalid.
+const hoursBetween = (startTime: string, endTime: string) => {
+  if (!startTime || !endTime) return null;
   const start = new Date(startTime);
   const end = new Date(endTime);
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return null;
-  const hours = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
-  const isWeekend = [0, 6].includes(start.getDay());
+  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60));
+};
+
+// Suggests rent/security from the selected car + trip duration, mirroring the
+// server's own default calculation — the admin can still overwrite either
+// field before submitting (e.g. a negotiated rate, or security actually
+// collected differing from the car's listed deposit). This only ever writes
+// to the booking's own fields — it never touches the car's listed price, so
+// the website's regular listing is never affected by a booking-time override.
+const suggestPricing = (car: CarOption | undefined, startTime: string, endTime: string) => {
+  if (!car) return null;
+  // The rate should show as soon as a car is picked, even before valid
+  // pickup/return dates exist — only the Rent total needs a real duration.
+  const isWeekend = startTime && !isNaN(new Date(startTime).getTime()) && [0, 6].includes(new Date(startTime).getDay());
   const rate = isWeekend ? car.weekendPrice : car.regularPrice;
-  return { bookingFare: String(hours * rate), securityDeposit: String(car.securityDeposit ?? 0) };
+  const hours = hoursBetween(startTime, endTime);
+  return {
+    hourlyRate: String(rate),
+    bookingFare: hours !== null ? String(hours * rate) : null,
+    securityDeposit: String(car.securityDeposit ?? 0),
+  };
 };
 
 const DEFAULT_DOORSTEP_CHARGE = 500;
@@ -337,10 +353,12 @@ export default function OfflineBookingsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [canDeleteBooking, setCanDeleteBooking] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
+  const selectedCar = cars.find(c => c._id === form.carId);
 
   useEffect(() => { setCanDeleteBooking(canDelete("offlineBooking")); }, []);
   // Tracks the last auto-suggested rent/security so we only overwrite the
   // fields while the admin hasn't typed a custom value of their own.
+  const autoRate = useRef<string | null>(null);
   const autoRent = useRef<string | null>(null);
   const autoSecurity = useRef<string | null>(null);
   const autoDoorstep = useRef<string | null>(null);
@@ -392,20 +410,45 @@ export default function OfflineBookingsPage() {
     }
   };
 
-  // ── Suggest rent/security whenever car or dates change ─────────────────────
+  // ── Suggest rate/rent/security whenever car or dates change ────────────────
+  // Only ever writes to this booking's own fields (hourlyRate, bookingFare) —
+  // it never calls an API to update the car itself, so a rate override here
+  // has no effect on the car's listed price shown on the public website.
   useEffect(() => {
     const car = cars.find(c => c._id === form.carId);
     const suggestion = suggestPricing(car, form.startTime, form.endTime);
     if (!suggestion) return;
-    setForm(prev => ({
-      ...prev,
-      bookingFare: (prev.bookingFare === "" || prev.bookingFare === autoRent.current) ? suggestion.bookingFare : prev.bookingFare,
-      securityDeposit: (prev.securityDeposit === "" || prev.securityDeposit === autoSecurity.current) ? suggestion.securityDeposit : prev.securityDeposit,
-    }));
+    const hours = hoursBetween(form.startTime, form.endTime);
+    setForm(prev => {
+      // Keep the admin's own custom rate across a date change instead of
+      // silently reverting to the car's listed weekday/weekend rate.
+      const rate = (prev.hourlyRate === "" || prev.hourlyRate === autoRate.current) ? suggestion.hourlyRate : prev.hourlyRate;
+      const rateFare = hours !== null ? String(hours * Number(rate)) : null;
+      const canAutoFillFare = rateFare !== null && (prev.bookingFare === "" || prev.bookingFare === autoRent.current);
+      return {
+        ...prev,
+        hourlyRate: rate,
+        bookingFare: canAutoFillFare ? rateFare : prev.bookingFare,
+        securityDeposit: (prev.securityDeposit === "" || prev.securityDeposit === autoSecurity.current) ? suggestion.securityDeposit : prev.securityDeposit,
+      };
+    });
+    autoRate.current = suggestion.hourlyRate;
     autoRent.current = suggestion.bookingFare;
     autoSecurity.current = suggestion.securityDeposit;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.carId, form.startTime, form.endTime, cars]);
+
+  // Admin editing the rate directly recalculates Rent (hours × rate) right
+  // away — this only changes this booking's fare, not the car's listed price.
+  const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newRate = e.target.value;
+    const hours = hoursBetween(form.startTime, form.endTime);
+    setForm(prev => {
+      const bookingFare = hours !== null && newRate !== "" ? String(hours * Number(newRate)) : prev.bookingFare;
+      return { ...prev, hourlyRate: newRate, bookingFare };
+    });
+    if (hours !== null && newRate !== "") autoRent.current = String(hours * Number(newRate));
+  };
 
   // ── Suggest pickup & drop charge whenever it's toggled on or the car changes ─
   useEffect(() => {
@@ -654,10 +697,17 @@ export default function OfflineBookingsPage() {
                     <select value={form.carId} onChange={update("carId")} required className={inputCls + " pl-9"}>
                       <option value="">-- Select Car --</option>
                       {cars.map(c => (
-                        <option key={c._id} value={c._id}>{c.name} — {c.registrationNo}</option>
+                        <option key={c._id} value={c._id}>
+                          {c.name} — {c.registrationNo} (₹{c.regularPrice}/hr)
+                        </option>
                       ))}
                     </select>
                   </div>
+                  {selectedCar && (
+                    <p className="text-[#9090A8] text-xs mt-1.5">
+                      Listed rate: ₹{selectedCar.regularPrice}/hr (weekend ₹{selectedCar.weekendPrice}/hr)
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -717,9 +767,19 @@ export default function OfflineBookingsPage() {
                 )}
               </div>
 
-              {/* Rent & Security — auto-filled from the selected car + duration, editable */}
+              {/* Rate, Rent & Security — auto-filled from the selected car + duration, editable.
+                  These only ever write to this booking's own fields — changing the rate
+                  here never updates the car's listed price on the public website. */}
               <div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Rate (₹/hr)</label>
+                    <div className="relative">
+                      <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
+                      <input type="number" value={form.hourlyRate} onChange={handleRateChange} placeholder="0" min="0" className={inputCls + " pl-9"} />
+                    </div>
+                    <p className="text-[10px] text-[#9090A8] mt-1">Changing this recalculates Rent — only for this booking.</p>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Rent (₹)</label>
                     <div className="relative">
