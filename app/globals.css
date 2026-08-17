@@ -42,6 +42,16 @@ input, select, textarea {
   font-family: 'Inter', sans-serif;
 }
 
+/* Hide the native up/down spinner on number inputs everywhere */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* Gradient text */
 .gradient-text {
   background: linear-gradient(135deg, #E8540A 0%, #FF9A3C 100%);
