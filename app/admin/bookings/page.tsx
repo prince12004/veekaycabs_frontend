@@ -13,7 +13,7 @@ interface Booking {
   _id: string;
   bookingId: string;
   userId?: { name?: string; mobile?: string };
-  carId?: { name?: string; type?: string };
+  carId?: { name?: string; type?: string; registrationNo?: string };
   cityId?: { name?: string };
   startTime: string;
   endTime: string;
@@ -237,7 +237,9 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <p className="font-medium text-[#0F0F1A] text-sm">{b.carId?.name || "—"}</p>
-                        <p className="text-[#9090A8] text-xs">{b.cityId?.name || ""}</p>
+                        <p className="text-[#9090A8] text-xs">
+                          {[b.carId?.registrationNo, b.cityId?.name].filter(Boolean).join(" · ")}
+                        </p>
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-[#4A4A6A] text-xs">{fmtDate(b.startTime)}</p>
