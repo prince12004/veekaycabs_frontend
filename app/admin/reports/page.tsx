@@ -42,6 +42,7 @@ interface SettlementRow {
   status: string;
   closed: boolean;
   amount: number;
+  bookedBy: string;
 }
 interface StatusCounts { pending: number; confirmed: number; active: number; completed: number; cancelled: number }
 interface SettlementsData {
@@ -92,8 +93,8 @@ const downloadCsv = (filename: string, headers: string[], rows: (string | number
 };
 
 const settlementRowsToCsv = (rows: SettlementRow[]) =>
-  rows.map(r => [r.bookingCode, r.customer, r.mobile, r.car, r.regNo, r.closed ? "Closed" : r.status, r.amount]);
-const SETTLEMENT_CSV_HEADERS = ["Booking ID", "Customer", "Mobile", "Car", "Reg. No.", "Status", "Amount (Rs.)"];
+  rows.map(r => [r.bookingCode, r.customer, r.mobile, r.car, r.regNo, r.closed ? "Closed" : r.status, r.amount, r.bookedBy]);
+const SETTLEMENT_CSV_HEADERS = ["Booking ID", "Customer", "Mobile", "Car", "Reg. No.", "Status", "Amount (Rs.)", "Booked By"];
 
 function AdminReportsPageInner() {
   const router = useRouter();
