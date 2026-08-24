@@ -17,7 +17,7 @@ export function organizationSchema() {
       width: 300,
       height: 80,
     },
-    telephone: [COMPANY_INFO.phone, COMPANY_INFO.phone2, COMPANY_INFO.phone3],
+    telephone: [COMPANY_INFO.phone],
     email: COMPANY_INFO.email,
     address: {
       "@type": "PostalAddress",

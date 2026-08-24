@@ -34,13 +34,23 @@ const sitemapData = [
     ],
   },
   {
+    group: "Tempo Traveller",
+    links: [
+      { href: "/tempo-traveller/listing", label: "Browse Tempo Travellers" },
+      { href: "/tempo-traveller/tempo-traveller-in-noida", label: "Tempo Traveller in Noida" },
+      { href: "/tempo-traveller/best-tempo-traveller-services-faridabad", label: "Tempo Traveller in Faridabad" },
+      { href: "/tempo-traveller/tempo-traveller-in-ghaziabad", label: "Tempo Traveller in Ghaziabad" },
+      { href: "/tempo-traveller/tempo-traveller-in-gurugram", label: "Tempo Traveller in Gurugram" },
+    ],
+  },
+  {
     group: "Cities We Serve",
     links: [
-      { href: "/self-drive-cars-in-delhi", label: "Self Drive Cars in Delhi" },
-      { href: "/self-drive-cars-in-noida", label: "Self Drive Cars in Noida" },
-      { href: "/self-drive-cars-in-gurgaon", label: "Self Drive Cars in Gurgaon" },
-      { href: "/self-drive-cars-in-ghaziabad", label: "Self Drive Cars in Ghaziabad" },
-      { href: "/self-drive-cars-in-greater-noida", label: "Self Drive Cars in Greater Noida" },
+      { href: "/", label: "Self Drive Cars in Delhi" },
+      { href: "/car/self-drive-car-on-rent-noida", label: "Self Drive Cars in Noida" },
+      { href: "/car/self-drive-car-on-rent-gurgaon", label: "Self Drive Cars in Gurgaon" },
+      { href: "/car/self-drive-car-on-rent-ghaziabad", label: "Self Drive Cars in Ghaziabad" },
+      { href: "/car/self-drive-car-rental-in-greater-noida", label: "Self Drive Cars in Greater Noida" },
     ],
   },
   {

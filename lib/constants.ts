@@ -19,9 +19,7 @@ export const MIN_BOOKING_HOURS = 24;
 
 export const COMPANY_INFO = {
   name: "Veekay Cabs",
-  phone: "+91 99999 26867",
-  phone2: "+91 9311826201",
-  phone3: "+91 8448586825",
+  phone: "+91 9999926867",
   email: "sales@veekaycabs.com",
   whatsapp: "+919999926867",
   addressDelhi: "A 13, 1st Floor, Ganesh Nagar, New Delhi 110092",

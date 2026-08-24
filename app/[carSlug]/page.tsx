@@ -19,7 +19,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description:
         "Book a self-drive car in Delhi NCR with Veekay Cabs. Transparent pricing, verified fleet, doorstep delivery.",
       path: `/${carSlug}`,
-      noIndex: true,
     });
   }
 

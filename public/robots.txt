@@ -8,7 +8,7 @@ User-agent: ia_archiver
 User-agent: baiduspider
 
 User-agent: *
-Crawl-delay: 10
+
 
 Disallow: /login
 Disallow: /admin

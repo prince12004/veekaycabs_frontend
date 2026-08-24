@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Veekay Cabs - Self Drive Car Rental",
-    description: "Book self-drive cars in Delhi NCR starting from Rs. 89/hr",
+    description: "Book self-drive cars in Delhi NCR starting from Rs. 92/hr",
     url: SITE_URL,
     siteName: "VeekayCabs",
     locale: "en_IN",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@veekaycabs",
     title: "Veekay Cabs - Self Drive Car Rental",
-    description: "Book self-drive cars in Delhi NCR starting from Rs. 89/hr",
+    description: "Book self-drive cars in Delhi NCR starting from Rs. 92/hr",
   },
 };
 
@@ -52,6 +52,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <Script id="gtm" strategy="afterInteractive">
+          {`
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','GTM-NVVNCN56');
+          `}
+        </Script>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=AW-18348859511"
           strategy="afterInteractive"
@@ -66,6 +75,14 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="antialiased">
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-NVVNCN56"
+            height="0"
+            width="0"
+            style={{ display: "none", visibility: "hidden" }}
+          />
+        </noscript>
         <JsonLd data={[organizationSchema(), websiteSchema()]} />
         <QueryProvider>
           <NumberInputScrollGuard />

@@ -170,7 +170,7 @@ const STATS = [
   { value: 2587, suffix: "+", label: "Total Bookings" },
   { value: 101, suffix: "", label: "Cars in Fleet" },
   { value: 2165, suffix: "+", label: "Happy Customers" },
-  { value: 5, suffix: "+", label: "Years of Trust" },
+  { value: 20, suffix: "+", label: "Years of Trust" },
 ];
 
 const CAR_FILTER_TABS = ["All", "SUV", "Hatchback", "Sedan", "MUV"];
@@ -547,7 +547,7 @@ export default function HomeClient() {
                 className="textmain paragraphs text-white/55 text-base md:text-lg leading-relaxed mb-8 max-w-lg"
               >
                 101+ verified self-drive cars. Transparent pricing from{" "}
-                <span className="text-[#E8540A] font-semibold">Rs. 89/hr</span>
+                <span className="text-[#E8540A] font-semibold">Rs. 92/hr</span>
                 . No driver. No hidden charges. Just you and the open road.
               </motion.p>
 
@@ -692,7 +692,7 @@ export default function HomeClient() {
                   { value: "2587+", label: "Bookings Done" },
                   { value: "101", label: "Cars Available" },
                   { value: "4.9★", label: "Avg Rating" },
-                  { value: "5+", label: "Years Trust" },
+                  { value: "20+", label: "Years Trust" },
                 ].map((s) => (
                   <div key={s.label}>
                     <div className="text-white font-black text-2xl font-syne">{s.value}</div>

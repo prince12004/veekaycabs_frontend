@@ -14,10 +14,15 @@ import {
   Search,
 } from "lucide-react";
 import { carSeoPagesAPI } from "@/lib/api";
-import { CITY_PAGES } from "@/lib/cityPages";
 
-// lucide-react has no dedicated Pinterest glyph — a minimal inline mark instead
-// of pulling in a whole brand-icon package for one icon.
+const cityLinks = [
+  { slug: "delhi", name: "Delhi", href: "/" },
+  { slug: "noida", name: "Noida", href: "/car/self-drive-car-on-rent-noida" },
+  { slug: "gurgaon", name: "Gurgaon", href: "/car/self-drive-car-on-rent-gurgaon" },
+  { slug: "ghaziabad", name: "Ghaziabad", href: "/car/self-drive-car-on-rent-ghaziabad" },
+  { slug: "greater-noida", name: "Greater Noida", href: "/car/self-drive-car-rental-in-greater-noida" },
+];
+
 function PinterestIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -169,10 +174,10 @@ export default function Footer() {
               Our Cities
             </h4>
             <ul className="space-y-3">
-              {CITY_PAGES.map((city) => (
+              {cityLinks.map((city) => (
                 <li key={city.slug}>
                   <Link
-                    href={`/self-drive-cars-in-${city.slug}`}
+                    href={city.href}
                     className="text-white/50 text-sm hover:text-[#E8540A] hover:pl-2 transition-all duration-200 block"
                   >
                     {city.name}

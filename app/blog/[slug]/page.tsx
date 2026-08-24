@@ -48,7 +48,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: "Blog",
       description: "Read the latest from Veekay Cabs on self-drive car rentals in Delhi NCR.",
       path: `/blog/${slug}`,
-      noIndex: true,
     });
   }
 

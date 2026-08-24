@@ -130,7 +130,7 @@ export default function CarSeoLandingClient({ initialPage }: { initialPage?: Seo
               { value: "2587+", label: "Bookings Done" },
               { value: "101", label: "Cars Available" },
               { value: "4.9★", label: "Avg Rating" },
-              { value: "5+", label: "Years Trust" },
+              { value: "20+", label: "Years Trust" },
             ].map((s) => (
               <div key={s.label}>
                 <div className="text-white font-black text-2xl font-syne">{s.value}</div>
