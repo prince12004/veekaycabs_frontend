@@ -1,11 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Plus, Edit, Trash2, Search, Globe, ArrowLeft, Save, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminCarSeoPagesAPI } from "@/lib/api";
 import toast from "react-hot-toast";
 import { canDelete } from "@/lib/adminPermissions";
+
+// Loaded only when the add/edit form actually mounts — keeps the list view
+// (and the heavy Quill editor bundle) out of the initial page load.
+const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), {
+  ssr: false,
+  loading: () => <div className="h-[300px] border-[1.5px] border-[#E4E5EF] rounded-xl animate-pulse bg-[#F8F9FC]" />,
+});
 
 interface SeoPage {
   _id: string;
@@ -15,11 +23,12 @@ interface SeoPage {
   metaKeywords?: string;
   metaDescription: string;
   h1Tag?: string;
+  content?: string;
   createdAt: string;
 }
 
-interface PageForm { pageName: string; metaTitle: string; keyword: string; description: string; h1Tag: string; link: string }
-const emptyForm: PageForm = { pageName: "", metaTitle: "", keyword: "", description: "", h1Tag: "", link: "" };
+interface PageForm { pageName: string; metaTitle: string; keyword: string; description: string; h1Tag: string; link: string; content: string }
+const emptyForm: PageForm = { pageName: "", metaTitle: "", keyword: "", description: "", h1Tag: "", link: "", content: "" };
 const inputCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
 
 export default function SeoPage() {
@@ -58,6 +67,7 @@ export default function SeoPage() {
       metaKeywords: form.keyword,
       metaDescription: form.description,
       h1Tag: form.h1Tag,
+      content: form.content,
     };
     try {
       if (editId !== null) {
@@ -77,7 +87,7 @@ export default function SeoPage() {
   };
 
   const startEdit = (p: SeoPage) => {
-    setForm({ pageName: p.pageName, metaTitle: p.metaTitle, keyword: p.metaKeywords || "", description: p.metaDescription, h1Tag: p.h1Tag || "", link: p.pageSlug });
+    setForm({ pageName: p.pageName, metaTitle: p.metaTitle, keyword: p.metaKeywords || "", description: p.metaDescription, h1Tag: p.h1Tag || "", link: p.pageSlug, content: p.content || "" });
     setEditId(p._id); setView("edit");
   };
 
@@ -116,6 +126,15 @@ export default function SeoPage() {
             <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Meta Description (150 chars) <span className="text-[#EF4444]">*</span></label>
             <textarea value={form.description} onChange={update("description")} required rows={3} placeholder="Rent a self drive car in... with Veekay Cabs." className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none resize-none" />
             <p className="text-xs text-[#9090A8] mt-1">{form.description.length}/150 characters</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Page Content</label>
+            <RichTextEditor
+              value={form.content}
+              onChange={(html: string) => setForm(p => ({ ...p, content: html }))}
+              placeholder="Write the full body content shown on this page..."
+              minHeight={300}
+            />
           </div>
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={saving} className="flex items-center gap-2 btn-gradient px-8 py-3.5 rounded-xl text-white font-bold text-sm disabled:opacity-60">
