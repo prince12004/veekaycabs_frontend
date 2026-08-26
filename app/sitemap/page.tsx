@@ -50,7 +50,7 @@ const sitemapData = [
       { href: "/car/self-drive-car-on-rent-noida", label: "Self Drive Cars in Noida" },
       { href: "/car/self-drive-car-on-rent-gurgaon", label: "Self Drive Cars in Gurgaon" },
       { href: "/car/self-drive-car-on-rent-ghaziabad", label: "Self Drive Cars in Ghaziabad" },
-      { href: "/car/self-drive-car-rental-in-greater-noida", label: "Self Drive Cars in Greater Noida" },
+      { href: "/car/self-drive-car-rental-greater-noida", label: "Self Drive Cars in Greater Noida" },
     ],
   },
   {

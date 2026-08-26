@@ -1264,6 +1264,339 @@ export default function HomeClient() {
         </svg>
       </a>
 
+      {/* SEO content — hidden from view, kept for search engines */}
+      <div className="hidden">
+        <h2>Cheap Self Drive Car Rental Delhi Price: What You Actually Pay in 2026</h2>
+        <p>
+          Delhi is one of the most complicated cities to navigate in India. It is vast,
+          multi-layered, and keeps on changing. Public transportation can take you close but
+          hardly ever exactly where you want to go. Ride-hailing apps work, except when there is
+          surge pricing or the driver cancels at midnight. Having a car in Delhi will make you go
+          crazy with parking and EMIs. Then there is the option most people discover only after
+          the first try: rent a self-drive car and enjoy the freedom of being the master of your
+          own trip.
+        </p>
+        <p>
+          At the cheapest end, a self drive car rental in Delhi starts from around ₹96 per hour
+          for compact hatchbacks. Below is a fair estimate of the cost for different types of
+          vehicles.
+        </p>
+
+        <h3>Hatchbacks (Economy Segment)</h3>
+        <ul>
+          <li>Self drive car rental Delhi price per day (hatchback): ₹1,500 – ₹2,500</li>
+          <li>Great for city commutes, solo trips, and short-distance outstation drives</li>
+          <li>Fuel efficient and very easy to park even in the narrow lanes of Delhi</li>
+          <li>Examples: Toyota Glanza, Maruti Suzuki Brezza (compact), Hyundai Venue</li>
+        </ul>
+
+        <h3>Sedans &amp; Mid-Size SUVs</h3>
+        <ul>
+          <li>Self drive car rental Delhi price per day (sedan/mid-size SUV): ₹2,500 – ₹4,000</li>
+          <li>Comfortable for family trips, business meetings, and longer outstation drives</li>
+          <li>A good balance of space, mileage, and driving comfort</li>
+          <li>Examples: Hyundai Verna, Maruti Ciaz, Hyundai Creta, Mahindra Scorpio N</li>
+        </ul>
+
+        <h3>Premium &amp; Luxury SUVs</h3>
+        <ul>
+          <li>Daily rental for premium SUVs: ₹5,000 – ₹10,000+</li>
+          <li>Perfect for corporate travel, wedding events, or long Himalayan drives</li>
+          <li>Models: Toyota Fortuner, Toyota Hilux</li>
+        </ul>
+
+        <h3>Important Pricing Notes</h3>
+        <ul>
+          <li>Renting a self-drive car in Delhi costs 30% – 40% less than hiring a car with a driver.</li>
+          <li>You are responsible for fuel charges, so you only pay for the fuel you use.</li>
+          <li>
+            Rentals usually include a package of 120 – 250 km per day; extra kilometres are
+            charged per km.
+          </li>
+          <li>
+            The refundable security deposit ranges from ₹2,000 to ₹10,000 depending on the
+            vehicle category.
+          </li>
+          <li>
+            Before booking, always get an all-inclusive price break-up that covers GST, insurance,
+            and cleaning fees.
+          </li>
+        </ul>
+
+        <h2>Who Should Book a Self-Drive Car in Delhi?</h2>
+        <p>
+          Most people don&apos;t expect to become a self-driver. But a self drive car for rent in
+          Delhi actually matches the needs of a much larger group than people generally realize.
+        </p>
+        <p>
+          <strong>The Weekend Escapee</strong> — if you live in Noida or Dwarka and plan to drive
+          to Mussoorie or Lansdowne without a cab driver, you can book on Friday evening and
+          return Sunday night. The total cost with fuel is often less than hiring a cab both ways.
+        </p>
+        <p>
+          <strong>The Corporate Traveller</strong> — meetings across several locations in Delhi
+          NCR can be tiring by Uber. A car on rent in Delhi self drive gives you a reliable,
+          private vehicle for the entire day — no waiting, no surge pricing, no hassle.
+        </p>
+        <p>
+          <strong>The Family on a Budget</strong> — along with driver food and accommodation, a
+          driver alone can cost ₹1,500 – ₹2,500 per day on a 5-day Rajasthan trip. Hire a
+          self-driven SUV instead and put that money towards better hotels.
+        </p>
+        <p>
+          <strong>The Airport Traveller</strong> — a shared cab for an early morning or late night
+          flight is stressful. Self drive car rental Delhi airport gives you the freedom to park
+          right at the terminal, manage your own time, and skip the anxiety of a late driver.
+        </p>
+
+        <h2>VeekayCabs Self-Drive Fleet Options for Every Trip Type</h2>
+        <p>
+          VeekayCabs has structured car rental Delhi self drive to offer diversity along with
+          honesty. Since there are various modes of travel in the capital, it&apos;s impossible to
+          cater to the whole market with a single product — so the fleet spans several classes.
+        </p>
+
+        <h3>Self Drive Hatchback on Rent Delhi</h3>
+        <p>
+          Hatchbacks are the leading choice among residents who prefer a car for city use.
+          Travelling in a metropolitan area like Delhi without getting stuck in traffic becomes
+          realistic with a small car, and CNG variants keep running costs very low. A client
+          favourite is the Toyota Glanza (Manual and Automatic available) — dependable, frugal,
+          and easy to operate.
+        </p>
+
+        <h3>Self Drive Automatic Car Rental Delhi</h3>
+        <p>
+          Automatic transmission vehicles are fast becoming the top segment in the rental market.
+          Whether you learned to drive on an automatic or just want to simplify stop-and-go
+          traffic, this is the vehicle for you. Several SUVs and hatchbacks are available as
+          automatics, with only a small difference in price compared to manuals.
+        </p>
+
+        <h3>Hourly Self Drive Car Rental Delhi</h3>
+        <p>
+          Few trips need a car for the whole day. VeekayCabs&apos; Hourly Self Drive Car Rental
+          Delhi plan is well suited for short periods — half-day errands, airport pickups or
+          drop-offs, and similar needs. The minimum booking is generally 3 – 4 hours, perfect for
+          someone who needs a car for a morning meeting and nothing else.
+        </p>
+
+        <h3>Luxury Self Drive Car Hire Delhi</h3>
+        <p>
+          The Fortuner, the Hilux, and upscale automatic SUVs are for those who consider driving
+          part of the experience — a day on mountain roads to Manali or a formal event in South
+          Delhi. With VeekayCabs you also get full insurance, GPS, and 24/7 support.
+        </p>
+
+        <h3>Rent a Car Without Driver Delhi</h3>
+        <p>
+          This is the fundamental service a self-drive car rental offers, and what sets it apart
+          from conventional taxis. When you rent a car without driver Delhi, the whole car is at
+          your disposal — no second opinions on directions, no forced conversation, no waiting on
+          anyone else&apos;s tea break. Just you, the car, and the road.
+        </p>
+
+        <h2>How VeekayCabs Makes the Rental Process Simple</h2>
+        <ol>
+          <li>Go to veekaycabs.com and choose your city and dates.</li>
+          <li>Filter the fleet by car type, fuel type, transmission, or number of seats.</li>
+          <li>Check prices — all prices are shown upfront, with no hidden charges.</li>
+          <li>Reserve your car online and get an instant confirmation — no call required.</li>
+          <li>
+            Pick up your car at the designated location, or opt for doorstep delivery where
+            available.
+          </li>
+          <li>Drive and return the car at the agreed location at the end of your rental period.</li>
+        </ol>
+        <p>
+          You will need a valid driving license (at least one year old) and one government ID.
+          Outstation trips may require an additional security deposit.
+        </p>
+
+        <h2>Self Drive Rental Cars in Delhi: City-Wise Pickup Locations</h2>
+        <p>
+          VeekayCabs serves the Delhi NCR area with several pickup points, so you&apos;re not
+          stuck relying on a single central office if you live in Dwarka or Vasundhara.
+        </p>
+        <ul>
+          <li>
+            Delhi: Ganesh Nagar (main hub), Aerocity, Connaught Place, Dwarka, Karol Bagh, Saket,
+            Lajpat Nagar, Pitampura, Vasant Kunj, Rajouri Garden, Uttam Nagar and more
+          </li>
+          <li>
+            Noida: Sector 15A, 16, 18, 52, 62, 63, 71, 135, 136, Noida Extension
+          </li>
+          <li>Ghaziabad: Indirapuram, Vasundhara, Vaishali, Crossing Republik</li>
+          <li>Gurgaon / Gurugram: Cyber City, MG Road zone</li>
+          <li>Greater Noida: Pari Chowk, Knowledge Park</li>
+        </ul>
+        <p>
+          If your locality isn&apos;t listed above, get in touch with the team — delivery is
+          possible for a few pincode zones not yet listed on the website.
+        </p>
+
+        <h2>Tips for First-Time Self-Drive Renters in Delhi</h2>
+        <ul>
+          <li>
+            Do a detailed inspection of the car before you leave with it. Photograph any existing
+            marks or dents and share them with the team — this protects you at the time of
+            return.
+          </li>
+          <li>
+            Note the fuel level at handover. Rentals usually operate on a full-to-full basis: you
+            get a full tank and are expected to return it full.
+          </li>
+          <li>
+            Planning an outstation trip? Chart the route in advance. Delhi has several toll plazas
+            and state border checkpoints, so keep your rental agreement and ID handy.
+          </li>
+          <li>
+            Keep an offline map downloaded, since mobile connectivity can drop in hilly areas if
+            you&apos;re headed to Uttarakhand or Himachal.
+          </li>
+          <li>
+            For city pickups, avoid rush hours. Picking up your car at 9 AM on a weekday in
+            central Delhi causes unnecessary stress — schedule the pickup for off-peak windows
+            where possible.
+          </li>
+        </ul>
+
+        <h2>Frequently Asked Questions</h2>
+        <div>
+          <h3>What is the price for self-drive cars Delhi?</h3>
+          <p>
+            VeekayCabs provides self-drive car hire in Delhi starting at ₹96 per hour. Charges
+            depend on the type of vehicle and the duration of the rental — check the latest
+            self-drive car rent Delhi price on our website before finalizing your booking.
+          </p>
+
+          <h3>What is the cheapest self-drive car rental in Delhi?</h3>
+          <p>
+            Simple cars such as Swift, i20, and Baleno are the least expensive choices. The most
+            affordable self-drive car rental in Delhi at VeekayCabs starts from under ₹800/day —
+            these cars are clean, well-maintained, and always available.
+          </p>
+
+          <h3>What documents are needed to rent a car without a driver in Delhi?</h3>
+          <p>
+            To rent a car without a driver in Delhi, you need a valid driving license, a
+            government-issued ID, and a refundable security deposit. No additional paperwork is
+            necessary.
+          </p>
+
+          <h3>How do I book a self-drive car in Delhi online?</h3>
+          <p>
+            Booking a self-drive car in Delhi online is easy at VeekayCabs.com — choose your car,
+            decide on dates and pickup location, upload the necessary documents, and make the
+            payment. The whole process takes less than two minutes.
+          </p>
+
+          <h3>What is the self-drive car rental price per day in Delhi?</h3>
+          <p>
+            The price of self-drive car rental in Delhi per day varies from ₹800 for hatchbacks to
+            ₹4,000+ for SUVs and luxury vehicles. New rates may apply for outstation trips — the
+            pricing page has the latest information.
+          </p>
+
+          <h3>Is hourly self-drive car rental available in Delhi?</h3>
+          <p>
+            Yes. You can hire a self-drive car by the hour in Delhi at VeekayCabs and pay only for
+            the time you take it. Booking for just a few hours is possible, which suits airport
+            drop-offs, pickups, and running errands in the city.
+          </p>
+
+          <h3>Can I get a cheap self-drive car rental in Delhi without compromising on quality?</h3>
+          <p>
+            VeekayCabs provides affordable self-drive car rental in Delhi with well-maintained
+            vehicles, GPS-enabled cars, 24/7 customer service, low prices, and no hidden charges.
+          </p>
+
+          <h3>Is self-drive car rental available at Delhi airport?</h3>
+          <p>
+            Yes, VeekayCabs offers self-drive car rental at Delhi airport. You can pick up the car
+            at terminals T1, T2, and T3 — book online beforehand and your car will be ready the
+            moment you step out of the airport.
+          </p>
+
+          <h3>Are self-drive rental cars available across Delhi NCR?</h3>
+          <p>
+            Yes, self-drive rental cars in Delhi NCR are available across Delhi, Noida, Gurgaon,
+            and Ghaziabad. Doorstep delivery is available in most areas, so you don&apos;t need to
+            travel to a pickup point.
+          </p>
+
+          <h3>What types of self-driven cars are available for rent in Delhi?</h3>
+          <p>
+            A large variety of self-driven cars for rent in Delhi are available at VeekayCabs,
+            including hatchbacks, sedans, automatic cars, SUVs, and luxury vehicles — choose
+            according to your budget, group size, and trip type.
+          </p>
+
+          <h3>Can I find self-driven car rentals in Delhi for outstation trips?</h3>
+          <p>
+            Self-driven car rentals in Delhi for outstation trips are very common. Popular
+            highways include Delhi to Agra, Jaipur, Manali, Rishikesh, and Nainital — mention your
+            plan when you book your car.
+          </p>
+
+          <h3>How does car rental in Delhi on a self-drive basis work?</h3>
+          <p>
+            Car rental in Delhi self-drive means the car comes without a driver. You pick it up at
+            the rental office (or have it delivered), drive it as you please, and return it at the
+            end of the rental period.
+          </p>
+
+          <h3>Is there a self-drive SUV rental option in Delhi?</h3>
+          <p>
+            Yes, self-drive SUV rental in Delhi is available at VeekayCabs, including the popular
+            and highly rated Scorpio N, Creta, Brezza, and Fortuner — well suited for family
+            trips, hill stations, and long highway drives.
+          </p>
+
+          <h3>Is it possible to rent automatic self-drive cars in Delhi?</h3>
+          <p>
+            Absolutely — self-drive automatic car rental in Delhi is available for a more
+            comfortable driving experience, especially in heavy traffic. Hatchback, sedan, and SUV
+            categories all have automatic versions.
+          </p>
+
+          <h3>Can I hire a self-drive hatchback in Delhi?</h3>
+          <p>
+            Self-drive hatchback on rent in Delhi remains the most popular and cheapest option —
+            Swift, i20, Baleno, and Glanza are great choices for city commutes, short trips, and
+            day-to-day use.
+          </p>
+
+          <h3>Can we get luxury self-drive car hire in Delhi?</h3>
+          <p>
+            Yes — luxury self-drive car hire in Delhi is available with VeekayCabs for weddings,
+            corporate gatherings, and more. Enjoy a luxury vehicle with the freedom of driving it
+            yourself.
+          </p>
+
+          <h3>How much is self-drive car rental without a driver in Delhi?</h3>
+          <p>
+            Self-drive car rental in Delhi without a driver starts at ₹96/hour or ₹800/day. Since
+            there&apos;s no chauffeur, you save on driver costs, making it much cheaper than
+            traditional cab hire.
+          </p>
+
+          <h3>Are self-driven rental cars available in Delhi NCR for monthly use?</h3>
+          <p>
+            Self-driven rental cars in Delhi are also offered on weekly and monthly plans, which
+            are much more affordable than daily rates — ideal for professionals, long stayers, and
+            regular commuters across NCR.
+          </p>
+
+          <h3>How do I get a self-driven car in Delhi delivered to my location?</h3>
+          <p>
+            For a self-driven car in Delhi with doorstep delivery, just choose the doorstep
+            delivery option while booking on VeekayCabs.com. It&apos;s available in Delhi, Noida,
+            Gurgaon, and Ghaziabad.
+          </p>
+        </div>
+      </div>
+
       <Footer />
     </div>
   );

@@ -27,6 +27,38 @@ export function organizationSchema() {
       postalCode: "110092",
       addressCountry: "IN",
     },
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: 28.6274,
+      longitude: 77.3072,
+    },
+    hasMap: "https://www.google.com/maps?cid=2708465873955549409",
+    openingHoursSpecification: [
+      {
+        "@type": "OpeningHoursSpecification",
+        dayOfWeek: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ],
+        opens: "00:00",
+        closes: "23:59",
+      },
+    ],
+    priceRange: "₹96 - ₹563 per hour",
+    currenciesAccepted: "INR",
+    paymentAccepted: "Cash, Credit Card, Debit Card, UPI, Net Banking",
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "4.5",
+      reviewCount: "18000",
+      bestRating: "5",
+      worstRating: "1",
+    },
     areaServed: [
       { "@type": "City", name: "Delhi" },
       { "@type": "City", name: "Noida" },
@@ -104,6 +136,21 @@ export function productSchema(opts: {
       availability: "https://schema.org/InStock",
       seller: { "@id": `${SITE_URL}/#business` },
     },
+  };
+}
+
+export function faqSchema(items: { question: string; answer: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
   };
 }
 

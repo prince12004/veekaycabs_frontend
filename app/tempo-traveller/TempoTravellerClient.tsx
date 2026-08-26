@@ -48,13 +48,13 @@ const SERVICES = [
   {
     title: "Spiritual Journeys to Ujjain",
     desc: "Plan your visit to the sacred city of Ujjain with our reliable travel services. Enjoy smooth, hassle-free transportation for Mahakal Darshan, temple tours, and local sightseeing.",
-    img: "https://images.unsplash.com/photo-1585936369940-bbcd6b7428d8?w=600&q=80",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Mahakal_Temple_Ujjain.JPG/960px-Mahakal_Temple_Ujjain.JPG",
     alt: "Ujjain temple",
   },
   {
     title: "Amusement Park Outings and Picnics",
     desc: "Head to popular destinations like Worlds of Wonder, Appu Ghar, or Adventure Island without the headache of organizing multiple vehicles. Travel as a group and enjoy the day from start to finish together.",
-    img: "https://images.unsplash.com/photo-1567591370989-7702d1734b7d?w=600&q=80",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Roller_coaster_in_a_park_%28Unsplash%29.jpg/960px-Roller_coaster_in_a_park_%28Unsplash%29.jpg",
     alt: "Amusement park",
   },
   {

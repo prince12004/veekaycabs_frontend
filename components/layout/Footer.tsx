@@ -20,7 +20,7 @@ const cityLinks = [
   { slug: "noida", name: "Noida", href: "/car/self-drive-car-on-rent-noida" },
   { slug: "gurgaon", name: "Gurgaon", href: "/car/self-drive-car-on-rent-gurgaon" },
   { slug: "ghaziabad", name: "Ghaziabad", href: "/car/self-drive-car-on-rent-ghaziabad" },
-  { slug: "greater-noida", name: "Greater Noida", href: "/car/self-drive-car-rental-in-greater-noida" },
+  { slug: "greater-noida", name: "Greater Noida", href: "/car/self-drive-car-rental-greater-noida" },
 ];
 
 function PinterestIcon({ size = 16 }: { size?: number }) {
