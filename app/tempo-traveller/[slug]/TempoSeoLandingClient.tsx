@@ -148,11 +148,11 @@ export default function TempoSeoLandingClient({ initialPage }: { initialPage?: S
         <div className="max-w-6xl mx-auto px-6">
           <div className="lg:grid lg:grid-cols-4 lg:gap-10">
             {/* Article */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 min-w-0">
               <div className="bg-white rounded-2xl border border-[#E4E5EF] p-8 lg:p-12 shadow-[0_2px_20px_rgba(0,0,0,0.06)]">
                 {page.content ? (
                   <div
-                    className="text-[#4A4A6A] leading-relaxed [&_h2]:text-2xl [&_h2]:font-black [&_h2]:font-syne [&_h2]:text-[#0F0F1A] [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-[#0F0F1A] [&_h3]:mt-6 [&_h3]:mb-3 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_li]:mb-1.5 [&_strong]:text-[#0F0F1A] [&_strong]:font-bold [&_a]:text-[#E8540A] [&_a]:underline [&_img]:rounded-xl [&_img]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[#E4E5EF] [&_td]:p-2 [&_table]:my-4 [&_table]:block [&_table]:overflow-x-auto"
+                    className="text-[#4A4A6A] leading-relaxed break-words [&_h2]:text-2xl [&_h2]:font-black [&_h2]:font-syne [&_h2]:text-[#0F0F1A] [&_h2]:mt-8 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-[#0F0F1A] [&_h3]:mt-6 [&_h3]:mb-3 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_li]:mb-1.5 [&_strong]:text-[#0F0F1A] [&_strong]:font-bold [&_a]:text-[#E8540A] [&_a]:underline [&_img]:rounded-xl [&_img]:my-4 [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_table]:my-4 [&_table]:border-collapse [&_td]:border [&_td]:border-[#E4E5EF] [&_td]:p-2.5 [&_th]:border [&_th]:border-[#E4E5EF] [&_th]:p-2.5 [&_th]:bg-[#F8F9FC] [&_th]:font-bold [&_th]:text-[#0F0F1A] [&_th]:text-left"
                     dangerouslySetInnerHTML={{ __html: page.content }}
                   />
                 ) : (
