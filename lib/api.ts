@@ -92,6 +92,14 @@ export const bookingsApi = {
     adminApi.patch(`/api/admin/bookings/${id}/extend`, data),
   markRefundPaid: (id: string) =>
     adminApi.patch(`/api/admin/bookings/${id}/refund-paid`),
+  // Record one installment received (optionally with a screenshot as proof)
+  // — amountPaid/balanceDue are recalculated server-side immediately.
+  addPayment: (id: string, formData: FormData) =>
+    adminApi.post(`/api/admin/bookings/${id}/payments`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  deletePayment: (id: string, paymentId: string) =>
+    adminApi.delete(`/api/admin/bookings/${id}/payments/${paymentId}`),
   update: (id: string, data: Record<string, unknown>) =>
     adminApi.put(`/api/admin/bookings/${id}`, data),
   exportCsv: (params?: Record<string, string>) =>

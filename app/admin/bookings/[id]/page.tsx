@@ -15,6 +15,7 @@ import {
   Printer, Shield, Fuel, Gauge, Send, X as XIcon, FileCheck, Loader2,
   MapPin, Truck, AlertTriangle, Eye, Image as ImageIcon, Zap,
   ScanSearch, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Pencil,
+  Plus, Trash2, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -64,14 +65,6 @@ interface DentDetectionResult {
 const fmtDT = (d: string) =>
   new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" });
 
-// Formats a UTC instant into the "YYYY-MM-DDTHH:mm" wall-clock string a
-// <input type="datetime-local"> needs to show real IST time. Deliberately
-// uses an explicit Asia/Kolkata timezone via Intl instead of the old
-// `d.getMinutes() - d.getTimezoneOffset()` trick, which silently rendered
-// the wrong time whenever the admin's own browser/OS wasn't set to IST —
-// e.g. a booking scheduled for 10:30 PM IST would prefill as 4:00 AM the
-// next day on a browser reporting a different timezone, which then made a
-// perfectly on-time return look "6 hrs late" in the closing bill.
 const toISTLocalInput = (d: Date | string) => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -82,15 +75,6 @@ const toISTLocalInput = (d: Date | string) => {
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 };
 
-// The reverse direction: a <input type="datetime-local"> value is a naive
-// "YYYY-MM-DDTHH:mm" string with no timezone — but every date/time shown in
-// this admin panel is IST, so that's what the digits mean. Appending an
-// explicit +05:30 offset before parsing means the resulting instant is
-// correct regardless of what timezone the browser or the server process
-// itself happens to be running in — without this, `new Date(naiveString)`
-// silently used whatever machine it ran on as "local", which is exactly what
-// produced spurious ~5.5h-shifted "late return" charges even for genuinely
-// on-time returns.
 const istInputToISOString = (localStr: string): string =>
   localStr ? new Date(`${localStr}:00+05:30`).toISOString() : "";
 
@@ -200,6 +184,12 @@ export default function BookingDetailPage() {
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [extendForm, setExtendForm] = useState({ newEndTime: "", extraAmount: "", additionalPaymentReceived: "0" });
   const [extendLoading, setExtendLoading] = useState(false);
+
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", mode: "upi", date: "", note: "" });
+  const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
   // Invoice PDF
   const [companySettings, setCompanySettings] = useState<Record<string, any> | null>(null);
@@ -478,6 +468,53 @@ export default function BookingDetailPage() {
       toast.error(e?.response?.data?.message || "Failed to extend booking");
     } finally {
       setExtendLoading(false);
+    }
+  };
+
+  const openPaymentModal = () => {
+    setPaymentForm({ amount: "", mode: "upi", date: toISTLocalInput(new Date()), note: "" });
+    setPaymentScreenshot(null);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSave = async () => {
+    if (!rawBooking) return;
+    const amount = Number(paymentForm.amount);
+    if (!paymentForm.amount || isNaN(amount) || amount <= 0) {
+      toast.error("Enter a valid payment amount");
+      return;
+    }
+    setPaymentLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("amount", String(amount));
+      fd.append("mode", paymentForm.mode);
+      if (paymentForm.date) fd.append("date", istInputToISOString(paymentForm.date));
+      if (paymentForm.note) fd.append("note", paymentForm.note);
+      if (paymentScreenshot) fd.append("screenshot", paymentScreenshot);
+      const { data } = await bookingsApi.addPayment(rawBooking._id, fd);
+      setRawBooking(data.data);
+      setShowPaymentModal(false);
+      toast.success(`Rs. ${amount.toLocaleString("en-IN")} payment recorded`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to record payment");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!rawBooking) return;
+    if (!confirm("Remove this payment entry? Amount Paid will be reduced accordingly.")) return;
+    setDeletingPaymentId(paymentId);
+    try {
+      const { data } = await bookingsApi.deletePayment(rawBooking._id, paymentId);
+      setRawBooking(data.data);
+      toast.success("Payment entry removed");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Failed to remove payment");
+    } finally {
+      setDeletingPaymentId(null);
     }
   };
 
@@ -860,6 +897,12 @@ export default function BookingDetailPage() {
               <button onClick={openExtendModal}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A]/50 hover:text-[#E8540A] transition-colors">
                 <Clock size={14} /> Extend Booking
+              </button>
+            )}
+            {balance > 0 && (
+              <button onClick={openPaymentModal}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] text-[#4A4A6A] font-semibold text-sm hover:border-[#10B981]/50 hover:text-[#10B981] transition-colors">
+                <IndianRupee size={14} /> Record Payment
               </button>
             )}
           </div>
@@ -1932,6 +1975,49 @@ export default function BookingDetailPage() {
                 </button>
               </div>
             </div>
+
+            {/* Payment History — individual installments logged over time (e.g. a
+                customer paying in parts via UPI on separate days), each with an
+                optional screenshot as proof. */}
+            <div className="bg-white rounded-2xl border border-[#E4E5EF] p-5 lg:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-[#0F0F1A] flex items-center gap-2"><IndianRupee size={16} className="text-[#E8540A]" /> Payment History</h3>
+                <button onClick={openPaymentModal}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#10B981] text-white text-xs font-semibold hover:bg-[#0ea472] transition-colors">
+                  <Plus size={13} /> Record Payment
+                </button>
+              </div>
+              {(!rawBooking.payments || rawBooking.payments.length === 0) ? (
+                <p className="text-[#9090A8] text-sm text-center py-6">No individual payments recorded yet — the amounts above come from the booking total.</p>
+              ) : (
+                <div className="space-y-2">
+                  {[...rawBooking.payments].reverse().map((p: any) => (
+                    <div key={p._id} className="flex items-center justify-between p-3 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF]">
+                      <div>
+                        <p className="font-semibold text-sm text-[#0F0F1A]">
+                          Rs. {p.amount.toLocaleString("en-IN")}{" "}
+                          <span className="text-[#9090A8] font-normal text-xs uppercase">· {p.mode || "upi"}</span>
+                        </p>
+                        <p className="text-xs text-[#9090A8]">{new Date(p.date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
+                        {p.note && <p className="text-xs text-[#4A4A6A] mt-0.5">{p.note}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {p.screenshotUrl && (
+                          <a href={p.screenshotUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-xs font-semibold text-[#E8540A] hover:underline flex items-center gap-1">
+                            <ExternalLink size={12} /> Screenshot
+                          </a>
+                        )}
+                        <button onClick={() => handleDeletePayment(p._id)} disabled={deletingPaymentId === p._id}
+                          className="w-7 h-7 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white flex items-center justify-center transition-colors disabled:opacity-50">
+                          {deletingPaymentId === p._id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -2134,6 +2220,68 @@ export default function BookingDetailPage() {
               </button>
               <button onClick={handleExtendSave} disabled={extendLoading} className="flex-1 py-3 rounded-xl btn-gradient text-white font-bold text-sm disabled:opacity-60">
                 {extendLoading ? <><Loader2 size={14} className="animate-spin inline mr-1" />Saving...</> : "Extend Booking"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl my-4">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-bold font-syne text-[#0F0F1A] text-lg">Record Payment</h3>
+                <p className="text-[#9090A8] text-xs mt-0.5">#{rawBooking?.bookingId || rawBooking?._id?.slice(-8)} · Balance due: Rs. {balance.toLocaleString("en-IN")}</p>
+              </div>
+              <button onClick={() => setShowPaymentModal(false)} className="text-[#9090A8] hover:text-[#0F0F1A] transition-colors"><XIcon size={20} /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Amount (Rs.)</label>
+                  <input type="number" min="0" value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                    placeholder="e.g. 10000" autoFocus
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Mode</label>
+                  <select value={paymentForm.mode} onChange={e => setPaymentForm(f => ({ ...f, mode: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none bg-white">
+                    <option value="upi">UPI</option>
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Received On</label>
+                <input type="datetime-local" value={paymentForm.date} onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Screenshot (optional)</label>
+                <label className="flex items-center gap-2 w-full px-3 py-2.5 border-2 border-dashed border-[#E4E5EF] rounded-xl text-xs text-[#9090A8] hover:border-[#E8540A] hover:text-[#E8540A] cursor-pointer transition-colors justify-center">
+                  <Upload size={13} /> {paymentScreenshot ? paymentScreenshot.name : "Upload UPI/payment screenshot"}
+                  <input type="file" accept="image/*,.pdf" className="hidden"
+                    onChange={e => setPaymentScreenshot(e.target.files?.[0] || null)} />
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Note (optional)</label>
+                <input value={paymentForm.note} onChange={e => setPaymentForm(f => ({ ...f, note: e.target.value }))}
+                  placeholder="e.g. 2nd installment"
+                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
+              </div>
+              <p className="text-[11px] text-[#9090A8]">This adds to Amount Paid and reduces Balance Due immediately — it doesn't replace the totals, it logs one more installment on top of them.</p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A] hover:bg-[#F8F9FC]">
+                Cancel
+              </button>
+              <button onClick={handlePaymentSave} disabled={paymentLoading} className="flex-1 py-3 rounded-xl bg-[#10B981] hover:bg-[#0ea472] text-white font-bold text-sm disabled:opacity-60">
+                {paymentLoading ? <><Loader2 size={14} className="animate-spin inline mr-1" />Saving...</> : "Save Payment"}
               </button>
             </div>
           </div>
