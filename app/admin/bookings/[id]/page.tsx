@@ -18,6 +18,7 @@ import {
   Plus, Trash2, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isSuperAdmin } from "@/lib/adminPermissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MediaRecord { _id: string; type: string; urls: string[]; notes: string; uploadedAt: string; }
@@ -188,8 +189,18 @@ export default function BookingDetailPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", mode: "upi", date: "", note: "" });
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const paymentFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const pickPaymentScreenshot = (file: File | null) => {
+    setPaymentScreenshot(file);
+    setPaymentScreenshotPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file && file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    });
+  };
 
   // Invoice PDF
   const [companySettings, setCompanySettings] = useState<Record<string, any> | null>(null);
@@ -473,7 +484,7 @@ export default function BookingDetailPage() {
 
   const openPaymentModal = () => {
     setPaymentForm({ amount: "", mode: "upi", date: toISTLocalInput(new Date()), note: "" });
-    setPaymentScreenshot(null);
+    pickPaymentScreenshot(null);
     setShowPaymentModal(true);
   };
 
@@ -482,6 +493,10 @@ export default function BookingDetailPage() {
     const amount = Number(paymentForm.amount);
     if (!paymentForm.amount || isNaN(amount) || amount <= 0) {
       toast.error("Enter a valid payment amount");
+      return;
+    }
+    if (!paymentScreenshot) {
+      toast.error("Upload a payment screenshot");
       return;
     }
     setPaymentLoading(true);
@@ -495,6 +510,7 @@ export default function BookingDetailPage() {
       const { data } = await bookingsApi.addPayment(rawBooking._id, fd);
       setRawBooking(data.data);
       setShowPaymentModal(false);
+      pickPaymentScreenshot(null);
       toast.success(`Rs. ${amount.toLocaleString("en-IN")} payment recorded`);
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Failed to record payment");
@@ -1991,30 +2007,50 @@ export default function BookingDetailPage() {
                 <p className="text-[#9090A8] text-sm text-center py-6">No individual payments recorded yet — the amounts above come from the booking total.</p>
               ) : (
                 <div className="space-y-2">
-                  {[...rawBooking.payments].reverse().map((p: any) => (
-                    <div key={p._id} className="flex items-center justify-between p-3 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF]">
-                      <div>
-                        <p className="font-semibold text-sm text-[#0F0F1A]">
-                          Rs. {p.amount.toLocaleString("en-IN")}{" "}
-                          <span className="text-[#9090A8] font-normal text-xs uppercase">· {p.mode || "upi"}</span>
-                        </p>
-                        <p className="text-xs text-[#9090A8]">{new Date(p.date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
-                        {p.note && <p className="text-xs text-[#4A4A6A] mt-0.5">{p.note}</p>}
+                  {[...rawBooking.payments].reverse().map((p: any) => {
+                    const isImageProof = p.screenshotUrl && !p.screenshotUrl.toLowerCase().endsWith(".pdf");
+                    return (
+                      <div key={p._id} className="flex items-center justify-between p-3 rounded-xl bg-[#F8F9FC] border border-[#E4E5EF]">
+                        <div className="flex items-center gap-3">
+                          {p.screenshotUrl && (
+                            <a href={p.screenshotUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                              {isImageProof ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={p.screenshotUrl} alt="Payment proof" className="w-12 h-12 rounded-lg object-cover border border-[#E4E5EF] hover:opacity-80 transition-opacity" />
+                              ) : (
+                                <div className="w-12 h-12 rounded-lg bg-white border border-[#E4E5EF] flex items-center justify-center hover:border-[#E8540A]">
+                                  <FileText size={18} className="text-[#9090A8]" />
+                                </div>
+                              )}
+                            </a>
+                          )}
+                          <div>
+                            <p className="font-semibold text-sm text-[#0F0F1A]">
+                              Rs. {p.amount.toLocaleString("en-IN")}{" "}
+                              <span className="text-[#9090A8] font-normal text-xs uppercase">· {p.mode || "upi"}</span>
+                            </p>
+                            <p className="text-xs text-[#9090A8]">{new Date(p.date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
+                            {p.note && <p className="text-xs text-[#4A4A6A] mt-0.5">{p.note}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {p.screenshotUrl && (
+                            <a href={p.screenshotUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-xs font-semibold text-[#E8540A] hover:underline flex items-center gap-1">
+                              <ExternalLink size={12} /> View
+                            </a>
+                          )}
+                          {isSuperAdmin() && (
+                            <button onClick={() => handleDeletePayment(p._id)} disabled={deletingPaymentId === p._id}
+                              title="Only Super Admin can delete a payment entry"
+                              className="w-7 h-7 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white flex items-center justify-center transition-colors disabled:opacity-50">
+                              {deletingPaymentId === p._id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {p.screenshotUrl && (
-                          <a href={p.screenshotUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-xs font-semibold text-[#E8540A] hover:underline flex items-center gap-1">
-                            <ExternalLink size={12} /> Screenshot
-                          </a>
-                        )}
-                        <button onClick={() => handleDeletePayment(p._id)} disabled={deletingPaymentId === p._id}
-                          className="w-7 h-7 rounded-lg bg-[#FEE2E2] text-[#991B1B] hover:bg-[#EF4444] hover:text-white flex items-center justify-center transition-colors disabled:opacity-50">
-                          {deletingPaymentId === p._id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2257,16 +2293,31 @@ export default function BookingDetailPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Received On</label>
-                <input type="datetime-local" value={paymentForm.date} onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
-                  className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" />
+                <div className="relative">
+                  <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8] pointer-events-none" />
+                  <input type="datetime-local" value={paymentForm.date} onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl pl-9 pr-3 py-2.5 text-sm outline-none" />
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Screenshot (optional)</label>
-                <label className="flex items-center gap-2 w-full px-3 py-2.5 border-2 border-dashed border-[#E4E5EF] rounded-xl text-xs text-[#9090A8] hover:border-[#E8540A] hover:text-[#E8540A] cursor-pointer transition-colors justify-center">
-                  <Upload size={13} /> {paymentScreenshot ? paymentScreenshot.name : "Upload UPI/payment screenshot"}
-                  <input type="file" accept="image/*,.pdf" className="hidden"
-                    onChange={e => setPaymentScreenshot(e.target.files?.[0] || null)} />
-                </label>
+                <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Payment Screenshot <span className="text-[#EF4444]">*</span></label>
+                <input ref={paymentFileInputRef} type="file" accept="image/*,.pdf" className="hidden"
+                  onChange={e => pickPaymentScreenshot(e.target.files?.[0] || null)} />
+                {paymentScreenshotPreview ? (
+                  <div className="flex items-center gap-3 p-2 border-[1.5px] border-[#E4E5EF] rounded-xl">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={paymentScreenshotPreview} alt="Payment screenshot preview" className="w-14 h-14 rounded-lg object-cover border border-[#E4E5EF]" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#0F0F1A] truncate">{paymentScreenshot?.name}</p>
+                      <button type="button" onClick={() => paymentFileInputRef.current?.click()} className="text-xs text-[#E8540A] font-semibold hover:underline">Change</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => paymentFileInputRef.current?.click()}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 border-2 border-dashed border-[#E4E5EF] rounded-xl text-xs text-[#9090A8] hover:border-[#E8540A] hover:text-[#E8540A] cursor-pointer transition-colors justify-center">
+                    <Upload size={13} /> {paymentScreenshot ? paymentScreenshot.name : "Upload UPI/payment screenshot"}
+                  </button>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Note (optional)</label>
