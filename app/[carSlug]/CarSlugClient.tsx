@@ -29,8 +29,8 @@ import toast from "react-hot-toast";
 
 const PICKUP_LOCATIONS = [
   { id: "delhi", label: "Delhi Office", address: "A 13, 1st Floor, Ganesh Nagar, New Delhi" },
-  { id: "noida", label: "Noida Office", address: "Sector 62, Noida, UP" },
-  { id: "gurgaon", label: "Gurgaon Office", address: "Cyber Hub, Gurugram, Haryana" },
+  // { id: "noida", label: "Noida Office", address: "Sector 62, Noida, UP" },
+  // { id: "gurgaon", label: "Gurgaon Office", address: "Cyber Hub, Gurugram, Haryana" },
 ];
 
 const DOCS_REQUIRED = [
