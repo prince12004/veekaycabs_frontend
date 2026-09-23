@@ -104,8 +104,10 @@ export const bookingsApi = {
     adminApi.put(`/api/admin/bookings/${id}`, data),
   exportCsv: (params?: Record<string, string>) =>
     adminApi.get("/api/admin/bookings/export", { params, responseType: "blob" }),
-  createOffline: (data: Record<string, unknown>) =>
-    adminApi.post("/api/admin/bookings/offline", data),
+  createOffline: (data: FormData) =>
+    adminApi.post("/api/admin/bookings/offline", data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   // Media
   getMedia: (id: string) => adminApi.get(`/api/admin/bookings/${id}/media`),
   uploadMedia: (id: string, formData: FormData) =>

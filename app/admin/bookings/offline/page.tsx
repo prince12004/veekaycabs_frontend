@@ -5,7 +5,7 @@ import {
   Plus, Search, Download, Eye, QrCode, FileText, Phone,
   ChevronLeft, ChevronRight, X, IndianRupee, Calendar,
   Car, User, MapPin, Clock, Printer, Loader2, RefreshCw,
-  Pencil, Check, Trash2, Truck, Percent,
+  Pencil, Check, Trash2, Truck, Percent, Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bookingsApi, adminCarsApi } from "@/lib/api";
@@ -355,6 +355,20 @@ export default function OfflineBookingsPage() {
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
   const selectedCar = cars.find(c => c._id === form.carId);
 
+  // Payment proof for any amount collected at booking creation — required
+  // whenever Amount Received > 0, same rule as the "Record Payment" flow.
+  const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
+  const paymentFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const pickPaymentScreenshot = (file: File | null) => {
+    setPaymentScreenshot(file);
+    setPaymentScreenshotPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file && file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+    });
+  };
+
   useEffect(() => { setCanDeleteBooking(canDelete("offlineBooking")); }, []);
   // Tracks the last auto-suggested rent/security so we only overwrite the
   // fields while the admin hasn't typed a custom value of their own.
@@ -474,28 +488,38 @@ export default function OfflineBookingsPage() {
       toast.error("Delivery address is required for pickup & drop");
       return;
     }
+    if (Number(form.amountPaid) > 0 && !paymentScreenshot) {
+      toast.error("Upload a payment screenshot for the amount received");
+      return;
+    }
     setSubmitting(true);
     try {
-      await bookingsApi.createOffline({
-        mobile: form.mobile,
-        name: form.name || `Walk-in ${form.mobile.slice(-4)}`,
-        bookedBy: form.bookedBy || undefined,
-        carId: form.carId,
-        pickupLocation: form.pickupLocation || "Admin Office",
-        startTime: new Date(form.startTime).toISOString(),
-        endTime: new Date(form.endTime).toISOString(),
-        bookingFare: form.bookingFare !== "" ? Number(form.bookingFare) : undefined,
-        securityDeposit: form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined,
-        gstPercent: form.gstPercent !== "" ? Number(form.gstPercent) : undefined,
-        doorstepDelivery: form.doorstepDelivery,
-        deliveryAddress: form.doorstepDelivery ? form.deliveryAddress : undefined,
-        doorstepCharge: form.doorstepDelivery && form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined,
-        amountPaid: Number(form.amountPaid) || 0,
-        paymentMode: form.paymentMode,
-        notes: form.notes,
-      });
+      const fd = new FormData();
+      const append = (key: string, value: unknown) => {
+        if (value !== undefined && value !== null && value !== "") fd.append(key, String(value));
+      };
+      append("mobile", form.mobile);
+      append("name", form.name || `Walk-in ${form.mobile.slice(-4)}`);
+      append("bookedBy", form.bookedBy);
+      append("carId", form.carId);
+      append("pickupLocation", form.pickupLocation || "Admin Office");
+      append("startTime", new Date(form.startTime).toISOString());
+      append("endTime", new Date(form.endTime).toISOString());
+      append("bookingFare", form.bookingFare !== "" ? Number(form.bookingFare) : undefined);
+      append("securityDeposit", form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined);
+      append("gstPercent", form.gstPercent !== "" ? Number(form.gstPercent) : undefined);
+      fd.append("doorstepDelivery", String(form.doorstepDelivery));
+      if (form.doorstepDelivery) append("deliveryAddress", form.deliveryAddress);
+      if (form.doorstepDelivery) append("doorstepCharge", form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined);
+      fd.append("amountPaid", String(Number(form.amountPaid) || 0));
+      append("paymentMode", form.paymentMode);
+      append("notes", form.notes);
+      if (paymentScreenshot) fd.append("screenshot", paymentScreenshot);
+
+      await bookingsApi.createOffline(fd);
       toast.success("Offline booking created");
       setForm(emptyForm);
+      pickPaymentScreenshot(null);
       setShowAddForm(false);
       fetchBookings(1, search, statusFilter);
     } catch (e: any) {
@@ -657,7 +681,7 @@ export default function OfflineBookingsPage() {
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl my-auto">
             <div className="flex items-center justify-between px-6 py-5 border-b border-[#E4E5EF]">
               <h3 className="font-black font-syne text-[#0F0F1A] text-lg">Add Offline Booking</h3>
-              <button onClick={() => { setShowAddForm(false); setForm(emptyForm); }} className="text-[#9090A8] hover:text-[#0F0F1A]"><X size={20} /></button>
+              <button onClick={() => { setShowAddForm(false); setForm(emptyForm); pickPaymentScreenshot(null); }} className="text-[#9090A8] hover:text-[#0F0F1A]"><X size={20} /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               {/* Customer */}
@@ -835,8 +859,34 @@ export default function OfflineBookingsPage() {
                 </div>
               </div>
 
+              {Number(form.amountPaid) > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">
+                    Payment Screenshot <span className="text-red-500">*</span>
+                  </label>
+                  <input ref={paymentFileInputRef} type="file" accept="image/*,.pdf" className="hidden"
+                    onChange={e => pickPaymentScreenshot(e.target.files?.[0] || null)} />
+                  {paymentScreenshotPreview ? (
+                    <div className="flex items-center gap-3 p-2 border-[1.5px] border-[#E4E5EF] rounded-xl">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={paymentScreenshotPreview} alt="Payment screenshot preview" className="w-14 h-14 rounded-lg object-cover border border-[#E4E5EF]" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[#0F0F1A] truncate">{paymentScreenshot?.name}</p>
+                        <button type="button" onClick={() => paymentFileInputRef.current?.click()} className="text-xs text-[#E8540A] font-semibold hover:underline">Change</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => paymentFileInputRef.current?.click()}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 border-2 border-dashed border-[#E4E5EF] rounded-xl text-xs text-[#9090A8] hover:border-[#E8540A] hover:text-[#E8540A] cursor-pointer transition-colors justify-center">
+                      <Upload size={13} /> {paymentScreenshot ? paymentScreenshot.name : "Upload proof for the amount received"}
+                    </button>
+                  )}
+                  <p className="text-[10px] text-[#9090A8] mt-1">Required whenever an amount is entered above — proof of payment for the customer's advance.</p>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowAddForm(false); setForm(emptyForm); }}
+                <button type="button" onClick={() => { setShowAddForm(false); setForm(emptyForm); pickPaymentScreenshot(null); }}
                   className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A]">Cancel</button>
                 <button type="submit" disabled={submitting}
                   className="flex-1 py-3 rounded-xl btn-gradient text-white font-bold text-sm disabled:opacity-60 flex items-center justify-center gap-2">
