@@ -508,7 +508,10 @@ export default function OfflineBookingsPage() {
       append("bookingFare", form.bookingFare !== "" ? Number(form.bookingFare) : undefined);
       append("securityDeposit", form.securityDeposit !== "" ? Number(form.securityDeposit) : undefined);
       append("gstPercent", form.gstPercent !== "" ? Number(form.gstPercent) : undefined);
-      fd.append("doorstepDelivery", String(form.doorstepDelivery));
+      // FormData only carries strings — send "true" only when actually on,
+      // and omit it otherwise, so the server's own default (false) applies
+      // instead of it seeing the truthy string "false".
+      if (form.doorstepDelivery) fd.append("doorstepDelivery", "true");
       if (form.doorstepDelivery) append("deliveryAddress", form.deliveryAddress);
       if (form.doorstepDelivery) append("doorstepCharge", form.doorstepCharge !== "" ? Number(form.doorstepCharge) : undefined);
       fd.append("amountPaid", String(Number(form.amountPaid) || 0));
