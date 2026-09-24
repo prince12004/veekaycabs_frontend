@@ -118,9 +118,10 @@ export default function DatePicker({ value, onChange, disabled, placeholder, min
   const formatted = value
     ? new Date(value + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
     : "";
-
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 100 }, (_, i) => currentYear + 5 - i);
+  const maxYear = maxDate ? new Date(maxDate + "T00:00:00").getFullYear() : currentYear + 25;
+  const minYear = minDate ? new Date(minDate + "T00:00:00").getFullYear() : currentYear - 100;
+  const yearOptions = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
 
   const dropdown = (
     <AnimatePresence>
