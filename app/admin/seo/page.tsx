@@ -104,7 +104,7 @@ export default function SeoPage() {
 
   if (view === "add" || view === "edit") {
     return (
-      <div className="p-6 max-w-3xl">
+      <div className="p-6 max-w-9xl">
         <div className="flex items-center gap-4 mb-6">
           <button onClick={() => { setView("list"); setForm(emptyForm); setEditId(null); }} className="text-[#9090A8] hover:text-[#E8540A]"><ArrowLeft size={20} /></button>
           <h1 className="font-black font-syne text-2xl text-[#0F0F1A]">{view === "edit" ? "Edit SEO Page" : "Add SEO Page"}</h1>

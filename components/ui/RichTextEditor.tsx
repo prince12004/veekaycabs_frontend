@@ -47,10 +47,23 @@ interface Props {
 
 export default function RichTextEditor({ value, onChange, placeholder = "Write content here...", minHeight = 300 }: Props) {
   const modules = useMemo(() => TOOLBAR_MODULES, []);
-  const [sourceMode, setSourceMode] = useState(false);
+  // Quill has no <table> support — loading content that already has a table
+  // into its visual mode silently flattens the table into plain <p> tags the
+  // moment anything is saved, destroying it. Content with a table opens
+  // straight into HTML Source mode so it's never round-tripped through Quill
+  // unless the admin explicitly, knowingly switches (and is warned first).
+  const [sourceMode, setSourceMode] = useState(() => value.includes("<table"));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const insertTableTemplate = () => {
+    // Coming from Visual mode there's no textarea yet to get a cursor
+    // position from — switch into HTML Source first (safe direction, no
+    // data loss) and just append the table at the end.
+    if (!sourceMode) {
+      setSourceMode(true);
+      onChange(`${value}\n${TABLE_TEMPLATE}\n`);
+      return;
+    }
     const el = textareaRef.current;
     const start = el?.selectionStart ?? value.length;
     const end = el?.selectionEnd ?? value.length;
@@ -77,18 +90,26 @@ export default function RichTextEditor({ value, onChange, placeholder = "Write c
       `}</style>
 
       <div className="flex items-center justify-end gap-2 mb-2">
-        {sourceMode && (
-          <button
-            type="button"
-            onClick={insertTableTemplate}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A] transition-colors"
-          >
-            <Table2 size={13} /> Insert Table
-          </button>
-        )}
         <button
           type="button"
-          onClick={() => setSourceMode((s) => !s)}
+          onClick={insertTableTemplate}
+          title="Tables only render correctly in HTML Source mode — clicking this switches you there"
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A] transition-colors"
+        >
+          <Table2 size={13} /> Insert Table
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // Leaving HTML Source for the Visual editor loses any <table> in
+            // the content permanently the moment this gets saved — Quill
+            // flattens it to plain paragraphs with no way back.
+            if (sourceMode && value.includes("<table") &&
+                !confirm("This content has a table. Switching to the Visual Editor will permanently remove the table formatting as soon as you save. Continue?")) {
+              return;
+            }
+            setSourceMode((s) => !s);
+          }}
           className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${sourceMode ? "bg-[#FFF3ED] border-[#E8540A]/30 text-[#E8540A]" : "border-[#E4E5EF] text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A]"}`}
         >
           <Code2 size={13} /> {sourceMode ? "Visual Editor" : "HTML Source"}
