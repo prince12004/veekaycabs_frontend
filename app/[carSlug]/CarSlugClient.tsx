@@ -340,7 +340,7 @@ export default function CarSlugClient() {
   // Mirrors the server's calculateFare exactly (bookingsController.js) — GST
   // on the taxable rental fare after discount, so what's shown here always
   // matches what fareBreakdown.totalAmount actually charges via Razorpay.
-  const gst = Math.round((baseFare - discount) * 0.12);
+  const gst = Math.round((baseFare - discount) * 0.05);
   const total = baseFare + gst + CAR.securityDeposit + doorstepFee - discount;
   const tokenAmount = Math.round(total * 0.25);
   const balanceDue = total - tokenAmount;
@@ -608,7 +608,7 @@ export default function CarSlugClient() {
                     )}
 
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-[#4A4A6A]">GST (12%)</span>
+                      <span className="text-[#4A4A6A]">GST (5%)</span>
                       <span className="text-[#0F0F1A] font-semibold">Rs. {gst.toLocaleString("en-IN")}</span>
                     </div>
 
