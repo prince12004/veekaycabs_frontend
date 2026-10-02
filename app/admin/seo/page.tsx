@@ -8,8 +8,6 @@ import { adminCarSeoPagesAPI } from "@/lib/api";
 import toast from "react-hot-toast";
 import { canDelete } from "@/lib/adminPermissions";
 
-// Loaded only when the add/edit form actually mounts — keeps the list view
-// (and the heavy Quill editor bundle) out of the initial page load.
 const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), {
   ssr: false,
   loading: () => <div className="h-[300px] border-[1.5px] border-[#E4E5EF] rounded-xl animate-pulse bg-[#F8F9FC]" />,

@@ -589,7 +589,11 @@ export default function BookingDetailPage() {
     status: rawBooking.status,
   };
 
-  const nights = Math.round((new Date(booking.end).getTime() - new Date(booking.start).getTime()) / (1000 * 60 * 60 * 24));
+  // Rounding whole days here (Math.round) turned an exact 2.5-day trip into
+  // "3 days" — which then over-allotted a full extra day of free km on the
+  // closing bill. Keep one decimal of precision instead so a half-day trip
+  // shows and bills as 2.5 days, not 3.
+  const nights = Math.round(((new Date(booking.end).getTime() - new Date(booking.start).getTime()) / (1000 * 60 * 60 * 24)) * 10) / 10;
   const balance = booking.payment.total - booking.payment.received;
 
   const buildInvoiceData = () => ({
@@ -669,7 +673,7 @@ export default function BookingDetailPage() {
   const openCloseBillModal = () => {
     const carKmPackage = rawBooking.carId?.kmPackage as string | undefined;
     const perDayKm = carKmPackage ? parseInt(carKmPackage, 10) || 0 : 0;
-    const defaultLimit = perDayKm ? perDayKm * Math.max(nights, 1) : "";
+    const defaultLimit = perDayKm ? Math.round(perDayKm * Math.max(nights, 1)) : "";
     // Always prefer the latest live odometer reading (return verification may
     // have been corrected after the bill was first closed) over whatever was
     // typed into the form at the time of the original close.
@@ -2249,6 +2253,16 @@ export default function BookingDetailPage() {
                 </div>
               </div>
               <p className="text-[11px] text-[#9090A8]">Extra Charge auto-fills from the car's rate for the added hours — edit if you negotiated a different amount. It's added to the booking's total; the additional payment (if any) is added to what's already been received.</p>
+              {(() => {
+                const gstRate = rawBooking?.bookingFare > 0 ? (rawBooking.gst || 0) / rawBooking.bookingFare : 0;
+                if (gstRate <= 0 || !extendForm.extraAmount) return null;
+                const extraGst = Math.round(Number(extendForm.extraAmount) * gstRate);
+                return (
+                  <p className="text-xs bg-[#FFF3ED] text-[#9A3412] rounded-xl px-3 py-2">
+                    This booking has GST applied ({Math.round(gstRate * 100)}%) — Rs. {extraGst.toLocaleString("en-IN")} GST will be added automatically on top of the Extra Charge, for a total of Rs. {(Number(extendForm.extraAmount) + extraGst).toLocaleString("en-IN")}.
+                  </p>
+                );
+              })()}
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowExtendModal(false)} className="flex-1 py-3 rounded-xl border-2 border-[#E4E5EF] font-bold text-sm text-[#4A4A6A] hover:bg-[#F8F9FC]">

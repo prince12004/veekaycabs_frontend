@@ -7,12 +7,12 @@ import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  value: string; // "YYYY-MM-DD"
+  value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  minDate?: string; // "YYYY-MM-DD"
-  maxDate?: string; // "YYYY-MM-DD"
+  minDate?: string;
+  maxDate?: string;
 }
 
 const MONTHS = [
@@ -36,9 +36,6 @@ export default function DatePicker({ value, onChange, disabled, placeholder, min
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpward = spaceBelow < DROPDOWN_H && rect.top > spaceBelow;
     const width = Math.max(rect.width, 300);
-    // Clamp horizontally so a trigger near the right edge (e.g. the last
-    // filter in a row) doesn't push the dropdown off-screen — it was simply
-    // getting clipped by the viewport with no way to see the rest of it.
     const left = Math.min(Math.max(rect.left, 8), window.innerWidth - width - 8);
     setDropStyle({
       top: openUpward ? rect.top - DROPDOWN_H - 8 : rect.bottom + 8,

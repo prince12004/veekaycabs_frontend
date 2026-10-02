@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowDownCircle, ArrowUpCircle, Loader2, RefreshCw, Phone,
-  Eye, Car, MapPin,
+  Eye, Car, MapPin, Download,
 } from "lucide-react";
 import { bookingsApi, adminCarsApi } from "@/lib/api";
 import DatePicker from "@/components/ui/DatePicker";
@@ -50,6 +50,34 @@ const fmtDateLabel = (dateStr: string) => {
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
+// Client-side CSV export (opens directly in Excel) — exports exactly the
+// rows currently shown for that section, respecting the date/city/status filters.
+const downloadCsv = (filename: string, rows: ScheduleBooking[], timeField: "startTime" | "endTime") => {
+  const headers = ["Time", "Booking ID", "Customer", "Mobile", "Car", "Reg No", "City", "Pickup Location", "Status"];
+  const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const lines = rows.map((b) => [
+    fmtTime(b[timeField]),
+    b.bookingId,
+    b.userId?.name || "—",
+    b.userId?.mobile || "—",
+    b.carId?.name || "—",
+    b.carId?.registrationNo || "—",
+    b.cityId?.name || "—",
+    b.pickupLocation || "—",
+    b.status,
+  ].map(escape).join(","));
+  const csv = [headers.join(","), ...lines].join("\n");
+  const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 function ScheduleTable({ rows, kind, loading }: { rows: ScheduleBooking[]; kind: "departure" | "arrival"; loading: boolean }) {
   const timeField = kind === "departure" ? "startTime" : "endTime";
   return (
@@ -64,6 +92,13 @@ function ScheduleTable({ rows, kind, loading }: { rows: ScheduleBooking[]; kind:
           </h3>
           <p className="text-[#9090A8] text-xs">{rows.length} booking{rows.length !== 1 ? "s" : ""}</p>
         </div>
+        <button
+          onClick={() => downloadCsv(`${kind}s-${Date.now()}.csv`, rows, timeField)}
+          disabled={rows.length === 0}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-xs font-semibold text-[#4A4A6A] hover:bg-[#F8F9FC] hover:border-[#E8540A]/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <Download size={12} /> Export to Excel
+        </button>
       </div>
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-[#9090A8] text-sm">
