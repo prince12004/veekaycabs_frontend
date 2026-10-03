@@ -294,7 +294,9 @@ export default function CarSlugClient() {
               bookingId: booking.bookingId,
             });
             toast.success("Booking confirmed! Check your SMS for details.");
-            router.push("/account/history");
+            // The booking-complete conversion event fires on /thank-you
+            // itself, not here — that's the actual "thank you page".
+            router.push(`/thank-you?bookingId=${encodeURIComponent(booking.bookingId)}`);
           } catch {
             toast.error("Payment received but verification failed. Please contact support with your payment ID: " + response.razorpay_payment_id);
           }

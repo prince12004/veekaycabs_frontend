@@ -71,6 +71,9 @@ export default function RootLayout({
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'AW-18348859511');
+            gtag('config', 'AW-18348859511/I_M6CJuw_o0dEPfAta1E', {
+              'phone_conversion_number': '99999 26867'
+            });
           `}
         </Script>
       </head>
