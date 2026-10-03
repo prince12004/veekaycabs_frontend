@@ -45,6 +45,7 @@ export default function AdminBookingsPage() {
   const [pages, setPages] = useState(1);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -54,11 +55,23 @@ export default function AdminBookingsPage() {
 
   useEffect(() => { setCanDeleteBooking(canDelete("allBookings")); }, []);
 
+  // Debounce the raw typed value — fetch only reacts to debouncedSearch, so
+  // typing doesn't fire a request per keystroke (that's what was causing the
+  // list to flicker/reload on every letter).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Jump back to page 1 whenever a filter actually changes the result set —
+  // page itself isn't in this list, so it doesn't re-trigger itself.
+  useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter, fromDate, toDate]);
+
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string | number> = { page, limit: 15 };
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter !== "All" && statusFilter !== "Drop-offs")
         params.status = statusFilter.toLowerCase();
       if (fromDate) params.from = fromDate;
@@ -73,15 +86,9 @@ export default function AdminBookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, fromDate, toDate, page]);
+  }, [debouncedSearch, statusFilter, fromDate, toDate, page]);
 
   useEffect(() => { fetch(); }, [fetch]);
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => { setPage(1); fetch(); }, 400);
-    return () => clearTimeout(t);
-  }, [search]);
 
   const isDropOff = (b: Booking) => b.status === "pending" && b.amountPaid === 0;
 

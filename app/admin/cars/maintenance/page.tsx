@@ -44,9 +44,6 @@ export default function MaintenanceCarPickerPage() {
   // Reset to page 1 whenever the search term changes.
   useEffect(() => { setPage(1); }, [search]);
 
-  // Table is server-paginated + server-searched so it stays correct no
-  // matter how large the fleet grows (a fixed client-side limit would
-  // silently hide cars beyond it).
   useEffect(() => {
     setCarsLoading(true);
     const timer = setTimeout(() => {
