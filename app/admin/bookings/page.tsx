@@ -251,7 +251,7 @@ export default function AdminBookingsPage() {
                           {[b.carId?.registrationNo, b.cityId?.name].filter(Boolean).join(" · ")}
                         </p>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <p className="text-[#4A4A6A] text-xs">{fmtDate(b.startTime)}</p>
                         <p className="text-[#9090A8] text-xs">→ {fmtDate(b.endTime)}</p>
                       </td>
