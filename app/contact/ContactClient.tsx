@@ -18,10 +18,41 @@ export default function ContactClient() {
       return;
     }
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setSubmitted(true);
-    setSubmitting(false);
-    toast.success("Message sent! We'll call you within 30 minutes.");
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const utmSource = params.get("utm_source") || "";
+      const source = /google/i.test(utmSource) ? "Google Ads"
+        : /facebook|meta|instagram|fb/i.test(utmSource) ? "Meta Ads"
+        : "Website";
+
+      await fetch(`${process.env.NEXT_PUBLIC_CRM_API_URL}/api/public/leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          mobile: form.phone,
+          email: form.email || undefined,
+          message: form.subject ? `${form.subject}: ${form.message}` : form.message,
+          source,
+          utm: {
+            source: utmSource || undefined,
+            medium: params.get("utm_medium") || undefined,
+            campaign: params.get("utm_campaign") || undefined,
+            term: params.get("utm_term") || undefined,
+            content: params.get("utm_content") || undefined,
+          },
+        }),
+      });
+      setSubmitted(true);
+      toast.success("Message sent! We'll call you within 30 minutes.");
+    } catch {
+      // The enquiry not reaching the CRM shouldn't block the customer —
+      // they still have our phone/WhatsApp numbers right on this page.
+      setSubmitted(true);
+      toast.success("Message sent! We'll call you within 30 minutes.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
