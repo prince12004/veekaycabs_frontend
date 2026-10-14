@@ -20,6 +20,8 @@ interface Booking {
   totalAmount: number;
   amountPaid: number;
   balanceDue?: number;
+  discount?: number;
+  closingBill?: { discountAmount?: number; discountType?: "fixed" | "percentage"; discountValue?: number };
   paymentMode: string;
   status: "pending" | "confirmed" | "active" | "completed" | "cancelled";
   createdAt: string;
@@ -226,7 +228,7 @@ export default function AdminBookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-[#F8F9FC] border-b border-[#E4E5EF]">
-                  {["Booking ID", "Customer", "Car", "Period", "Amount", "Paid", "Due", "Mode", "Status", "Action"].map(h => (
+                  {["Booking ID", "Customer", "Car", "Period", "Amount", "Discount", "Paid", "Due", "Mode", "Status", "Action"].map(h => (
                     <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-widest text-[#9090A8]">{h}</th>
                   ))}
                 </tr>
@@ -255,6 +257,13 @@ export default function AdminBookingsPage() {
                       </td>
                       <td className="px-4 py-4 font-bold text-[#0F0F1A] text-sm whitespace-nowrap">
                         Rs. {b.totalAmount?.toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {(() => {
+                          const totalDiscount = (b.discount || 0) + (b.closingBill?.discountAmount || 0);
+                          if (totalDiscount <= 0) return <span className="text-xs text-[#9090A8]">—</span>;
+                          return <span className="text-xs font-semibold text-[#059669]">- Rs. {totalDiscount.toLocaleString("en-IN")}</span>;
+                        })()}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`text-xs font-semibold ${(b.balanceDue ?? (b.totalAmount - b.amountPaid)) <= 0 ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
