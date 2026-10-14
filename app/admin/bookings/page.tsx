@@ -19,6 +19,7 @@ interface Booking {
   endTime: string;
   totalAmount: number;
   amountPaid: number;
+  balanceDue?: number;
   paymentMode: string;
   status: "pending" | "confirmed" | "active" | "completed" | "cancelled";
   createdAt: string;
@@ -256,18 +257,25 @@ export default function AdminBookingsPage() {
                         Rs. {b.totalAmount?.toLocaleString("en-IN")}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`text-xs font-semibold ${b.amountPaid >= b.totalAmount ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
+                        <span className={`text-xs font-semibold ${(b.balanceDue ?? (b.totalAmount - b.amountPaid)) <= 0 ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
                           Rs. {b.amountPaid?.toLocaleString("en-IN")}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {(b.totalAmount - b.amountPaid) > 0 ? (
-                          <span className="text-xs font-bold text-[#EF4444]">
-                            Rs. {(b.totalAmount - b.amountPaid).toLocaleString("en-IN")}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-semibold text-[#10B981]">Paid</span>
-                        )}
+                        {(() => {
+                          // Prefer balanceDue — it's kept in sync with the closing-bill
+                          // settlement once a booking is closed (extra charges/late
+                          // fees/discount), unlike totalAmount - amountPaid which stays
+                          // frozen at the original pre-closing estimate.
+                          const due = b.balanceDue ?? (b.totalAmount - b.amountPaid);
+                          if (due > 0) {
+                            return <span className="text-xs font-bold text-[#EF4444]">Rs. {due.toLocaleString("en-IN")}</span>;
+                          }
+                          if (due < 0) {
+                            return <span className="text-xs font-bold text-[#7C3AED]">Refund Rs. {Math.abs(due).toLocaleString("en-IN")}</span>;
+                          }
+                          return <span className="text-xs font-semibold text-[#10B981]">Paid</span>;
+                        })()}
                       </td>
                       <td className="px-4 py-4 text-[#4A4A6A] text-xs">{fmtMode(b.paymentMode)}</td>
                       <td className="px-4 py-4">
