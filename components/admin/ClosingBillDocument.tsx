@@ -114,6 +114,9 @@ export interface ClosingBillData {
     bookingFare: number;
     gst: number;
     discount: number;
+    closingDiscountType?: "fixed" | "percentage";
+    closingDiscountValue?: number;
+    closingDiscountAmount?: number;
     doorstepCharge: number;
     pickupCharges: number;
     dropCharges: number;
@@ -142,6 +145,10 @@ export default function ClosingBillDocument({ data }: { data: ClosingBillData })
     ["Base Rental Fare", charges.bookingFare],
     ...(charges.gst > 0 ? [["GST", charges.gst] as [string, number]] : []),
     ...(charges.discount > 0 ? [["Discount / Coupon", -charges.discount] as [string, number]] : []),
+    ...((charges.closingDiscountAmount || 0) > 0 ? [[
+      `Closing Discount${charges.closingDiscountType === "percentage" ? ` (${charges.closingDiscountValue}%)` : ""}`,
+      -(charges.closingDiscountAmount || 0),
+    ] as [string, number]] : []),
     ...(charges.doorstepCharge > 0 ? [["Doorstep Delivery Charge", charges.doorstepCharge] as [string, number]] : []),
     ...(meter.extraKmCharge > 0 ? [[`Extra KM Charges (${meter.extraKms} km @ ${money(meter.extraKmRate)}/km)`, meter.extraKmCharge] as [string, number]] : []),
     ...(lateReturn.lateCharges > 0 ? [[`Late Return Charges (${lateReturn.lateHours} hrs @ ${money(lateReturn.lateHourRate)}/hr)`, lateReturn.lateCharges] as [string, number]] : []),

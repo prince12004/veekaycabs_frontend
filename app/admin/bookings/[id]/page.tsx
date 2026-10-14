@@ -131,6 +131,7 @@ export default function BookingDetailPage() {
     actualReturnTime: "", lateHourRate: "",
     pickupCharges: "", dropCharges: "", fastagStateTax: "", allStateChallan: "",
     overspeedingFine: "", fuelCharges: "", damageCharges: "", washingCharges: "", notes: "",
+    discountType: "fixed" as "fixed" | "percentage", discountValue: "",
   });
   const [closingSaving, setClosingSaving] = useState(false);
   const [downloadingClosingBill, setDownloadingClosingBill] = useState(false);
@@ -721,6 +722,8 @@ export default function BookingDetailPage() {
       fuelCharges: prev?.fuelCharges ? String(prev.fuelCharges) : "",
       damageCharges: prev?.damageCharges ? String(prev.damageCharges) : "",
       washingCharges: prev?.washingCharges ? String(prev.washingCharges) : "",
+      discountType: prev?.discountType === "percentage" ? "percentage" : "fixed",
+      discountValue: prev?.discountValue ? String(prev.discountValue) : "",
       notes: prev?.notes || "",
     });
     setCloseBillModalOpen(true);
@@ -793,6 +796,9 @@ export default function BookingDetailPage() {
       bookingFare: rawBooking.bookingFare ?? 0,
       gst: rawBooking.gst ?? 0,
       discount: rawBooking.discount ?? 0,
+      closingDiscountType: closingBill?.discountType || "fixed",
+      closingDiscountValue: closingBill?.discountValue || 0,
+      closingDiscountAmount: closingBill?.discountAmount || 0,
       doorstepCharge: rawBooking.doorstepCharge ?? 0,
       pickupCharges: closingBill?.pickupCharges || 0,
       dropCharges: closingBill?.dropCharges || 0,
@@ -1569,6 +1575,14 @@ export default function BookingDetailPage() {
                             <span className="font-semibold text-[#0F0F1A]">Rs. {(value || 0).toLocaleString("en-IN")}</span>
                           </div>
                         ))}
+                        {(closingBill.discountAmount || 0) > 0 && (
+                          <div className="flex justify-between items-center py-1.5 text-xs">
+                            <span className="text-[#9090A8]">
+                              Discount {closingBill.discountType === "percentage" ? `(${closingBill.discountValue}%)` : ""}
+                            </span>
+                            <span className="font-semibold text-[#059669]">- Rs. {(closingBill.discountAmount || 0).toLocaleString("en-IN")}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center pt-2.5 mt-1.5 border-t border-[#E4E5EF] text-sm">
                           <span className="font-bold text-[#0F0F1A]">Total Charges</span>
                           <span className="font-black text-[#7C3AED]">Rs. {(closingBill.totalCharges || 0).toLocaleString("en-IN")}</span>
@@ -1756,6 +1770,45 @@ export default function BookingDetailPage() {
                     </div>
                   ))}
                 </div>
+
+                <p className="text-xs font-bold text-[#9090A8] uppercase tracking-wider pt-1">Discount</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Discount Type</label>
+                    <select value={closingForm.discountType}
+                      onChange={(e) => setClosingForm((f) => ({ ...f, discountType: e.target.value as "fixed" | "percentage" }))}
+                      className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] bg-white">
+                      <option value="fixed">Fixed Amount (Rs.)</option>
+                      <option value="percentage">Percentage (%)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">
+                      Discount Value {closingForm.discountType === "percentage" ? "(%)" : "(Rs.)"}
+                    </label>
+                    <input type="number" min="0" max={closingForm.discountType === "percentage" ? 100 : undefined}
+                      value={closingForm.discountValue}
+                      onChange={(e) => setClosingForm((f) => ({ ...f, discountValue: e.target.value }))}
+                      className="w-full border border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED]" placeholder="0" />
+                  </div>
+                </div>
+                {(() => {
+                  const rentalAmount = rawBooking.bookingFare || 0;
+                  const rawValue = Number(closingForm.discountValue) || 0;
+                  if (rawValue <= 0) return null;
+                  const discountAmount = Math.min(
+                    rentalAmount,
+                    Math.round(closingForm.discountType === "percentage" ? (rentalAmount * rawValue) / 100 : rawValue)
+                  );
+                  const exceedsRental = closingForm.discountType === "percentage" ? rawValue > 100 : rawValue > rentalAmount;
+                  return (
+                    <p className={cn("text-xs font-semibold -mt-2", exceedsRental ? "text-[#EF4444]" : "text-[#059669]")}>
+                      {exceedsRental
+                        ? "Discount cannot exceed the rental amount — reduce it to save"
+                        : `Rs. ${discountAmount.toLocaleString("en-IN")} off the Rs. ${rentalAmount.toLocaleString("en-IN")} rental amount`}
+                    </p>
+                  );
+                })()}
 
                 <button onClick={handleCloseBooking} disabled={closingSaving}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-[#7C3AED] text-white rounded-xl text-sm font-bold hover:bg-[#6D28D9] transition-colors disabled:opacity-60">
