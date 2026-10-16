@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import QueryProvider from "@/components/providers/QueryProvider";
 import NumberInputScrollGuard from "@/components/providers/NumberInputScrollGuard";
+import AttributionCapture from "@/components/providers/AttributionCapture";
 import JsonLd from "@/components/seo/JsonLd";
 import { organizationSchema, websiteSchema } from "@/lib/schema";
 import { SITE_URL } from "@/lib/seo";
@@ -89,6 +90,7 @@ export default function RootLayout({
         <JsonLd data={[organizationSchema(), websiteSchema()]} />
         <QueryProvider>
           <NumberInputScrollGuard />
+          <AttributionCapture />
           {children}
           <Toaster
             position="top-right"

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import PageLayout from "@/components/layout/PageLayout";
 import { Phone, Mail, MapPin, Clock, MessageCircle, Send, CheckCircle } from "lucide-react";
 import toast from "react-hot-toast";
+import { getAttribution, resolveLeadSource } from "@/lib/attribution";
 
 export default function ContactClient() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
@@ -19,11 +20,10 @@ export default function ContactClient() {
     }
     setSubmitting(true);
     try {
-      const params = new URLSearchParams(window.location.search);
-      const utmSource = params.get("utm_source") || "";
-      const source = /google/i.test(utmSource) ? "Google Ads"
-        : /facebook|meta|instagram|fb/i.test(utmSource) ? "Meta Ads"
-        : "Website";
+      // Read from the landing page, not this page's URL — an ad visitor
+      // usually reaches /contact a few clicks after the ad's landing page.
+      const attribution = getAttribution();
+      const source = resolveLeadSource(attribution);
 
       await fetch(`${process.env.NEXT_PUBLIC_CRM_API_URL}/api/public/leads`, {
         method: "POST",
@@ -34,13 +34,8 @@ export default function ContactClient() {
           email: form.email || undefined,
           message: form.subject ? `${form.subject}: ${form.message}` : form.message,
           source,
-          utm: {
-            source: utmSource || undefined,
-            medium: params.get("utm_medium") || undefined,
-            campaign: params.get("utm_campaign") || undefined,
-            term: params.get("utm_term") || undefined,
-            content: params.get("utm_content") || undefined,
-          },
+          campaign: attribution.campaign,
+          utm: attribution,
         }),
       });
       setSubmitted(true);
