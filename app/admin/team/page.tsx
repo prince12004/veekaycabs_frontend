@@ -5,7 +5,6 @@ import Link from "next/link";
 import { BarChart3, Edit2, GitMerge, Loader2, Plus, Trash2, UsersRound, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { teamApi } from "@/lib/api";
-import { canAdd, canDelete, canEdit } from "@/lib/adminPermissions";
 
 type TeamMember = { _id: string; name: string; aliases: string[]; bookingCount: number };
 type Modal =
@@ -24,11 +23,6 @@ export default function TeamManagementPage() {
   const [aliases, setAliases] = useState<string[]>([]);
   const [targetId, setTargetId] = useState("");
   const [saving, setSaving] = useState(false);
-  const [perms, setPerms] = useState({ add: false, edit: false, remove: false });
-
-  useEffect(() => {
-    setPerms({ add: canAdd("teamManagement"), edit: canEdit("teamManagement"), remove: canDelete("teamManagement") });
-  }, []);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -93,11 +87,9 @@ export default function TeamManagementPage() {
           <Link href="/admin/reports/team" className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4E5EF] bg-white text-[#4A4A6A] font-semibold text-sm hover:border-[#E8540A] hover:text-[#E8540A]">
             <BarChart3 size={15} /> Team Report
           </Link>
-          {perms.add && (
-            <button onClick={() => openModal({ type: "add" })} className="flex items-center gap-2 btn-gradient px-4 py-2.5 rounded-xl text-white font-bold text-sm">
-              <Plus size={15} /> Add Member
-            </button>
-          )}
+          <button onClick={() => openModal({ type: "add" })} className="flex items-center gap-2 btn-gradient px-4 py-2.5 rounded-xl text-white font-bold text-sm">
+            <Plus size={15} /> Add Member
+          </button>
         </div>
       </div>
 
@@ -131,15 +123,9 @@ export default function TeamManagementPage() {
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-1">
-                        {perms.edit && (
-                          <>
-                            <button onClick={() => openModal({ type: "edit", member: m })} title="Edit" aria-label={`Edit ${m.name}`} className="p-2 rounded-lg text-[#4A4A6A] hover:bg-[#F1F2F7]"><Edit2 size={15} /></button>
-                            <button onClick={() => openModal({ type: "merge", member: m })} title="Merge into another member" aria-label={`Merge ${m.name}`} className="p-2 rounded-lg text-[#4A4A6A] hover:bg-[#F1F2F7]"><GitMerge size={15} /></button>
-                          </>
-                        )}
-                        {perms.remove && (
-                          <button onClick={() => remove(m)} title="Remove" aria-label={`Remove ${m.name}`} className="p-2 rounded-lg text-[#EF4444] hover:bg-[#FEE2E2]"><Trash2 size={15} /></button>
-                        )}
+                        <button onClick={() => openModal({ type: "edit", member: m })} title="Edit" aria-label={`Edit ${m.name}`} className="p-2 rounded-lg text-[#4A4A6A] hover:bg-[#F1F2F7]"><Edit2 size={15} /></button>
+                        <button onClick={() => openModal({ type: "merge", member: m })} title="Merge into another member" aria-label={`Merge ${m.name}`} className="p-2 rounded-lg text-[#4A4A6A] hover:bg-[#F1F2F7]"><GitMerge size={15} /></button>
+                        <button onClick={() => remove(m)} title="Remove" aria-label={`Remove ${m.name}`} className="p-2 rounded-lg text-[#EF4444] hover:bg-[#FEE2E2]"><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>

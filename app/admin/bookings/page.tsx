@@ -8,8 +8,7 @@ import {
 } from "lucide-react";
 import { bookingsApi, teamApi } from "@/lib/api";
 import toast from "react-hot-toast";
-import { canDelete, canEdit } from "@/lib/adminPermissions";
-import BookedBySelect from "@/components/admin/BookedBySelect";
+import { isSuperAdmin } from "@/lib/adminPermissions";
 
 interface Booking {
   _id: string;
@@ -52,6 +51,7 @@ function AdminBookingsContent() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ confirmed: 0, active: 0, pending: 0, completed: 0, cancelled: 0, dropOffs: 0 });
   const [pages, setPages] = useState(1);
 
   const [search, setSearch] = useState("");
@@ -64,12 +64,8 @@ function AdminBookingsContent() {
   const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [canDeleteBooking, setCanDeleteBooking] = useState(false);
-  const [canAssign, setCanAssign] = useState(false);
 
-  useEffect(() => {
-    setCanDeleteBooking(canDelete("allBookings"));
-    setCanAssign(canEdit("allBookings"));
-  }, []);
+  useEffect(() => { setCanDeleteBooking(isSuperAdmin()); }, []);
 
   useEffect(() => {
     teamApi.getAll()
@@ -92,10 +88,10 @@ function AdminBookingsContent() {
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string | number> = { page, limit: 15 };
+      const params: Record<string, string | number> = { page, limit: 15, withCounts: "true" };
       if (debouncedSearch) params.search = debouncedSearch;
-      if (statusFilter !== "All" && statusFilter !== "Drop-offs")
-        params.status = statusFilter.toLowerCase();
+      if (statusFilter === "Drop-offs") params.dropOffs = "true";
+      else if (statusFilter !== "All") params.status = statusFilter.toLowerCase();
       if (fromDate) params.from = fromDate;
       if (toDate) params.to = toDate;
       if (bookedByFilter) params.bookedBy = bookedByFilter;
@@ -104,6 +100,7 @@ function AdminBookingsContent() {
       setBookings(data.data || []);
       setTotal(data.total || 0);
       setPages(data.pages || 1);
+      if (data.counts) setCounts(data.counts);
     } catch {
       setBookings([]);
     } finally {
@@ -114,32 +111,6 @@ function AdminBookingsContent() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const isDropOff = (b: Booking) => b.status === "pending" && b.amountPaid === 0;
-
-  const counts = {
-    confirmed: bookings.filter(b => b.status === "confirmed").length,
-    active:    bookings.filter(b => b.status === "active").length,
-    pending:   bookings.filter(b => b.status === "pending").length,
-    completed: bookings.filter(b => b.status === "completed").length,
-    cancelled: bookings.filter(b => b.status === "cancelled").length,
-    dropOffs:  bookings.filter(isDropOff).length,
-  };
-
-  const displayed = statusFilter === "Drop-offs"
-    ? bookings.filter(isDropOff)
-    : bookings;
-
-  // Online bookings are created by customers, so this is where they get assigned.
-  const assignTeamMember = async (b: Booking, bookedBy: string) => {
-    const previous = b.bookedBy;
-    setBookings(prev => prev.map(x => x._id === b._id ? { ...x, bookedBy } : x));
-    try {
-      await bookingsApi.update(b._id, { bookedBy });
-      toast.success(bookedBy ? `Assigned to ${bookedBy}` : "Team member removed");
-    } catch (e: any) {
-      setBookings(prev => prev.map(x => x._id === b._id ? { ...x, bookedBy: previous } : x));
-      toast.error(e?.response?.data?.message || "Failed to assign team member");
-    }
-  };
 
   const deleteBooking = async (b: Booking) => {
     if (!confirm(`Delete booking #${b.bookingId || b._id.slice(-8).toUpperCase()}? It'll disappear from all lists but the record is kept, not erased.`)) return;
@@ -264,7 +235,7 @@ function AdminBookingsContent() {
           <div className="flex items-center justify-center gap-3 py-20 text-[#9090A8]">
             <Loader2 size={20} className="animate-spin" /> Loading bookings...
           </div>
-        ) : displayed.length === 0 ? (
+        ) : bookings.length === 0 ? (
           <div className="py-20 text-center text-[#9090A8]">
             <Calendar size={36} className="mx-auto mb-3 text-[#E4E5EF]" />
             <p className="font-semibold">No bookings found</p>
@@ -280,7 +251,7 @@ function AdminBookingsContent() {
                 </tr>
               </thead>
               <tbody>
-                {displayed.map((b, i) => {
+                {bookings.map((b, i) => {
                   const s = statusColors[b.status] || statusColors.pending;
                   return (
                     <tr key={b._id} className={`border-b border-[#E4E5EF] hover:bg-[#FFF3ED] transition-colors ${i % 2 === 1 ? "bg-[#F8F9FC]/50" : ""}`}>
@@ -301,16 +272,7 @@ function AdminBookingsContent() {
                         <p className="text-[#4A4A6A] text-xs">{fmtDate(b.startTime)}</p>
                         <p className="text-[#9090A8] text-xs">→ {fmtDate(b.endTime)}</p>
                       </td>
-                      <td className="px-4 py-4 text-[#4A4A6A] text-xs whitespace-nowrap">
-                        {canAssign ? (
-                          <BookedBySelect
-                            value={b.bookedBy || ""}
-                            onChange={bookedBy => assignTeamMember(b, bookedBy)}
-                            names={teamNames}
-                            className="border-[1.5px] border-[#E4E5EF] rounded-lg px-2 py-1.5 text-xs focus:border-[#E8540A] outline-none bg-white max-w-[150px]"
-                          />
-                        ) : (b.bookedBy?.trim() || "—")}
-                      </td>
+                      <td className="px-4 py-4 text-[#4A4A6A] text-xs whitespace-nowrap">{b.bookedBy?.trim() || "—"}</td>
                       <td className="px-4 py-4 font-bold text-[#0F0F1A] text-sm whitespace-nowrap">
                         Rs. {b.totalAmount?.toLocaleString("en-IN")}
                       </td>

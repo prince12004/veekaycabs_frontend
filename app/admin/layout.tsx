@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { adminDashboardAPI } from "@/lib/api";
 import { canView, isSuperAdmin } from "@/lib/adminPermissions";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; badge: number | null; external?: boolean; permKey?: string };
+type NavItem = { href: string; label: string; icon: LucideIcon; badge: number | null; external?: boolean; permKey?: string; superAdminOnly?: boolean };
 
 // permKey matches a SECTIONS key from app/admin/manage-admins/page.tsx — used
 // to hide nav items (and block direct navigation) an admin hasn't been
@@ -44,8 +44,8 @@ const buildNavGroups = (counts: Record<string, number>): { label: string; items:
       { href: "/admin/bookings/offline", label: "Offline Booking", icon: Activity, badge: null, permKey: "offlineBooking" },
       { href: "/admin/bookings/arrivals", label: "Arrivals & Departures", icon: ArrowLeftRight, badge: null, permKey: "arrivals" },
       { href: "/admin/bookings/closing-bills", label: "Closing Bills", icon: FileText, badge: null, permKey: "closingBills" },
-      { href: "/admin/team", label: "Team Management", icon: UsersRound, badge: null, permKey: "teamManagement" },
-      { href: "/admin/reports/team", label: "Team Booking Report", icon: BarChart3, badge: null, permKey: "reports" },
+      { href: "/admin/team", label: "Team Management", icon: UsersRound, badge: null, superAdminOnly: true },
+      { href: "/admin/reports/team", label: "Team Booking Report", icon: BarChart3, badge: null, superAdminOnly: true },
     ],
   },
   {
@@ -190,7 +190,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     .map(g => ({
       ...g,
       items: g.items.filter(i =>
-        i.href === "/admin/manage-admins" ? isSuperAdmin() : !i.permKey || canView(i.permKey)
+        i.href === "/admin/manage-admins" || i.superAdminOnly ? isSuperAdmin() : !i.permKey || canView(i.permKey)
       ),
     }))
     .filter(g => g.items.length > 0);
@@ -212,7 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       .sort((a, b) => b.href.length - a.href.length)[0];
     const extra = EXTRA_ROUTE_PERMS.find(r => pathname.startsWith(r.prefix));
     const permKey = matched?.permKey ?? extra?.permKey;
-    const needsManageAdminsGuard = pathname.startsWith("/admin/manage-admins") && !isSuperAdmin();
+    const needsManageAdminsGuard = (pathname.startsWith("/admin/manage-admins") || matched?.superAdminOnly) && !isSuperAdmin();
     const blocked = needsManageAdminsGuard || (permKey && !canView(permKey));
     if (blocked) {
       const firstAllowed = navGroups[0]?.items[0]?.href || "/admin/dashboard";

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { bookingsApi, adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import { canDelete } from "@/lib/adminPermissions";
+import { isSuperAdmin } from "@/lib/adminPermissions";
 import BookedBySelect from "@/components/admin/BookedBySelect";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ export default function OfflineBookingsPage() {
     });
   };
 
-  useEffect(() => { setCanDeleteBooking(canDelete("offlineBooking")); }, []);
+  useEffect(() => { setCanDeleteBooking(isSuperAdmin()); }, []);
   // Tracks the last auto-suggested rent/security so we only overwrite the
   // fields while the admin hasn't typed a custom value of their own.
   const autoRate = useRef<string | null>(null);
