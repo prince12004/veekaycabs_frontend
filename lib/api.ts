@@ -339,6 +339,28 @@ export const adminReportsApi = {
     adminApi.get("/api/admin/reports/car-revenue", { params }),
   getSettlements: (params: { from?: string; to?: string }) =>
     adminApi.get("/api/admin/reports/settlements", { params }),
+  getTeamBookings: (params: { from?: string; to?: string }) =>
+    adminApi.get("/api/admin/reports/team-bookings", { params }),
+};
+
+export const teamApi = {
+  getAll: () => adminApi.get("/api/admin/team"),
+  create: (name: string) => adminApi.post("/api/admin/team", { name }),
+  update: (id: string, data: { name?: string; aliases?: string[] }) => adminApi.put(`/api/admin/team/${id}`, data),
+  merge: (id: string, targetId: string) => adminApi.post(`/api/admin/team/${id}/merge`, { targetId }),
+  remove: (id: string) => adminApi.delete(`/api/admin/team/${id}`),
+};
+
+export const editorUploadApi = {
+  uploadImage: (file: File, signal: AbortSignal, onProgress: (loaded: number, total: number) => void) => {
+    const formData = new FormData();
+    formData.append("upload", file);
+    return adminApi.post("/api/admin/editor-uploads/image", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      signal,
+      onUploadProgress: (e) => onProgress(e.loaded, e.total ?? file.size),
+    });
+  },
 };
 
 export const adminDashboardAPI = {

@@ -49,7 +49,7 @@ export function organizationSchema() {
         closes: "23:59",
       },
     ],
-    priceRange: "₹96 - ₹563 per hour",
+    priceRange: "₹92 - ₹563 per hour",
     currenciesAccepted: "INR",
     paymentAccepted: "Cash, Credit Card, Debit Card, UPI, Net Banking",
     aggregateRating: {

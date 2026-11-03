@@ -12,6 +12,7 @@ import { bookingsApi, adminCarsApi } from "@/lib/api";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { canDelete } from "@/lib/adminPermissions";
+import BookedBySelect from "@/components/admin/BookedBySelect";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface BookingRow {
@@ -704,10 +705,10 @@ export default function OfflineBookingsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Booked By</label>
+                  <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-1.5">Team Member</label>
                   <div className="relative">
                     <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9090A8]" />
-                    <input value={form.bookedBy} onChange={update("bookedBy")} placeholder="Booking source / agent name" className={inputCls + " pl-9"} />
+                    <BookedBySelect value={form.bookedBy} onChange={(bookedBy) => setForm(f => ({ ...f, bookedBy }))} className={inputCls + " pl-9"} />
                   </div>
                 </div>
                 <div>

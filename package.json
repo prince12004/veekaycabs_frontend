@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ckeditor/ckeditor5-react": "^12.0.0",
     "@hookform/resolvers": "^3.10.0",
     "@react-pdf/renderer": "^4.5.1",
     "@tanstack/react-query": "^5.101.0",
     "axios": "^1.17.0",
+    "ckeditor5": "^49.0.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.0.0",
     "framer-motion": "^11.18.2",
@@ -23,7 +25,6 @@
     "react-dom": "^18",
     "react-hook-form": "^7.78.0",
     "react-hot-toast": "^2.6.0",
-    "react-quill-new": "^3.8.3",
     "recharts": "^2.15.4",
     "swiper": "^11.2.10",
     "tailwind-merge": "^2.6.1",

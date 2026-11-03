@@ -727,7 +727,7 @@ export default function HomeClient() {
                 <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur-xl rounded-2xl px-5 py-4 shadow-xl">
                   <p className="text-[#9090A8] text-xs font-semibold mb-1">Starting from</p>
                   <p className="text-[#E8540A] font-black font-syne text-2xl leading-none">
-                    Rs. 89<span className="text-sm font-semibold text-[#4A4A6A]">/hr</span>
+                    Rs. 92<span className="text-sm font-semibold text-[#4A4A6A]">/hr</span>
                   </p>
                   <p className="text-[#9090A8] text-xs mt-1">Petrol · Manual · 5 Seats</p>
                 </div>
@@ -1277,7 +1277,7 @@ export default function HomeClient() {
           own trip.
         </p>
         <p>
-          At the cheapest end, a self drive car rental in Delhi starts from around ₹96 per hour
+          At the cheapest end, a self drive car rental in Delhi starts from around ₹92 per hour
           for compact hatchbacks. Below is a fair estimate of the cost for different types of
           vehicles.
         </p>
@@ -1465,7 +1465,7 @@ export default function HomeClient() {
         <div>
           <h3>What is the price for self-drive cars Delhi?</h3>
           <p>
-            VeekayCabs provides self-drive car hire in Delhi starting at ₹96 per hour. Charges
+            VeekayCabs provides self-drive car hire in Delhi starting at ₹92 per hour. Charges
             depend on the type of vehicle and the duration of the rental — check the latest
             self-drive car rent Delhi price on our website before finalizing your booking.
           </p>
@@ -1576,7 +1576,7 @@ export default function HomeClient() {
 
           <h3>How much is self-drive car rental without a driver in Delhi?</h3>
           <p>
-            Self-drive car rental in Delhi without a driver starts at ₹96/hour or ₹800/day. Since
+            Self-drive car rental in Delhi without a driver starts at ₹92/hour or ₹800/day. Since
             there&apos;s no chauffeur, you save on driver costs, making it much cheaper than
             traditional cab hire.
           </p>

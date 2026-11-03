@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/adminPermissions";
+import BookedBySelect from "@/components/admin/BookedBySelect";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MediaRecord { _id: string; type: string; urls: string[]; notes: string; uploadedAt: string; }
@@ -2223,9 +2224,9 @@ export default function BookingDetailPage() {
                   <p className="text-[10px] text-[#9090A8] mt-1">Choose a replacement car if the current car has a problem.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Booked By</label>
-                  <input type="text" value={editForm.bookedBy} onChange={e => setEditForm(f => ({ ...f, bookedBy: e.target.value }))}
-                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none" placeholder="Agent or referral source" />
+                  <label className="block text-xs font-semibold text-[#4A4A6A] mb-1.5">Team Member</label>
+                  <BookedBySelect value={editForm.bookedBy} onChange={bookedBy => setEditForm(f => ({ ...f, bookedBy }))}
+                    className="w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-3 py-2.5 text-sm outline-none bg-white" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

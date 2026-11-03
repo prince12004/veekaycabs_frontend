@@ -175,3 +175,70 @@ input:focus, select:focus, textarea:focus {
 .h-36{
   height: 12rem !important;
 }
+
+/* Admin rich text on public pages. Tables scroll inside their own box on small
+   screens instead of widening the page; a table's own width, borders and cell
+   colours come through as inline styles from the editor. */
+.rich-content figure.table {
+  display: block;
+  max-width: 100%;
+  margin: 1rem 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.rich-content figure.table > table {
+  display: table;
+  width: 100%;
+  margin: 0;
+  overflow: visible;
+  border-collapse: collapse;
+}
+.rich-content figure.table.table-style-align-left {
+  float: left;
+  margin-right: 1.5rem;
+}
+.rich-content figure.table.table-style-align-right {
+  float: right;
+  margin-left: 1.5rem;
+}
+.rich-content figure.table.table-style-align-center {
+  margin-inline: auto;
+}
+.rich-content figure.table.table-style-block-align-left {
+  margin-right: auto;
+}
+.rich-content figure.table.table-style-block-align-right {
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .rich-content figure.table,
+  .rich-content figure.image.image-style-side {
+    float: none !important;
+    width: 100% !important;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+}
+.rich-content figure.table caption,
+.rich-content figure.image figcaption {
+  padding: 0.5rem;
+  font-size: 0.8125rem;
+  color: #9090A8;
+  text-align: center;
+}
+.rich-content figure.image {
+  max-width: 100%;
+  margin: 1rem auto;
+  text-align: center;
+}
+.rich-content figure.image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.rich-content figure.image.image-style-side {
+  float: right;
+  max-width: 50%;
+  margin: 0 0 1rem 1rem;
+}

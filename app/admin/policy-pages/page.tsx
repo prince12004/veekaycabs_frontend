@@ -5,8 +5,7 @@ import { Save, Loader2, FileText, ChevronRight } from "lucide-react";
 import { policyApi } from "@/lib/api";
 import dynamic from "next/dynamic";
 
-const QuillEditor = dynamic(() => import("react-quill-new"), { ssr: false });
-import "react-quill-new/dist/quill.snow.css";
+const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), { ssr: false });
 
 const PAGES = [
   { key: "about",        label: "About Us",            icon: "🏢" },
@@ -15,17 +14,6 @@ const PAGES = [
   { key: "refund",       label: "Refund Policy",        icon: "💰" },
   { key: "cancellation", label: "Cancellation Policy",  icon: "🚫" },
 ];
-
-const TOOLBAR = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ["bold", "italic", "underline"],
-    [{ list: "ordered" }, { list: "bullet" }],
-    [{ indent: "-1" }, { indent: "+1" }],
-    ["link"],
-    ["clean"],
-  ],
-};
 
 const inputCls = "w-full border-[1.5px] border-[#E4E5EF] focus:border-[#E8540A] rounded-xl px-4 py-2.5 text-sm text-[#0F0F1A] bg-white outline-none";
 
@@ -80,9 +68,9 @@ export default function PolicyPagesAdmin() {
   };
 
   return (
-    <div className="p-6 flex gap-6">
+    <div className="p-6 flex flex-col md:flex-row gap-6">
       {/* Sidebar */}
-      <div className="w-56 shrink-0">
+      <div className="w-full md:w-56 shrink-0">
         <h1 className="text-xl font-black text-[#0F0F1A] font-syne mb-4">Policy Pages</h1>
         <div className="bg-white rounded-2xl border border-[#E4E5EF] overflow-hidden shadow-sm">
           {PAGES.map((page) => (
@@ -123,15 +111,12 @@ export default function PolicyPagesAdmin() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#4A4A6A] uppercase tracking-wider mb-2">Content</label>
-                  <div className="border border-[#E4E5EF] rounded-xl overflow-hidden">
-                    <QuillEditor
-                      value={current.content || ""}
-                      onChange={(val) => updateField("content", val)}
-                      modules={TOOLBAR}
-                      theme="snow"
-                      style={{ minHeight: "320px" }}
-                    />
-                  </div>
+                  <RichTextEditor
+                    key={activeKey}
+                    value={current.content || ""}
+                    onChange={(val) => updateField("content", val)}
+                    minHeight={320}
+                  />
                 </div>
               </div>
             </div>

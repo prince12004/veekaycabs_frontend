@@ -52,6 +52,8 @@ const SECTIONS: SectionDef[] = [
   { key: "userList",            label: "User List",              group: "Users & KYC",  ops: ["view","edit","delete"] as const },
   { key: "kycReview",           label: "KYC Review",             group: "Users & KYC",  ops: ["view","edit"] as const },
 
+  { key: "teamManagement",      label: "Team Management",        group: "Bookings",      ops: ["view","add","edit","delete"] as const },
+
   { key: "refunds",             label: "Refunds",                group: "Finance",       ops: ["view","edit"] as const },
   { key: "paymentLinks",        label: "Payment Links",          group: "Finance",       ops: ["view","add"] as const },
 
@@ -100,7 +102,7 @@ const ROLES = [
     permissions: {
       dashboard: true,
       carListing: true, addCar: true, carDocuments: true, carMaintenance: true, vehicleVerification: true,
-      allBookings: true, offlineBooking: true, arrivals: true, closingBills: true,
+      allBookings: true, offlineBooking: true, arrivals: true, closingBills: true, teamManagement: true,
       userList: true, kycReview: true,
       refunds: true, paymentLinks: true,
       gpsTracking: true, publicDisplay: true, reports: true,

@@ -7,7 +7,7 @@ import BookClient from "./BookClient";
 export const metadata: Metadata = buildMetadata({
   title: "Book a Self Drive Car",
   description:
-    "Book a self-drive car in Delhi NCR in 60 seconds. Choose from 101+ verified hatchbacks, SUVs and luxury cars with transparent pricing. Starting ₹89/hour.",
+    "Book a self-drive car in Delhi NCR in 60 seconds. Choose from 101+ verified hatchbacks, SUVs and luxury cars with transparent pricing. Starting ₹92/hour.",
   keywords: "book self drive car delhi, car rental booking noida gurgaon, self drive car booking online",
   path: "/book",
 });

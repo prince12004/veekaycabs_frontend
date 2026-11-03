@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { adminApi } from "@/lib/api";
 import toast from "react-hot-toast";
+
+const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), { ssr: false });
 
 const PAGE_OPTIONS = [
   "Tempo Traveller in Delhi",
@@ -172,8 +175,11 @@ export default function AddTempoSeoPage() {
 
           <div>
             <label className="block text-sm font-semibold text-[#4A4A6A] mb-1.5">Content</label>
-            <textarea name="content" value={form.content} onChange={handleChange} rows={8} placeholder="Page content (HTML supported)..." className="w-full px-4 py-3 border-[1.5px] border-[#E4E5EF] rounded-xl text-sm focus:border-[#7C3AED] outline-none resize-none font-mono" />
-            <p className="text-xs text-[#9090A8] mt-1">HTML content supported</p>
+            <RichTextEditor
+              value={form.content}
+              onChange={(html: string) => setForm((f) => ({ ...f, content: html }))}
+              placeholder="Write the full body content shown on this page..."
+            />
           </div>
 
           <div className="pt-2">

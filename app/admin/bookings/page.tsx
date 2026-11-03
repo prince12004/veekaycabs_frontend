@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search, Download, Eye, ChevronLeft, ChevronRight,
   Calendar, CheckCircle, Activity, Clock, XCircle, PhoneCall, Loader2, Trash2,
 } from "lucide-react";
-import { bookingsApi } from "@/lib/api";
+import { bookingsApi, teamApi } from "@/lib/api";
 import toast from "react-hot-toast";
-import { canDelete } from "@/lib/adminPermissions";
+import { canDelete, canEdit } from "@/lib/adminPermissions";
+import BookedBySelect from "@/components/admin/BookedBySelect";
 
 interface Booking {
   _id: string;
@@ -24,8 +26,11 @@ interface Booking {
   closingBill?: { discountAmount?: number; discountType?: "fixed" | "percentage"; discountValue?: number };
   paymentMode: string;
   status: "pending" | "confirmed" | "active" | "completed" | "cancelled";
+  bookedBy?: string;
   createdAt: string;
 }
+
+const UNASSIGNED_BOOKED_BY = "__unassigned__";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   confirmed: { bg: "#D1FAE5", text: "#065F46" },
@@ -41,7 +46,9 @@ const fmtDate = (d: string) =>
 const fmtMode = (m: string) =>
   m === "online" ? "Online" : m === "offline_cash" ? "Cash" : m === "offline_qr" ? "QR/UPI" : m;
 
-export default function AdminBookingsPage() {
+function AdminBookingsContent() {
+  // The Team Booking Report links here with its filters in the URL.
+  const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -49,14 +56,26 @@ export default function AdminBookingsPage() {
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "All");
+  const [fromDate, setFromDate] = useState(searchParams.get("from") || "");
+  const [toDate, setToDate] = useState(searchParams.get("to") || "");
+  const [bookedByFilter, setBookedByFilter] = useState(searchParams.get("bookedBy") || "");
+  const [teamNames, setTeamNames] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [canDeleteBooking, setCanDeleteBooking] = useState(false);
+  const [canAssign, setCanAssign] = useState(false);
 
-  useEffect(() => { setCanDeleteBooking(canDelete("allBookings")); }, []);
+  useEffect(() => {
+    setCanDeleteBooking(canDelete("allBookings"));
+    setCanAssign(canEdit("allBookings"));
+  }, []);
+
+  useEffect(() => {
+    teamApi.getAll()
+      .then(({ data }) => setTeamNames((data.data || []).map((m: { name: string }) => m.name)))
+      .catch(() => setTeamNames([]));
+  }, []);
 
   // Debounce the raw typed value — fetch only reacts to debouncedSearch, so
   // typing doesn't fire a request per keystroke (that's what was causing the
@@ -68,7 +87,7 @@ export default function AdminBookingsPage() {
 
   // Jump back to page 1 whenever a filter actually changes the result set —
   // page itself isn't in this list, so it doesn't re-trigger itself.
-  useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter, fromDate, toDate]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter, fromDate, toDate, bookedByFilter]);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -79,6 +98,7 @@ export default function AdminBookingsPage() {
         params.status = statusFilter.toLowerCase();
       if (fromDate) params.from = fromDate;
       if (toDate) params.to = toDate;
+      if (bookedByFilter) params.bookedBy = bookedByFilter;
 
       const { data } = await bookingsApi.getAll(params);
       setBookings(data.data || []);
@@ -89,7 +109,7 @@ export default function AdminBookingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, fromDate, toDate, page]);
+  }, [debouncedSearch, statusFilter, fromDate, toDate, bookedByFilter, page]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -107,6 +127,19 @@ export default function AdminBookingsPage() {
   const displayed = statusFilter === "Drop-offs"
     ? bookings.filter(isDropOff)
     : bookings;
+
+  // Online bookings are created by customers, so this is where they get assigned.
+  const assignTeamMember = async (b: Booking, bookedBy: string) => {
+    const previous = b.bookedBy;
+    setBookings(prev => prev.map(x => x._id === b._id ? { ...x, bookedBy } : x));
+    try {
+      await bookingsApi.update(b._id, { bookedBy });
+      toast.success(bookedBy ? `Assigned to ${bookedBy}` : "Team member removed");
+    } catch (e: any) {
+      setBookings(prev => prev.map(x => x._id === b._id ? { ...x, bookedBy: previous } : x));
+      toast.error(e?.response?.data?.message || "Failed to assign team member");
+    }
+  };
 
   const deleteBooking = async (b: Booking) => {
     if (!confirm(`Delete booking #${b.bookingId || b._id.slice(-8).toUpperCase()}? It'll disappear from all lists but the record is kept, not erased.`)) return;
@@ -192,6 +225,19 @@ export default function AdminBookingsPage() {
         >
           {["All", "Pending", "Confirmed", "Active", "Drop-offs", "Completed", "Cancelled"].map(s => <option key={s}>{s}</option>)}
         </select>
+        <select
+          aria-label="Team member"
+          value={bookedByFilter}
+          onChange={e => { setBookedByFilter(e.target.value); setPage(1); }}
+          className="border-[1.5px] border-[#E4E5EF] rounded-xl px-3 py-2.5 text-sm focus:border-[#E8540A] outline-none bg-white"
+        >
+          <option value="">All Team Members</option>
+          <option value={UNASSIGNED_BOOKED_BY}>Not assigned</option>
+          {bookedByFilter && bookedByFilter !== UNASSIGNED_BOOKED_BY && !teamNames.includes(bookedByFilter) && (
+            <option value={bookedByFilter}>{bookedByFilter}</option>
+          )}
+          {teamNames.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
         <input
           type="date"
           value={fromDate}
@@ -228,7 +274,7 @@ export default function AdminBookingsPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-[#F8F9FC] border-b border-[#E4E5EF]">
-                  {["Booking ID", "Customer", "Car", "Period", "Amount", "Discount", "Paid", "Due", "Mode", "Status", "Action"].map(h => (
+                  {["Booking ID", "Customer", "Car", "Period", "Team Member", "Amount", "Discount", "Paid", "Due", "Mode", "Status", "Action"].map(h => (
                     <th key={h} className="px-4 py-3.5 text-left text-[10px] font-bold uppercase tracking-widest text-[#9090A8]">{h}</th>
                   ))}
                 </tr>
@@ -254,6 +300,16 @@ export default function AdminBookingsPage() {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <p className="text-[#4A4A6A] text-xs">{fmtDate(b.startTime)}</p>
                         <p className="text-[#9090A8] text-xs">→ {fmtDate(b.endTime)}</p>
+                      </td>
+                      <td className="px-4 py-4 text-[#4A4A6A] text-xs whitespace-nowrap">
+                        {canAssign ? (
+                          <BookedBySelect
+                            value={b.bookedBy || ""}
+                            onChange={bookedBy => assignTeamMember(b, bookedBy)}
+                            names={teamNames}
+                            className="border-[1.5px] border-[#E4E5EF] rounded-lg px-2 py-1.5 text-xs focus:border-[#E8540A] outline-none bg-white max-w-[150px]"
+                          />
+                        ) : (b.bookedBy?.trim() || "—")}
                       </td>
                       <td className="px-4 py-4 font-bold text-[#0F0F1A] text-sm whitespace-nowrap">
                         Rs. {b.totalAmount?.toLocaleString("en-IN")}
@@ -356,5 +412,13 @@ export default function AdminBookingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminBookingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminBookingsContent />
+    </Suspense>
   );
 }

@@ -1,42 +1,118 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useMemo, useRef, useState } from "react";
-import { Code2, Table2 } from "lucide-react";
-import "react-quill-new/dist/quill.snow.css";
+import { useMemo, useRef } from "react";
+import { CKEditor } from "@ckeditor/ckeditor5-react";
+import {
+  Alignment, AutoImage, AutoLink, Autoformat, BlockQuote, Bold, ClassicEditor, Essentials,
+  FileRepository, FontBackgroundColor, FontColor, FontFamily, FontSize, GeneralHtmlSupport, Heading,
+  HorizontalLine, Image, ImageCaption, ImageInsert, ImageResize, ImageStyle, ImageToolbar, ImageUpload,
+  Indent, IndentBlock, Italic, Link, LinkImage, List, ListProperties, Paragraph, PasteFromOffice,
+  RemoveFormat, SourceEditing, Strikethrough, Subscript, Superscript, Table, TableCaption,
+  TableCellProperties, TableColumnResize, TableProperties, TableToolbar, Underline,
+  type Editor, type EditorConfig, type FileLoader, type UploadAdapter,
+} from "ckeditor5";
+import "ckeditor5/ckeditor5.css";
+import { adminApi, editorUploadApi } from "@/lib/api";
 
-// Quill must not render server-side (uses browser globals)
-const QuillEditor = dynamic(() => import("react-quill-new"), { ssr: false, loading: () => (
-  <div className="h-[300px] border-[1.5px] border-[#E4E5EF] rounded-xl animate-pulse bg-[#F8F9FC]" />
-)});
+// Sends pasted, dropped or picked images to storage so the saved HTML holds a
+// URL instead of a base64 blob. Word pastes arrive as base64 and go through this too.
+class ServerUploadAdapter implements UploadAdapter {
+  private controller = new AbortController();
 
-const TOOLBAR_MODULES = {
-  toolbar: [
-    [{ header: [1, 2, 3, false] }],
-    ["bold", "italic", "underline", "strike"],
-    [{ color: [] }, { background: [] }],
-    [{ list: "ordered" }, { list: "bullet" }],
-    [{ indent: "-1" }, { indent: "+1" }],
-    ["blockquote", "code-block"],
-    ["link", "image"],
-    ["clean"],
-  ],
-};
+  constructor(private loader: FileLoader) {}
 
-const FORMATS = [
-  "header", "bold", "italic", "underline", "strike",
-  "color", "background",
-  "list", "bullet", "indent",
-  "blockquote", "code-block",
-  "link", "image",
+  async upload() {
+    const file = await this.loader.file;
+    if (!file) throw new Error("No image selected");
+    try {
+      const { data } = await editorUploadApi.uploadImage(file, this.controller.signal, (loaded, total) => {
+        this.loader.uploadTotal = total;
+        this.loader.uploaded = loaded;
+      });
+      // Local disk storage returns a path on the API host; Cloudinary/S3 URLs pass through.
+      return { default: new URL(data.url, adminApi.defaults.baseURL).href };
+    } catch (e: any) {
+      throw e?.response?.data?.message || "Image upload failed";
+    }
+  }
+
+  abort() {
+    this.controller.abort();
+  }
+}
+
+function UploadAdapterPlugin(editor: Editor) {
+  editor.plugins.get(FileRepository).createUploadAdapter = (loader) => new ServerUploadAdapter(loader);
+}
+
+const BORDER_COLORS = [
+  { color: "#000000", label: "Black" }, { color: "#4A4A6A", label: "Slate" }, { color: "#9090A8", label: "Grey" },
+  { color: "#E4E5EF", label: "Light grey" }, { color: "#E8540A", label: "Veekay orange" }, { color: "#FFFFFF", label: "White", hasBorder: true },
 ];
 
-const TABLE_TEMPLATE = `<table>
-  <tr><th>Car Category</th><th>Hourly Rate (approx.)</th><th>Daily Rate (approx.)</th></tr>
-  <tr><td>Hatchback (Swift, i20, Baleno)</td><td>₹99</td><td>₹999</td></tr>
-  <tr><td>Sedan (Honda City, Verna)</td><td>₹129</td><td>₹1,499</td></tr>
-  <tr><td>SUV (Creta, XUV700)</td><td>₹169</td><td>₹1,999</td></tr>
-</table>`;
+const CELL_COLORS = [
+  { color: "#F8F9FC", label: "Off white", hasBorder: true }, { color: "#F1F2F7", label: "Light grey" }, { color: "#FFF3ED", label: "Light orange" },
+  { color: "#FEF3C7", label: "Light yellow" }, { color: "#D1FAE5", label: "Light green" }, { color: "#DBEAFE", label: "Light blue" },
+  { color: "#FEE2E2", label: "Light red" }, { color: "#E8540A", label: "Veekay orange" }, { color: "#0F0F1A", label: "Dark" },
+];
+
+const TOOLBAR_ITEMS = [
+  "undo", "redo", "|", "heading", "|", "fontFamily", "fontSize", "fontColor", "fontBackgroundColor", "|",
+  "bold", "italic", "underline", "strikethrough", "subscript", "superscript", "removeFormat", "|",
+  "alignment", "bulletedList", "numberedList", "outdent", "indent", "|",
+  "link", "insertImage", "insertTable", "blockQuote", "horizontalLine", "|", "sourceEditing",
+];
+
+const EDITOR_CONFIG: EditorConfig = {
+  licenseKey: "GPL",
+  plugins: [
+    Alignment, AutoImage, AutoLink, Autoformat, BlockQuote, Bold, Essentials, FontBackgroundColor, FontColor,
+    FontFamily, FontSize, GeneralHtmlSupport, Heading, HorizontalLine, Image, ImageCaption, ImageInsert, ImageResize,
+    ImageStyle, ImageToolbar, ImageUpload, Indent, IndentBlock, Italic, Link, LinkImage, List, ListProperties,
+    Paragraph, PasteFromOffice, RemoveFormat, SourceEditing, Strikethrough, Subscript, Superscript, Table,
+    TableCaption, TableCellProperties, TableColumnResize, TableProperties, TableToolbar, Underline,
+  ],
+  extraPlugins: [UploadAdapterPlugin],
+  heading: {
+    options: [
+      { model: "paragraph", title: "Paragraph", class: "ck-heading_paragraph" },
+      { model: "heading1", view: "h1", title: "Heading 1", class: "ck-heading_heading1" },
+      { model: "heading2", view: "h2", title: "Heading 2", class: "ck-heading_heading2" },
+      { model: "heading3", view: "h3", title: "Heading 3", class: "ck-heading_heading3" },
+      { model: "heading4", view: "h4", title: "Heading 4", class: "ck-heading_heading4" },
+      { model: "heading5", view: "h5", title: "Heading 5", class: "ck-heading_heading5" },
+      { model: "heading6", view: "h6", title: "Heading 6", class: "ck-heading_heading6" },
+    ],
+  },
+  fontFamily: { supportAllValues: true },
+  fontSize: { options: [10, 12, 14, "default", 16, 18, 20, 24, 28, 32], supportAllValues: true },
+  list: { properties: { styles: true, startIndex: true, reversed: true } },
+  link: {
+    addTargetToExternalLinks: false,
+    decorators: { openInNewTab: { mode: "manual", label: "Open in a new tab", attributes: { target: "_blank", rel: "noopener noreferrer" } } },
+  },
+  image: {
+    insert: { integrations: ["upload", "url"] },
+    toolbar: ["imageTextAlternative", "toggleImageCaption", "|", "imageStyle:inline", "imageStyle:block", "imageStyle:side", "|", "linkImage"],
+  },
+  table: {
+    contentToolbar: ["tableColumn", "tableRow", "mergeTableCells", "|", "tableProperties", "tableCellProperties", "toggleTableCaption"],
+    tableProperties: { borderColors: BORDER_COLORS, backgroundColors: CELL_COLORS },
+    tableCellProperties: { borderColors: BORDER_COLORS, backgroundColors: CELL_COLORS },
+  },
+  // Keeps the inline styles, classes and attributes that older posts and Word or
+  // Docs pastes carry, so opening and saving a page doesn't strip its formatting.
+  // The server sanitizes again on save (see utils/sanitizeHtml.js on the API).
+  htmlSupport: {
+    allow: [{
+      name: /^(p|div|span|h[1-6]|a|b|strong|i|em|u|s|strike|del|ins|sub|sup|small|big|mark|font|ul|ol|li|dl|dt|dd|table|caption|colgroup|col|thead|tbody|tfoot|tr|th|td|figure|figcaption|img|blockquote|pre|code|hr)$/,
+      attributes: true,
+      classes: true,
+      styles: true,
+    }],
+    disallow: [{ attributes: [{ key: /^on/i, value: true }] }],
+  },
+};
 
 interface Props {
   value: string;
@@ -46,96 +122,46 @@ interface Props {
 }
 
 export default function RichTextEditor({ value, onChange, placeholder = "Write content here...", minHeight = 300 }: Props) {
-  const modules = useMemo(() => TOOLBAR_MODULES, []);
-  // Quill has no <table> support — loading content that already has a table
-  // into its visual mode silently flattens the table into plain <p> tags the
-  // moment anything is saved, destroying it. Content with a table opens
-  // straight into HTML Source mode so it's never round-tripped through Quill
-  // unless the admin explicitly, knowingly switches (and is warned first).
-  const [sourceMode, setSourceMode] = useState(() => value.includes("<table"));
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<Editor | null>(null);
+  // Wider screens show every tool; on phones the extras collapse into a "more" menu.
+  const config = useMemo<EditorConfig>(() => ({
+    ...EDITOR_CONFIG,
+    placeholder,
+    toolbar: { items: TOOLBAR_ITEMS, shouldNotGroupWhenFull: window.innerWidth >= 768 },
+  }), [placeholder]);
 
-  const insertTableTemplate = () => {
-    // Coming from Visual mode there's no textarea yet to get a cursor
-    // position from — switch into HTML Source first (safe direction, no
-    // data loss) and just append the table at the end.
-    if (!sourceMode) {
-      setSourceMode(true);
-      onChange(`${value}\n${TABLE_TEMPLATE}\n`);
-      return;
-    }
-    const el = textareaRef.current;
-    const start = el?.selectionStart ?? value.length;
-    const end = el?.selectionEnd ?? value.length;
-    const next = `${value.slice(0, start)}\n${TABLE_TEMPLATE}\n${value.slice(end)}`;
-    onChange(next);
-    requestAnimationFrame(() => {
-      const pos = start + TABLE_TEMPLATE.length + 2;
-      el?.focus();
-      el?.setSelectionRange(pos, pos);
-    });
+  // Source mode only feeds the editor's data when toggled off, so typed HTML
+  // would be missed by a Save clicked straight away — leaving the box commits it.
+  const commitSourceEdits = () => {
+    const sourceEditing = editorRef.current?.plugins.get(SourceEditing);
+    if (sourceEditing?.isSourceEditingMode) sourceEditing.updateEditorData();
   };
 
   return (
-    <div className="rich-editor-wrap">
+    <div className="rich-editor-wrap min-w-0" onBlurCapture={commitSourceEdits}>
       <style>{`
-        .rich-editor-wrap .ql-container { min-height: ${minHeight}px; font-family: inherit; font-size: 14px; }
-        .rich-editor-wrap .ql-editor { min-height: ${minHeight}px; line-height: 1.7; color: #0F0F1A; }
-        .rich-editor-wrap .ql-editor.ql-blank::before { color: #9090A8; font-style: normal; }
-        .rich-editor-wrap .ql-toolbar { border-radius: 12px 12px 0 0 !important; border-color: #E4E5EF !important; background: #F8F9FC; }
-        .rich-editor-wrap .ql-container { border-radius: 0 0 12px 12px !important; border-color: #E4E5EF !important; }
-        .rich-editor-wrap .ql-toolbar button:hover, .rich-editor-wrap .ql-toolbar button.ql-active { color: #E8540A !important; }
-        .rich-editor-wrap .ql-toolbar .ql-stroke { stroke: currentColor; }
-        .rich-editor-wrap .ql-toolbar .ql-fill { fill: currentColor; }
+        .rich-editor-wrap .ck-editor__editable_inline, .rich-editor-wrap .ck-source-editing-area { min-height: ${minHeight}px; }
+        .rich-editor-wrap .ck.ck-toolbar { background: #F8F9FC; border-color: #E4E5EF; }
+        .rich-editor-wrap .ck.ck-editor__main > .ck-editor__editable { border-color: #E4E5EF; color: #0F0F1A; font-size: 14px; line-height: 1.7; }
+        .rich-editor-wrap .ck.ck-editor__main > .ck-editor__editable.ck-focused { border-color: #E8540A; box-shadow: none; }
+        .rich-editor-wrap .ck-content h1 { font-size: 2em; font-weight: 800; margin: 0.8em 0 0.4em; }
+        .rich-editor-wrap .ck-content h2 { font-size: 1.5em; font-weight: 800; margin: 0.8em 0 0.4em; }
+        .rich-editor-wrap .ck-content h3 { font-size: 1.25em; font-weight: 700; margin: 0.8em 0 0.4em; }
+        .rich-editor-wrap .ck-content h4 { font-size: 1.1em; font-weight: 700; margin: 0.8em 0 0.4em; }
+        .rich-editor-wrap .ck-content h5, .rich-editor-wrap .ck-content h6 { font-weight: 700; margin: 0.8em 0 0.4em; }
+        .rich-editor-wrap .ck-content ul { list-style: disc; padding-left: 1.5em; }
+        .rich-editor-wrap .ck-content ol { list-style: decimal; padding-left: 1.5em; }
+        .rich-editor-wrap .ck-content a { color: #0B66C3; text-decoration: underline; }
+        .rich-editor-wrap .ck-content blockquote { border-left: 4px solid #E4E5EF; padding-left: 1em; font-style: italic; }
+        .rich-editor-wrap .ck-content table th { font-weight: 700; }
       `}</style>
-
-      <div className="flex items-center justify-end gap-2 mb-2">
-        <button
-          type="button"
-          onClick={insertTableTemplate}
-          title="Tables only render correctly in HTML Source mode — clicking this switches you there"
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E4E5EF] text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A] transition-colors"
-        >
-          <Table2 size={13} /> Insert Table
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            // Leaving HTML Source for the Visual editor loses any <table> in
-            // the content permanently the moment this gets saved — Quill
-            // flattens it to plain paragraphs with no way back.
-            if (sourceMode && value.includes("<table") &&
-                !confirm("This content has a table. Switching to the Visual Editor will permanently remove the table formatting as soon as you save. Continue?")) {
-              return;
-            }
-            setSourceMode((s) => !s);
-          }}
-          className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${sourceMode ? "bg-[#FFF3ED] border-[#E8540A]/30 text-[#E8540A]" : "border-[#E4E5EF] text-[#4A4A6A] hover:border-[#E8540A] hover:text-[#E8540A]"}`}
-        >
-          <Code2 size={13} /> {sourceMode ? "Visual Editor" : "HTML Source"}
-        </button>
-      </div>
-
-      {sourceMode ? (
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          spellCheck={false}
-          style={{ minHeight }}
-          className="w-full rounded-xl border-[1.5px] border-[#E4E5EF] p-4 font-mono text-[13px] leading-relaxed text-[#0F0F1A] focus:outline-none focus:border-[#E8540A]"
-        />
-      ) : (
-        <QuillEditor
-          value={value}
-          onChange={onChange}
-          modules={modules}
-          formats={FORMATS}
-          placeholder={placeholder}
-          theme="snow"
-        />
-      )}
+      <CKEditor
+        editor={ClassicEditor}
+        config={config}
+        data={value}
+        onReady={(editor) => { editorRef.current = editor; }}
+        onChange={(_, editor) => onChange(editor.getData())}
+      />
     </div>
   );
 }

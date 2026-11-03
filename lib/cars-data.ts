@@ -21,7 +21,7 @@ export interface CarData {
 export const CARS: CarData[] = [
   {
     id: "hyundai-i20", name: "Hyundai i20", type: "Hatchback", year: 2023,
-    fuel: "Petrol", transmission: "Manual", seats: 5, pricePerHr: 89,
+    fuel: "Petrol", transmission: "Manual", seats: 5, pricePerHr: 92,
     kmIncluded: 200, kmPackagePrice: 249, securityDeposit: 10000,
     rating: 4.8, reviews: 142, badge: "Most Popular", badgeColor: "#E8540A",
     gradient: "from-[#1C1C2E] to-[#242438]",
@@ -29,7 +29,7 @@ export const CARS: CarData[] = [
   },
   {
     id: "maruti-swift", name: "Maruti Swift", type: "Hatchback", year: 2023,
-    fuel: "Petrol", transmission: "Manual", seats: 5, pricePerHr: 89,
+    fuel: "Petrol", transmission: "Manual", seats: 5, pricePerHr: 92,
     kmIncluded: 200, kmPackagePrice: 249, securityDeposit: 10000,
     rating: 4.7, reviews: 198, badge: "Best Value", badgeColor: "#10B981",
     gradient: "from-[#1C1C2E] to-[#1A2E1A]",

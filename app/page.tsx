@@ -17,7 +17,7 @@ const homeFaqs = [
   {
     question: "What is the lowest price for self-drive car rental in Delhi?",
     answer:
-      "VeekayCabs offers self-drive car rentals in Delhi from as low as ₹96 per hour for compact cars like Toyota Glanza. For Mahindra Scorpio N type SUVs, prices start from ₹250/hour, and for luxury SUVs like Toyota Fortuner the rates start from ₹480/hour. Daily and weekly plans are also offered at discounted rates.",
+      "VeekayCabs offers self-drive car rentals in Delhi from as low as ₹92 per hour for compact cars like Maruti Suzuki Baleno. For Mahindra Scorpio N type SUVs, prices start from ₹250/hour, and for luxury SUVs like Toyota Fortuner the rates start from ₹480/hour. Daily and weekly plans are also offered at discounted rates.",
   },
   {
     question:
