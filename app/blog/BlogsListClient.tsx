@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Clock, ArrowRight, ChevronLeft, ChevronRight, Loader2, BookOpen } from "lucide-react";
 import PageLayout from "@/components/layout/PageLayout";
 import { blogsAPI } from "@/lib/api";
+import CoverImage from "@/components/ui/CoverImage";
 
 interface BlogRow {
   _id: string;
@@ -74,10 +75,11 @@ export default function BlogsListClient() {
             {featured && (
               <Link href={`/blog/${featured.slug}`} className="block mb-10 group">
                 <div className="bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] overflow-hidden hover:shadow-[0_12px_40px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all flex flex-col lg:flex-row">
-                  <div className="lg:w-1/2 h-64 lg:h-auto bg-gradient-to-br from-[#E8540A]/20 to-[#FF9A3C]/10 flex items-center justify-center relative overflow-hidden" >
+                  {/* The featured cover keeps its own shape, so there's no gap beside it. */}
+                  <div className={`lg:w-1/2 relative overflow-hidden ${featured.coverImage ? "lg:self-center" : "aspect-[16/9] lg:aspect-auto lg:min-h-[340px] bg-gradient-to-br from-[#E8540A]/20 to-[#FF9A3C]/10 flex items-center justify-center"}`}>
                     {featured.coverImage ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={featured.coverImage} alt={featured.title} className="w-full h-full object-cover" style={{ height: "400px" }} />
+                      <img src={featured.coverImage} alt={featured.title} className="block w-full h-auto" />
                     ) : (
                       <BookOpen size={64} className="text-[#E8540A]/40" />
                     )}
@@ -120,10 +122,9 @@ export default function BlogsListClient() {
                   href={`/blog/${blog.slug}`}
                   className="block bg-white rounded-2xl border border-[#E4E5EF] shadow-[0_2px_20px_rgba(0,0,0,0.06)] overflow-hidden hover:shadow-[0_8px_32px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all group"
                 >
-                  <div className="h-48 bg-gradient-to-br from-[#E8540A]/15 to-[#FF9A3C]/5 flex items-center justify-center relative overflow-hidden">
+                  <div className="aspect-[16/9] bg-gradient-to-br from-[#E8540A]/15 to-[#FF9A3C]/5 flex items-center justify-center relative overflow-hidden">
                     {blog.coverImage ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={blog.coverImage} alt={blog.title} className="w-full h-full object-cover" />
+                      <CoverImage src={blog.coverImage} alt={blog.title} />
                     ) : (
                       <BookOpen size={40} className="text-[#E8540A]/30" />
                     )}

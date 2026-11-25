@@ -30,6 +30,7 @@ import { cn, addHoursToSlot, getEarliestPickup, getDefaultBookingWindow, isSlotB
 import { MIN_BOOKING_HOURS } from "@/lib/constants";
 import { carsAPI, blogsAPI } from "@/lib/api";
 import { useActiveCities } from "@/lib/useActiveCities";
+import CoverImage from "@/components/ui/CoverImage";
 
 // ─── Car Images (Unsplash) ────────────────────────────────────────────────────
 
@@ -1150,19 +1151,20 @@ export default function HomeClient() {
                   {/* Blog cover image */}
                   <div
                     className={cn(
-                      "h-52 bg-gradient-to-br relative overflow-hidden",
+                      "aspect-[16/9] bg-gradient-to-br relative overflow-hidden",
                       style.gradient
                     )}
                   >
-                    <img
-                      src={blog.coverImage || ""}
-                      alt={blog.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.opacity = "0";
-                      }}
-                    />
+                    {blog.coverImage && (
+                      <CoverImage
+                        src={blog.coverImage}
+                        alt={blog.title}
+                        className="group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.opacity = "0";
+                        }}
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                     {blog.tags?.[0] && (
                       <div

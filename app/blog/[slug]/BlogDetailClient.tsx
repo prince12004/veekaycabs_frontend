@@ -169,10 +169,11 @@ export default function BlogDetailClient({ initialBlog }: { initialBlog?: BlogDe
 
       {/* Cover */}
       <div className="max-w-4xl blog_details mx-auto px-6 -mt-8 mb-0">
-        <div className="relative h-72 lg:h-96 bg-gradient-to-br from-[#242438] via-[#1C1C2E] to-[#0F0F1A] rounded-2xl flex items-center justify-center border border-[#2E2E45] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+        {/* The cover is shown at its own shape so text on it is never cut off. */}
+        <div className={`relative rounded-2xl border border-[#2E2E45] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.35)] ${blog.coverImage ? "bg-[#1C1C2E]" : "h-72 lg:h-96 bg-gradient-to-br from-[#242438] via-[#1C1C2E] to-[#0F0F1A] flex items-center justify-center"}`}>
           {blog.coverImage ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={blog.coverImage} alt={blog.title} className="w-full h-full object-cover" />
+            <img src={blog.coverImage} alt={blog.title} className="block w-full h-auto" />
           ) : (
             <>
               <div className="absolute -top-16 -right-16 w-64 h-64 bg-[#E8540A] rounded-full opacity-[0.15] blur-[90px] pointer-events-none" />
