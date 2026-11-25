@@ -15,7 +15,7 @@ export default function CoverImage({ src, alt, className, onError }: Props) {
   return (
     <>
       <img src={src} alt="" aria-hidden className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-xl" />
-      <img src={src} alt={alt} loading="lazy" onError={onError} className={cn("absolute inset-0 h-full w-full object-contain", className)} />
+      <img src={src} alt={alt} loading="lazy" onError={onError} className={cn("absolute inset-0 h-full w-full", className)} />
     </>
   );
 }
